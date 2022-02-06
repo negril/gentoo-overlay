@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+  <maintainer type="project">
+    <email>paludis@gentoo.org</email>
+  </maintainer>
+  <use>
+    <!--<flag name="eapi7">Enable experimental support for EAPI7</flag>-->
+    <flag name="pbins"></flag>
+    <flag name="pink"></flag>
+    <flag name="search-index"></flag>
+  </use>
+</pkgmetadata>
