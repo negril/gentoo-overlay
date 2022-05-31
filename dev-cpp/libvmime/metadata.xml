@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<use>
+		<flag name="c++11"></flag>
+		<flag name="pop"></flag>
+		<flag name="sendmail"></flag>
+		<flag name="smtp"></flag>
+	</use>
+</pkgmetadata>
