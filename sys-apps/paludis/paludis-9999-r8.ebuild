@@ -3,66 +3,41 @@
 
 EAPI=8
 
-EGIT_REPO_URI="https://git.xn--jtunheimr-07a.org/aerith/paludis.git"
-EGIT_BRANCH="gentoo"
 PYTHON_COMPAT=( python3_{8..10} )
-USE_RUBY="ruby26 ruby27 ruby30"
 
-inherit bash-completion-r1 cmake git-r3 python-r1 ruby-utils
+USE_RUBY="$(echo ruby{{26..27},{30..31}})"
+RUBY_OPTIONAL="yes"
+
+inherit bash-completion-r1 cmake python-r1
+
+_S="$S"
+inherit ruby-ng
+S="$_S"
 
 DESCRIPTION="paludis, the other package mangler"
 HOMEPAGE="http://paludis.exherbo.org/"
-SRC_URI=""
 
-IUSE="doc pbins pink python ruby search-index test +xml"
+if [[ ${PV} == *9999* ]] ; then
+	EGIT_REPO_URI="https://git.xn--jtunheimr-07a.org/aerith/paludis.git"
+	EGIT_BRANCH="gentoo"
+	inherit git-r3
+else
+	if [[ ${PV} == *_beta* ]] ; then
+		SRC_URI="https://github.com/negril/paludis/archive/refs/tags/v${PV/_/-}.tar.gz -> ${P}.tar.gz"
+		S="${WORKDIR}"/${P/_/-}
+	else
+		SRC_URI="https://github.com/negril/paludis/releases/download/v${PV}/${P}.tar.gz"
+		S="${WORKDIR}/${PN}"
+		KEYWORDS="~amd64 ~x86"
+	fi
+fi
+
 LICENSE="GPL-2 vim"
 SLOT="0/eapi8"
-KEYWORDS=""
 
-#ruby is stupid...
-_ruby_get_all_impls() {
-	local i
-	for i in ${USE_RUBY}; do
-		case ${i} in
-			# removed implementations
-			ruby19|ruby20|ruby21|ruby22|ruby23|ruby24|ruby25|jruby)
-				;;
-			*)
-				echo ${i};;
-		esac
-	done
-}
-
-ruby_samelib() {
-	local res=
-	for _ruby_implementation in $(_ruby_get_all_impls); do
-		has -${_ruby_implementation} $@ || \
-			res="${res}ruby_targets_${_ruby_implementation}(-)?,"
-	done
-
-	echo "[${res%,}]"
-}
-
-ruby_implementations_depend() {
-	local depend
-	for _ruby_implementation in $(_ruby_get_all_impls); do
-		depend="${depend}${depend+ }ruby_targets_${_ruby_implementation}? ( $(_ruby_implementation_depend $_ruby_implementation) )"
-	done
-	echo "${depend}"
-}
-
-ruby_get_use_targets() {
-	local t implementation
-	for implementation in $(_ruby_get_all_impls); do
-		t+=" ruby_targets_${implementation}"
-	done
-	echo $t
-}
-IUSE+=" $(ruby_get_use_targets)"
-###
+IUSE="doc pbins pink python ruby search-index test +xml"
 
 COMMON_DEPEND="
-	>=app-shells/bash-5.0:*
 	python? ( ${PYTHON_DEPS} )
 	ruby? ( $( ruby_implementations_depend ) )
 "
@@ -78,22 +53,24 @@ LINK_DEPEND="
 
 #DEPEND specifies dependencies for CHOST, i.e. packages that need to be found on built system, e.g. libraries and headers.
 DEPEND="
-	${COMMON_DEPEND}
 	${LINK_DEPEND}
+	${COMMON_DEPEND}
 "
 
 #BDEPEND specifies dependencies applicable to CBUILD, i.e. programs that need to be executed during the build, e.g. virtual/pkgconfig. 
-BDEPEND="${COMMON_DEPEND}
+BDEPEND="
+	>=app-shells/bash-5.0:*
 	>=app-text/asciidoc-8.6.3
 	app-text/htmltidy
 	app-text/xmlto
 	>=sys-devel/gcc-8
+	virtual/pkgconfig
 	doc? (
 		app-doc/doxygen
 		python? ( dev-python/sphinx[${PYTHON_USEDEP}] )
 		ruby? ( dev-ruby/syntax$(ruby_samelib) )
 	)
-	virtual/pkgconfig
+	${COMMON_DEPEND}
 	test? (
 		${LINK_DEPEND}
 		>=dev-cpp/gtest-1.6.0-r1
@@ -103,11 +80,10 @@ BDEPEND="${COMMON_DEPEND}
 
 #The RDEPEND ebuild variable should specify any dependencies which are required at runtime. This includes libraries (when dynamically linked), any data packages and (for interpreted languages) the relevant interpreter.
 RDEPEND="
-	${DEPEND}
-	>=app-admin/eselect-1.2.13
 	acct-user/paludisbuild
 	acct-group/paludisbuild
 	sys-apps/sandbox
+	${DEPEND}
 "
 
 PDEPEND="app-eselect/eselect-package-manager"
@@ -119,40 +95,36 @@ REQUIRED_USE="
 
 RESTRICT="!test? ( test )"
 
-pkg_pretend() {
-	if [[ ${MERGE_TYPE} != buildonly ]]; then
-		if id paludisbuild >/dev/null 2>/dev/null ; then
-			if ! groups paludisbuild | grep --quiet '\<tty\>' ; then
-				eerror "The 'paludisbuild' user is now expected to be a member of the"
-				eerror "'tty' group. You should add the user to this group before"
-				eerror "upgrading Paludis."
-				die "Please add paludisbuild to tty group"
-			fi
-		fi
-	fi
-}
+# pkg_pretend() {
+# 	echo "pkg_pretend"
+# 	local MULTIBUILD_VARIANTS
+# 	_python_obtain_impls
+# 	echo "${MULTIBUILD_VARIANTS[@]}" | tr ' ' ';'
+# 	ruby_get_use_implementations | tr ' ' ';'
+# }
 
-#pkg_setup() {
-#	use python && python_setup
-#	use ruby && ruby
-#}
+# pkg_setup() {
+	# use python && python_setup
+# }
 
-src_unpack() {
-	git-r3_fetch
-	git-r3_checkout
-}
+# src_unpack() {
+# 	git-r3_fetch
+# 	git-r3_checkout
+# }
 
 src_prepare() {
-	if [[ $(use ruby) ]]; then
-	# Fix the script shebang on Ruby scripts.
-	# https://bugs.gentoo.org/show_bug.cgi?id=439372#c2
-	sed -i -e "1s/ruby/&${RUBY_VER/./}/" ruby/demos/*.rb || die
-	fi
+# TODO FIXME
+# 	if [[ $(use ruby) ]]; then
+# 	# Fix the script shebang on Ruby scripts.
+# 	# https://bugs.gentoo.org/show_bug.cgi?id=439372#c2
+# 	sed -i -e "1s/ruby/&${RUBY_VER/./}/" ruby/demos/*.rb || die
+# 	fi
 
 	cmake_src_prepare
 }
 
 src_configure() {
+	# TODO cmake
 	local mycmakeargs=(
 		-DENABLE_DOXYGEN=$(usex doc)
 		-DENABLE_GTEST=$(usex test)
@@ -174,7 +146,12 @@ src_configure() {
 		# GNUInstallDirs
 # 		-DCMAKE_INSTALL_DOCDIR="${EPREFIX}/usr/share/doc/${PF}"
 	)
-	[[ $(use ruby) ]] && mycmakeargs+=( -DRUBY_VERSION=${RUBY_VER} )
+# 	use ruby && mycmakeargs+=( -DRUBY_VERSIONS="$(ruby_get_use_implementations | tr ' ' ';')" )
+# 	use python && {
+# 		local MULTIBUILD_VARIANTS
+# 		_python_obtain_impls
+# 		mycmakeargs+=( -DPYTHON_VERSIONS="$(echo "${MULTIBUILD_VARIANTS[@]//_/.}" | tr ' ' ';')")
+# 	}
 
 	cmake_src_configure
 }
