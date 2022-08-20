@@ -11,8 +11,10 @@ EGIT_REPO_URI="https://github.com/kisli/vmime.git"
 
 LICENSE="GPL-3"
 SLOT="0"
-KEYWORDS="~amd64 ~x86"
-IUSE="+c++11 debug doc examples gnutls +icu +imap +maildir pop sasl sendmail +smtp ssl static test"
+KEYWORDS=""
+IUSE="debug doc examples gnutls +icu +imap +maildir pop sasl sendmail +smtp ssl static test"
+
+RESTRICT="!test? ( test )"
 
 RDEPEND="
 	gnutls? ( >=net-libs/gnutls-1.2.0 )
@@ -70,14 +72,15 @@ src_configure() {
 src_install() {
 	cmake_src_install
 	dodoc AUTHORS
+
+	local HTML_DOCS=( "doc/html" )
 	if use doc ; then
-		dohtml doc/html/*
+		einstalldocs
 	fi
 
-	insinto /usr/share/doc/${PF}
 	if use examples ; then
-		doins -r examples
+		dodoc examples
 	fi
-	# mv "${D}"usr/include/var/tmp/paludis/dev-cpp-libvmime-9999/work/libvmime-9999_build/src/vmime/* "${D}"/usr/include/vmime/
-	# rm -rf "${D}"usr/include/var/
+	# mv "${D}"/usr/include/var/tmp/paludis/dev-cpp-libvmime-9999/work/libvmime-9999_build/src/vmime/* "${D}"/usr/include/vmime/
+	# rm -rf "${D}"/usr/include/var/
 }

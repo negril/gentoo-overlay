@@ -3,63 +3,39 @@
 
 EAPI=7
 
-EGIT_REPO_URI="https://git.xn--jtunheimr-07a.org/aerith/paludis.git"
-EGIT_BRANCH="gentoo"
-PYTHON_COMPAT=( python3_{8..10} )
-USE_RUBY="ruby26 ruby27 ruby30"
+PYTHON_COMPAT=( python3_{8..11} )
 
-inherit bash-completion-r1 cmake git-r3 python-r1 ruby-utils
+USE_RUBY="$(echo ruby{{26..27},{30..31}})"
+RUBY_OPTIONAL="yes"
+
+inherit bash-completion-r1 cmake python-r1
+
+_S="$S"
+inherit ruby-ng
+S="$_S"
 
 DESCRIPTION="paludis, the other package mangler"
 HOMEPAGE="http://paludis.exherbo.org/"
-SRC_URI=""
 
-IUSE="doc pbins pink python ruby search-index test +xml"
+if [[ ${PV} == *9999* ]] ; then
+	EGIT_REPO_URI="https://git.xn--jtunheimr-07a.org/aerith/paludis.git"
+	EGIT_BRANCH="gentoo"
+	inherit git-r3
+else
+	if [[ ${PV} == *_beta* ]] ; then
+		SRC_URI="https://github.com/negril/paludis/archive/refs/tags/v${PV/_/-}.tar.gz -> ${P}.tar.gz"
+		S="${WORKDIR}"/${P/_/-}
+	else
+		SRC_URI="https://github.com/negril/paludis/releases/download/v${PV}/${P}.tar.gz"
+		S="${WORKDIR}/${PN}"
+		KEYWORDS="~amd64 ~x86"
+	fi
+fi
+
 LICENSE="GPL-2 vim"
 SLOT="0/eapi7"
-KEYWORDS=""
 
-#ruby is stupid...
-_ruby_get_all_impls() {
-	local i
-	for i in ${USE_RUBY}; do
-		case ${i} in
-			# removed implementations
-			ruby19|ruby20|ruby21|ruby22|ruby23|ruby24|ruby25|jruby)
-				;;
-			*)
-				echo ${i};;
-		esac
-	done
-}
-
-ruby_samelib() {
-	local res=
-	for _ruby_implementation in $(_ruby_get_all_impls); do
-		has -${_ruby_implementation} $@ || \
-			res="${res}ruby_targets_${_ruby_implementation}(-)?,"
-	done
-
-	echo "[${res%,}]"
-}
-
-ruby_implementations_depend() {
-	local depend
-	for _ruby_implementation in $(_ruby_get_all_impls); do
-		depend="${depend}${depend+ }ruby_targets_${_ruby_implementation}? ( $(_ruby_implementation_depend $_ruby_implementation) )"
-	done
-	echo "${depend}"
-}
-
-ruby_get_use_targets() {
-	local t implementation
-	for implementation in $(_ruby_get_all_impls); do
-		t+=" ruby_targets_${implementation}"
-	done
-	echo $t
-}
-IUSE+=" $(ruby_get_use_targets)"
-###
+IUSE="doc pbins pink python ruby search-index test +xml"
 
 COMMON_DEPEND="
 	>=app-shells/bash-4.4:*
@@ -82,7 +58,7 @@ DEPEND="
 	${LINK_DEPEND}
 "
 
-#BDEPEND specifies dependencies applicable to CBUILD, i.e. programs that need to be executed during the build, e.g. virtual/pkgconfig. 
+#BDEPEND specifies dependencies applicable to CBUILD, i.e. programs that need to be executed during the build, e.g. virtual/pkgconfig.
 BDEPEND="${COMMON_DEPEND}
 	>=app-text/asciidoc-8.6.3
 	app-text/htmltidy
@@ -189,15 +165,15 @@ src_install() {
 }
 
 src_test() {
-	# Work around Portage bugs
-	local -x PALUDIS_DO_NOTHING_SANDBOXY="portage sucks"
-	local -x BASH_ENV=/dev/null
-
-	if [[ ${EUID} == 0 ]] ; then
-		# hate
-		local -x PALUDIS_REDUCED_UID=0
-		local -x PALUDIS_REDUCED_GID=0
-	fi
+# 	# Work around Portage bugs
+# 	local -x PALUDIS_DO_NOTHING_SANDBOXY="portage sucks"
+# 	local -x BASH_ENV=/dev/null
+#
+# 	if [[ ${EUID} == 0 ]] ; then
+# 		# hate
+# 		local -x PALUDIS_REDUCED_UID=0
+# 		local -x PALUDIS_REDUCED_GID=0
+# 	fi
 
 	cmake_src_test
 }

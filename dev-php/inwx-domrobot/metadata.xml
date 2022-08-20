@@ -2,8 +2,6 @@
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
 	<use>
-		<flag name="pop">pop</flag>
-		<flag name="sendmail">sendmail</flag>
-		<flag name="smtp">smtp</flag>
+		<flag name="json">json</flag>
 	</use>
 </pkgmetadata>

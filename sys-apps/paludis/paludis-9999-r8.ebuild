@@ -3,13 +3,14 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{8..10} )
+PYTHON_COMPAT=( python3_{8..11} )
 
 USE_RUBY="$(echo ruby{{26..27},{30..31}})"
 RUBY_OPTIONAL="yes"
 
 inherit bash-completion-r1 cmake python-r1
 
+#ruby is stupid...
 _S="$S"
 inherit ruby-ng
 S="$_S"
@@ -57,7 +58,7 @@ DEPEND="
 	${COMMON_DEPEND}
 "
 
-#BDEPEND specifies dependencies applicable to CBUILD, i.e. programs that need to be executed during the build, e.g. virtual/pkgconfig. 
+#BDEPEND specifies dependencies applicable to CBUILD, i.e. programs that need to be executed during the build, e.g. virtual/pkgconfig.
 BDEPEND="
 	>=app-shells/bash-5.0:*
 	>=app-text/asciidoc-8.6.3
@@ -166,15 +167,15 @@ src_install() {
 }
 
 src_test() {
-	# Work around Portage bugs
-	local -x PALUDIS_DO_NOTHING_SANDBOXY="portage sucks"
-	local -x BASH_ENV=/dev/null
-
-	if [[ ${EUID} == 0 ]] ; then
-		# hate
-		local -x PALUDIS_REDUCED_UID=0
-		local -x PALUDIS_REDUCED_GID=0
-	fi
+# 	# Work around Portage bugs
+# 	local -x PALUDIS_DO_NOTHING_SANDBOXY="portage sucks"
+# 	local -x BASH_ENV=/dev/null
+#
+# 	if [[ ${EUID} == 0 ]] ; then
+# 		# hate
+# 		local -x PALUDIS_REDUCED_UID=0
+# 		local -x PALUDIS_REDUCED_GID=0
+# 	fi
 
 	cmake_src_test
 }

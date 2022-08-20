@@ -1,0 +1,36 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+	<link rel="stylesheet" type="text/css" href="http://www.vdr-developer.org/mantisbt/css/default.css" />
+	<script type="text/javascript" language="JavaScript"><!--
+		if(document.layers) {document.write("<style>td{padding:0px;}<\/style>")}
+	// --></script>
+	<meta http-equiv="Content-type" content="text/html;charset=windows-1252" />
+	<meta http-equiv="Pragma" content="no-cache" />
+	<meta http-equiv="Cache-Control" content="no-cache" />
+	<meta http-equiv="Pragma-directive" content="no-cache" />
+	<meta http-equiv="Cache-Directive" content="no-cache" />
+	<meta http-equiv="Expires" content="Wed, 04 Feb 2009 20:14:14 GMT" />
+	<title>VDR-Developer.org Bugtracking</title>
+	<script type="text/JavaScript" src="javascript/common.js"></script>
+</head>
+<body>
+<div class="center"><span class="pagetitle"></span></div>
+<div align="left"><a href="http://www.mantisbt.org" title="Mantis Bugtracker"><img border="0" width="238" height="78" alt="Mantis Bugtracker" src="images/mantis_logo.gif" /></a></div><table class="hide"><tr><td class="login-info-left">Anonymous | <a href="login_page.php?return=%2Fmantisbt%2Ffile_download.php%3Ffile_id%3D212">Login</a> | <a href="signup_page.php">Signup for a new account</a></td><td class="login-info-middle"><span class="italic">02-04-2009 21:14 CET</span></td><td class="login-info-right"><form method="post" name="form_set_project" action="set_project.php">Project: <select name="project_id" class="small" onchange="document.forms.form_set_project.submit();"><option value="0" selected="selected" >All Projects</option>
+<option value="2">Burn-Plugin</option>
+<option value="10">EnigmaNG</option>
+<option value="8">Epgsearch-Plugin</option>
+<option value="9">live</option>
+<option value="5">Streamdev-Client</option>
+<option value="4">Streamdev-Server</option>
+<option value="6">Taste-Plugin</option>
+<option value="7">Text2Skin-Plugin</option>
+<option value="1">VDRAdmin-AM</option>
+</select> <input type="submit" class="button-small" value="Switch" /></form></td></tr></table><table class="width100" cellspacing="0"><tr><td class="menu"><a href="main_page.php">Main</a> | <a href="my_view_page.php">My View</a> | <a href="view_all_bug_page.php">View Issues</a> | <a href="changelog_page.php">Change Log</a> | <a href="proj_doc_page.php">Docs</a></td><td class="right" style="white-space: nowrap;"><form method="post" action="jump_to_bug.php"><input type="text" name="bug_id" size="10" class="small" />&nbsp;<input type="submit" class="button-small" value="Jump" />&nbsp;</form></td></tr></table><br /><div align="center"><table class="width50" cellspacing="1"><tr><td class="form-title">APPLICATION ERROR #200</td></tr><tr><td><p class="center" style="color:red">A required parameter to this page (type) was not found.</p></td></tr><tr><td><p class="center">Please use the "Back" button in your web browser to return to the previous page.  There you can correct whatever problems were identified in this error or select another action.  You can also click an option from the menu bar to go directly to a new section.</p></td></tr></table></div>	<br />
+	<hr size="1" />
+<table border="0" width="100%" cellspacing="0" cellpadding="0"><tr valign="top"><td>	<span class="timer"><a href="http://www.mantisbt.org/">Mantis 1.0.3</a>[<a href="http://www.mantisbt.org/" target="_blank">^</a>]</span>
+	<address>Copyright &copy; 2000 - 2006 Mantis Group</address>
+	13 total queries executed.<br />
+	11 unique queries executed.<br />
+</td><td><div align="right"><a href="http://www.mantisbt.org" title="Powered by Mantis Bugtracker"><img src="images/mantis_logo_button.gif" width="88" height="35" alt="Powered by Mantis Bugtracker" border="0" /></a></div></td></tr></table></body>
+</html>

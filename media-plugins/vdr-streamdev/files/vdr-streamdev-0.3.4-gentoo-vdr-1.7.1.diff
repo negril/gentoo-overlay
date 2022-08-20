@@ -1,0 +1,77 @@
+--- streamdev-0.3.4.orig/client/filter.c	2009-01-13 23:02:42.000000000 +0100
++++ streamdev-0.3.4/client/filter.c	2009-01-13 23:03:49.000000000 +0100
+@@ -225,7 +225,7 @@
+ 	while (Running()) {
+ 		const uchar *block = m_TSBuffer->Get();
+ 		if (block) {
+-			u_short pid = (((u_short)block[1] & PID_MASK_HI) << 8) | block[2];
++			u_short pid = (((u_short)block[1] & TS_PID_MASK_HI) << 8) | block[2];
+ 			u_char tid = block[3];
+ 			bool Pusi = block[1] & 0x40;
+ 			int len = block[4];
+--- streamdev-0.3.4.orig/libdvbmpeg/transform.c	2009-01-13 23:02:42.000000000 +0100
++++ streamdev-0.3.4/libdvbmpeg/transform.c	2009-01-13 23:04:05.000000000 +0100
+@@ -182,7 +182,7 @@
+ {
+ 	uint16_t pp = 0;
+ 
+-	pp = (pid[0] & PID_MASK_HI)<<8;
++	pp = (pid[0] & TS_PID_MASK_HI)<<8;
+ 	pp |= pid[1];
+ 
+ 	return pp;
+--- streamdev-0.3.4.orig/libdvbmpeg/transform.h	2009-01-13 23:02:42.000000000 +0100
++++ streamdev-0.3.4/libdvbmpeg/transform.h	2009-01-13 23:04:58.000000000 +0100
+@@ -81,7 +81,7 @@
+ #define TRANS_ERROR    0x80
+ #define PAY_START      0x40
+ #define TRANS_PRIO     0x20
+-#define PID_MASK_HI    0x1F
++#define TS_PID_MASK_HI    0x1F
+ //flags
+ #define TRANS_SCRMBL1  0x80
+ #define TRANS_SCRMBL2  0x40
+--- streamdev-0.3.4.orig/libdvbmpeg/cpptools.hh	2009-01-13 23:02:42.000000000 +0100
++++ streamdev-0.3.4/libdvbmpeg/cpptools.hh	2009-01-13 23:04:25.000000000 +0100
+@@ -207,7 +207,7 @@
+ 	}
+ 
+ 	inline uint8_t FLAG1(){
+-		return (p.pid[0] & ~PID_MASK_HI);
++		return (p.pid[0] & ~TS_PID_MASK_HI);
+ 	}
+ 
+ 	inline int &Info(){
+--- streamdev-0.3.4.orig/libdvbmpeg/ctools.h	2009-01-13 23:02:42.000000000 +0100
++++ streamdev-0.3.4/libdvbmpeg/ctools.h	2009-01-13 23:04:43.000000000 +0100
+@@ -176,7 +176,7 @@
+ #define TRANS_ERROR    0x80
+ #define PAY_START      0x40
+ #define TRANS_PRIO     0x20
+-#define PID_MASK_HI    0x1F
++#define TS_PID_MASK_HI    0x1F
+ //flags
+ #define TRANS_SCRMBL1  0x80
+ #define TRANS_SCRMBL2  0x40
+--- streamdev-0.3.4.orig/remux/tsremux.c	2009-01-13 23:02:42.000000000 +0100
++++ streamdev-0.3.4/remux/tsremux.c	2009-01-13 23:05:19.000000000 +0100
+@@ -20,7 +20,7 @@
+ 
+ int cTSRemux::GetPid(const uchar *Data)
+ {
+-  return (((uint16_t)Data[0] & PID_MASK_HI) << 8) | (Data[1] & 0xFF);
++  return (((uint16_t)Data[0] & TS_PID_MASK_HI) << 8) | (Data[1] & 0xFF);
+ }
+ 
+ int cTSRemux::GetPacketLength(const uchar *Data, int Count, int Offset)
+--- streamdev-0.3.4.orig/libdvbmpeg/remux.h	2009-01-14 00:53:23.000000000 +0100
++++ streamdev-0.3.4/libdvbmpeg/remux.h	2009-01-14 00:53:47.000000000 +0100
+@@ -138,7 +138,7 @@
+ 		uint32_t time_off;
+ 	} Remux;
+ 
+-	enum { NONE, I_FRAME, P_FRAME, B_FRAME, D_FRAME };
++//	enum { NONE, I_FRAME, P_FRAME, B_FRAME, D_FRAME };
+ 
+ 	void remux(int fin, int fout, int pack_size, int mult);
+ 	void remux2(int fdin, int fdout);
