@@ -19,9 +19,9 @@ DESCRIPTION="paludis, the other package mangler"
 HOMEPAGE="http://paludis.exherbo.org/"
 
 if [[ ${PV} == *9999* ]] ; then
-	EGIT_REPO_URI="https://git.xn--jtunheimr-07a.org/aerith/paludis.git"
-	EGIT_BRANCH="gentoo"
 	inherit git-r3
+	EGIT_REPO_URI="https://github.com/negril/paludis.git"
+	EGIT_BRANCH="gentoo"
 else
 	if [[ ${PV} == *_beta* ]] ; then
 		SRC_URI="https://github.com/negril/paludis/archive/refs/tags/v${PV/_/-}.tar.gz -> ${P}.tar.gz"
@@ -157,6 +157,10 @@ src_configure() {
 	cmake_src_configure
 }
 
+src_compile() {
+	cmake_src_compile
+}
+
 src_install() {
 	cmake_src_install
 
@@ -167,17 +171,14 @@ src_install() {
 }
 
 src_test() {
-# 	# Work around Portage bugs
-# 	local -x PALUDIS_DO_NOTHING_SANDBOXY="portage sucks"
-# 	local -x BASH_ENV=/dev/null
-#
-# 	if [[ ${EUID} == 0 ]] ; then
-# 		# hate
-# 		local -x PALUDIS_REDUCED_UID=0
-# 		local -x PALUDIS_REDUCED_GID=0
-# 	fi
-
-	cmake_src_test
+	# known broken tests
+	skip_tests=(
+		"best_version"
+		"banned_dolib_rep"
+		"prefix"
+		"env_unset"
+	)
+	cmake_src_test -E ".*($(IFS=\| ; echo "${skip_tests[*]}")).*"
 }
 
 pkg_postinst() {

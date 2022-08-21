@@ -19,9 +19,9 @@ DESCRIPTION="paludis, the other package mangler"
 HOMEPAGE="http://paludis.exherbo.org/"
 
 if [[ ${PV} == *9999* ]] ; then
-	EGIT_REPO_URI="https://git.xn--jtunheimr-07a.org/aerith/paludis.git"
-	EGIT_BRANCH="gentoo"
 	inherit git-r3
+	EGIT_REPO_URI="https://github.com/negril/paludis.git"
+	EGIT_BRANCH="gentoo"
 else
 	if [[ ${PV} == *_beta* ]] ; then
 		SRC_URI="https://github.com/negril/paludis/archive/refs/tags/v${PV/_/-}.tar.gz -> ${P}.tar.gz"
