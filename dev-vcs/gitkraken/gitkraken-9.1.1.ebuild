@@ -11,7 +11,7 @@ SRC_URI="https://release.axocdn.com/linux/GitKraken-v${PV}.deb"
 SLOT="0"
 KEYWORDS="~amd64"
 IUSE=""
-RESTRICT="strip"
+RESTRICT="strip mirror"
 S="${WORKDIR}"
 
 RDEPEND="
@@ -50,7 +50,7 @@ src_install() {
 	insinto /usr/share
 	doins -r usr/share/{gitkraken,applications,pixmaps,lintian}
 
-	dodoc copyright
+	dodoc usr/share/doc/gitkraken/copyright
 
 	fperms 755 /usr/share/gitkraken/gitkraken
 	fperms 755 /usr/share/gitkraken/chrome-sandbox
