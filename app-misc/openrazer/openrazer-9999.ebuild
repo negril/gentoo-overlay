@@ -3,9 +3,10 @@
 
 EAPI=8
 
+DISTUTILS_USE_PEP517=setuptools
 PYTHON_COMPAT=( python3_{8..11} )
 
-inherit distutils-r1 python-r1 udev desktop linux-mod
+inherit distutils-r1 udev desktop linux-mod
 
 DESCRIPTION="Drivers for Razer peripherals on GNU/Linux"
 HOMEPAGE="https://openrazer.github.io/"
