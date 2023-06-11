@@ -5,7 +5,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{8..12} )
 
-USE_RUBY="$(echo ruby{{26..27},{30..31}})"
+USE_RUBY="$(echo ruby{30..32})"
 RUBY_OPTIONAL="yes"
 
 inherit bash-completion-r1 cmake python-r1
