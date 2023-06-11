@@ -104,9 +104,11 @@ RESTRICT="!test? ( test )"
 # 	ruby_get_use_implementations | tr ' ' ';'
 # }
 
-# pkg_setup() {
-	# use python && python_setup
-# }
+pkg_setup() {
+	cmake-pkg_setup
+	use python && python_setup
+	use ruby && ruby-pkg_setup
+}
 
 # src_unpack() {
 # 	git-r3_fetch
