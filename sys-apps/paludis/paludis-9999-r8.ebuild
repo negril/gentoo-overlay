@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{8..11} )
+PYTHON_COMPAT=( python3_{8..12} )
 
 USE_RUBY="$(echo ruby{{26..27},{30..31}})"
 RUBY_OPTIONAL="yes"
