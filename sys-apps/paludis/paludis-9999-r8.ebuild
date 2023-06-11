@@ -10,7 +10,7 @@ RUBY_OPTIONAL="yes"
 
 inherit bash-completion-r1 cmake python-r1
 
-#ruby is stupid...
+# ruby is stupid...
 _S="$S"
 inherit ruby-ng
 S="$_S"
@@ -52,13 +52,17 @@ LINK_DEPEND="
 	xml? ( >=dev-libs/libxml2-2.6:= )
 "
 
-#DEPEND specifies dependencies for CHOST, i.e. packages that need to be found on built system, e.g. libraries and headers.
+# DEPEND specifies dependencies for CHOST,
+# i.e. packages that need to be found on built system,
+# e.g. libraries and headers.
 DEPEND="
 	${LINK_DEPEND}
 	${COMMON_DEPEND}
 "
 
-#BDEPEND specifies dependencies applicable to CBUILD, i.e. programs that need to be executed during the build, e.g. virtual/pkgconfig.
+# BDEPEND specifies dependencies applicable to CBUILD,
+# i.e. programs that need to be executed during the build,
+# e.g. virtual/pkgconfig.
 BDEPEND="
 	>=app-shells/bash-5.0:*
 	>=app-text/asciidoc-8.6.3
@@ -79,7 +83,9 @@ BDEPEND="
 	)
 "
 
-#The RDEPEND ebuild variable should specify any dependencies which are required at runtime. This includes libraries (when dynamically linked), any data packages and (for interpreted languages) the relevant interpreter.
+# The RDEPEND ebuild variable should specify any dependencies which are required at runtime.
+# This includes libraries (when dynamically linked),
+# any data packages and (for interpreted languages) the relevant interpreter.
 RDEPEND="
 	acct-user/paludisbuild
 	acct-group/paludisbuild
