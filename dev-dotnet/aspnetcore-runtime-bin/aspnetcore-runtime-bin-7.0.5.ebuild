@@ -3,7 +3,7 @@
 
 EAPI=8
 
-SDK="7.0.203"
+SDK="7.0.302"
 
 DESCRIPTION="ASP.NET Core runtime (binary)"
 HOMEPAGE="https://dotnet.microsoft.com/"

@@ -5,7 +5,7 @@ EAPI=8
 
 SDK="7.0.302"
 
-DESCRIPTION=".NET Host FX Resolver"
+DESCRIPTION="Full .NET Core SDK (binary)"
 HOMEPAGE="https://dotnet.microsoft.com/"
 LICENSE="MIT"
 
@@ -32,7 +32,12 @@ RESTRICT+=" splitdebug"
 REQUIRED_USE="|| ( elibc_glibc elibc_musl )"
 
 RDEPEND="
-	>=dev-dotnet/dotnet-host-bin-7.0.5
+	>=dev-dotnet/aspnetcore-runtime-bin-7.0.5:7.0
+	>=dev-dotnet/aspnetcore-targeting-pack-bin-7.0.5:7.0
+	>=dev-dotnet/dotnet-runtime-bin-7.0.5:7.0
+	>=dev-dotnet/dotnet-targeting-pack-bin-7.0.5:7.0
+	>=dev-dotnet/dotnet-apphost-pack-bin-7.0.5:7.0
+	>=dev-dotnet/dotnet-templates-bin-7.0.5:7.0
 "
 
 S=${WORKDIR}
@@ -41,6 +46,15 @@ src_install() {
 	local dotnet_root="opt/dotnet"
 	dodir "${dotnet_root%/*}"
 
-	insinto "${dotnet_root}/host"
-	doins -r host/fxr
+	# Create a magic workloads file, bug #841896
+	local featureband="$(ver_cut 3 | sed "s/[0-9][0-9]$/00/g")"
+	local workloads="metadata/workloads/${SLOT}.${featureband}"
+	mkdir -p "${workloads}"
+	touch "${workloads}/userlocal"
+
+	insinto "${dotnet_root}"
+	doins -r sdk sdk-manifests
+	[[ -d "library-packs" ]] && doins -r "library-packs"
+	[[ -d "template-packs" ]] && doins -r "template-packs"
+	[[ -d "metadata/workloads" ]] && { insinto "${dotnet_root}/metadata"; doins -r metadata/workloads; }
 }
