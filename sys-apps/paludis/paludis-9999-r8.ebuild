@@ -1,4 +1,4 @@
-# Copyright 2022 Gentoo Authors
+# Copyright 2023 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -36,9 +36,10 @@ fi
 LICENSE="GPL-2 vim"
 SLOT="0/eapi8"
 
-IUSE="doc pbins pink python ruby search-index test +xml"
+IUSE="bash-completion doc pbins pink python ruby search-index test vim-syntax +xml zsh-completion"
 
 COMMON_DEPEND="
+	>=app-shells/bash-5.0:*
 	python? ( ${PYTHON_DEPS} )
 	ruby? ( $( ruby_implementations_depend ) )
 "
@@ -64,7 +65,6 @@ DEPEND="
 # i.e. programs that need to be executed during the build,
 # e.g. virtual/pkgconfig.
 BDEPEND="
-	>=app-shells/bash-5.0:*
 	>=app-text/asciidoc-8.6.3
 	app-text/htmltidy
 	app-text/xmlto
@@ -103,7 +103,6 @@ REQUIRED_USE="
 RESTRICT="!test? ( test )"
 
 # pkg_pretend() {
-# 	echo "pkg_pretend"
 # 	local MULTIBUILD_VARIANTS
 # 	_python_obtain_impls
 # 	echo "${MULTIBUILD_VARIANTS[@]}" | tr ' ' ';'
@@ -113,7 +112,7 @@ RESTRICT="!test? ( test )"
 pkg_setup() {
 	cmake-pkg_setup
 	use python && python_setup
-	use ruby && ruby-pkg_setup
+	use ruby && ruby-ng_pkg_setup
 }
 
 # src_unpack() {
@@ -122,12 +121,12 @@ pkg_setup() {
 # }
 
 src_prepare() {
-# TODO FIXME
-# 	if [[ $(use ruby) ]]; then
-# 	# Fix the script shebang on Ruby scripts.
-# 	# https://bugs.gentoo.org/show_bug.cgi?id=439372#c2
-# 	sed -i -e "1s/ruby/&${RUBY_VER/./}/" ruby/demos/*.rb || die
-# 	fi
+	# TODO FIXME
+	if [[ $(use ruby) ]]; then
+		# Fix the script shebang on Ruby scripts.
+		# https://bugs.gentoo.org/show_bug.cgi?id=439372#c2
+		sed -i -e "1s/ruby/&${RUBY_VER/./}/" ruby/demos/*.rb || die
+	fi
 
 	cmake_src_prepare
 }
@@ -143,7 +142,7 @@ src_configure() {
 		-DENABLE_RUBY=$(usex ruby)
 		-DENABLE_RUBY_DOCS=$(usex doc) # USE=ruby implicit
 		-DENABLE_SEARCH_INDEX=$(usex search-index)
-		-DENABLE_VIM=ON
+		-DENABLE_VIM=$(usex vim-syntax)
 		-DENABLE_XML=$(usex xml)
 
 		-DPALUDIS_COLOUR_PINK=$(usex pink)
@@ -153,29 +152,27 @@ src_configure() {
 		-DCONFIG_FRAMEWORK=eselect
 
 		# GNUInstallDirs
-# 		-DCMAKE_INSTALL_DOCDIR="${EPREFIX}/usr/share/doc/${PF}"
+		# -DCMAKE_INSTALL_DOCDIR="${EPREFIX}/usr/share/doc/${PF}"
 	)
-# 	use ruby && mycmakeargs+=( -DRUBY_VERSIONS="$(ruby_get_use_implementations | tr ' ' ';')" )
-# 	use python && {
-# 		local MULTIBUILD_VARIANTS
-# 		_python_obtain_impls
-# 		mycmakeargs+=( -DPYTHON_VERSIONS="$(echo "${MULTIBUILD_VARIANTS[@]//_/.}" | tr ' ' ';')")
-# 	}
+	# use ruby && mycmakeargs+=( -DRUBY_VERSIONS="$(ruby_get_use_implementations | tr ' ' ';')" )
+	# use python && {
+	# 	local MULTIBUILD_VARIANTS
+	# 	_python_obtain_impls
+	# 	mycmakeargs+=( -DPYTHON_VERSIONS="$(echo "${MULTIBUILD_VARIANTS[@]//_/.}" | tr ' ' ';')")
+	# }
 
 	cmake_src_configure
-}
-
-src_compile() {
-	cmake_src_compile
 }
 
 src_install() {
 	cmake_src_install
 
-	dobashcomp bash-completion/cave
+	[[ $(use bash-completion) ]] && dobashcomp bash-completion/cave
 
-	insinto /usr/share/zsh/site-functions
-	doins zsh-completion/_cave
+	[[ $(use zsh-completion) ]] && {
+		insinto /usr/share/zsh/site-functions
+		doins zsh-completion/_cave
+	}
 }
 
 src_test() {
