@@ -1,7 +1,7 @@
 # Copyright 2023 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=7
+EAPI=8
 
 PYTHON_COMPAT=( python3_{8..12} )
 
@@ -34,7 +34,7 @@ else
 fi
 
 LICENSE="GPL-2 vim"
-SLOT="0/eapi7"
+SLOT="0/eapi8"
 
 IUSE="bash-completion doc pbins pink python ruby search-index test vim-syntax +xml zsh-completion"
 
@@ -110,7 +110,6 @@ RESTRICT="!test? ( test )"
 # }
 
 pkg_setup() {
-	cmake-pkg_setup
 	use python && python_setup
 	use ruby && ruby-ng_pkg_setup
 }
