@@ -166,9 +166,9 @@ src_configure() {
 src_install() {
 	cmake_src_install
 
-	[[ $(use bash-completion) ]] && dobashcomp bash-completion/cave
+	use bash-completion && dobashcomp bash-completion/cave
 
-	[[ $(use zsh-completion) ]] && {
+	use zsh-completion && {
 		insinto /usr/share/zsh/site-functions
 		doins zsh-completion/_cave
 	}
