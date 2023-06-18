@@ -90,6 +90,7 @@ RDEPEND="
 	acct-user/paludisbuild
 	acct-group/paludisbuild
 	sys-apps/sandbox
+	sys-devel/dwz
 	${DEPEND}
 "
 
