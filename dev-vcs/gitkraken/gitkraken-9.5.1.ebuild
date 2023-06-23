@@ -46,20 +46,29 @@ LICENSE="Axosoft"
 
 QA_PREBUILT="*"
 
+src_prepare() {
+	rm -Rf \
+		usr/share/gitkraken/resources/app.asar.unpacked/git \
+	  usr/share/gitkraken/resources/app.asar.unpacked/resources/cli/win \
+		usr/share/gitkraken/chrome-sandbox \
+		usr/share/gitkraken/chrome_crashpad_handler \
+		usr/share/gitkraken/libEGL.so \
+		usr/share/gitkraken/libGLESv2.so \
+		usr/share/gitkraken/libvk_swiftshader.so \
+		usr/share/gitkraken/libvulkan.so.1
+}
+
 src_install() {
+	insinto /usr/bin
+	doins usr/bin/gitkraken
+
 	insinto /usr/share
 	doins -r usr/share/{gitkraken,applications,pixmaps,lintian}
 
 	dodoc usr/share/doc/gitkraken/copyright
 
 	fperms 755 /usr/share/gitkraken/gitkraken
-	fperms 755 /usr/share/gitkraken/chrome-sandbox
-	fperms 755 /usr/share/gitkraken/chrome_crashpad_handler
-	fperms 755 /usr/share/gitkraken/libEGL.so
-	fperms 755 /usr/share/gitkraken/libGLESv2.so
 	fperms 755 /usr/share/gitkraken/libffmpeg.so
-	fperms 755 /usr/share/gitkraken/libvk_swiftshader.so
-	fperms 755 /usr/share/gitkraken/libvulkan.so.1
 	fperms 755 /usr/share/gitkraken/resources/bin/gitkraken.sh
 }
 
