@@ -1,0 +1,22 @@
+--- keyboard-2.3.1/CMakeLists.txt.orig	2023-06-19 13:28:46.315223694 +0200
++++ keyboard-2.3.1/CMakeLists.txt	2023-06-19 13:29:06.303354004 +0200
+@@ -204,6 +204,9 @@
+ target_compile_definitions(westernsupport PRIVATE ${maliit-keyboard-definitions})
+ 
+ function(language_plugin _language _full_language _ebook)
++    if(NOT EXISTS ${CMAKE_SOURCE_DIR}/plugins/${_language})
++      return()
++    endif()
+     # To support layout style variations such as en@dv we need to avoid using
+     # the @ character in variables, so split and replace it with _
+     set(_target ${_language})
+@@ -239,6 +242,9 @@
+ endfunction()
+ 
+ function(abstract_language_plugin _language _full_language)
++    if(NOT EXISTS ${CMAKE_SOURCE_DIR}/plugins/${_language})
++      return()
++    endif()
+     set(options ABSTRACT_LANGUAGE_PLUGIN)
+     set(oneValueArgs NGRAM_DATABASE PLUGIN_DIR LANGUAGE_FEATURES)
+     set(multiValueArgs SOURCES LIBRARIES INCLUDE_DIRS DEFINITIONS FILES DIRECTORY)

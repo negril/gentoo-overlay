@@ -11,6 +11,7 @@ SRC_URI="https://github.com/${PN/-/\/}/archive/refs/tags/${PV}.tar.gz -> ${P}.ta
 LICENSE="BSD GPL-3 LGPL-3"
 SLOT="0"
 KEYWORDS="~amd64"
+RESTRICT="mirror"
 
 IUSE="anthy chewing hunspell pinyin presage"
 
@@ -19,32 +20,58 @@ S="${WORKDIR}"/${P#maliit-}
 BDEPEND="sys-devel/gettext"
 
 DEPEND="
-    dev-libs/glib
-    =dev-qt/qtfeedback-5*
-    dev-qt/qtmultimedia:5
-    x11-misc/maliit-framework
-    anthy? ( app-i18n/anthy )
-    chewing? ( app-i18n/libchewing )
-    hunspell? ( app-text/hunspell )
-    pinyin? ( app-i18n/libpinyin )
-    presage? ( app-text/presage )"
+	dev-libs/glib
+	=dev-qt/qtfeedback-5*
+	dev-qt/qtmultimedia:5
+	x11-misc/maliit-framework
+	anthy? ( app-i18n/anthy )
+	chewing? ( app-i18n/libchewing )
+	hunspell? ( app-text/hunspell )
+	pinyin? ( app-i18n/libpinyin )
+	presage? ( app-text/presage )
+"
 
 RDEPEND="${DEPEND}"
 
-src_prepare() {
-    cmake_src_prepare
+PATCHES=(
+	"${FILESDIR}/observe_linguas.patch"
+)
 
-    sed -e "s|if(Anthy_FOUND)|if($(use anthy && echo 1 || echo 0))|" \
-        -e "s|if(Pinyin_FOUND)|if($(use pinyin && echo 1 || echo 0))|" \
-        -e "s|if(Chewing_FOUND)|if($(use chewing && echo 1 || echo 0))|" \
-        -e "s|doc/maliit-keyboard|doc/${PF}|" \
-        -i CMakeLists.txt || die
+
+
+src_prepare() {
+	cmake_src_prepare
+
+	sed -e "s|if(Anthy_FOUND)|if($(use anthy && echo 1 || echo 0))|" \
+			-e "s|if(Pinyin_FOUND)|if($(use pinyin && echo 1 || echo 0))|" \
+			-e "s|if(Chewing_FOUND)|if($(use chewing && echo 1 || echo 0))|" \
+			-e "s|doc/maliit-keyboard|doc/${PF}|" \
+			-i CMakeLists.txt || die
+
+	if [[ ${LINGUAS} ]]; then
+		local lingua
+
+		pushd po > /dev/null
+		for lingua in *.po; do
+			lingua=${lingua/.po}
+			has "${lingua}" "${LINGUAS}" || \
+				{ rm "${lingua}.po" || die; }
+		done
+		popd > /dev/null
+
+		pushd plugins > /dev/null
+		for lingua in */ ; do
+			has "${lingua%/}" "${LINGUAS} westernsupport" || \
+				{ rm -Rf "${lingua}" || die; }
+		done
+		popd > /dev/null
+	fi
 }
 
 src_configure() {
-    local mycmakeargs=(
-        -Denable-hunspell=$(usex hunspell)
-        -Denable-presage=$(usex presage)
-    )
-    cmake_src_configure
+	local mycmakeargs=(
+		-Denable-hunspell=$(usex hunspell)
+		-Denable-presage=$(usex presage)
+	)
+	cmake_src_configure
 }
