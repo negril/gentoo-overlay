@@ -5,7 +5,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{9..11} )
 
-inherit cmake flag-o-matic python-single-r1 virtualx
+inherit cmake python-single-r1 virtualx
 
 DESCRIPTION="A color management framework for visual effects and animation"
 HOMEPAGE="https://opencolorio.org https://github.com/AcademySoftwareFoundation/OpenColorIO"
@@ -44,7 +44,7 @@ RDEPEND="
 	opengl? (
 		media-libs/freeglut
 		media-libs/glew:=
-		virtual/opengl
+		media-libs/libglvnd
 	)
 	python? (
 		${PYTHON_DEPS}
@@ -69,7 +69,7 @@ BDEPEND="
 	opengl? (
 		media-libs/freeglut
 		media-libs/glew:=
-		virtual/opengl
+		media-libs/libglvnd
 	)
 "
 #	test? (
@@ -81,7 +81,10 @@ BDEPEND="
 # Restricting tests, bugs #439790 and #447908
 RESTRICT="!test? ( test )"
 
-PATCHES=( "${FILESDIR}"/${PN}-2.2.1-adjust-python-installation.patch )
+PATCHES=(
+	"${FILESDIR}"/${PN}-2.2.1-adjust-python-installation.patch
+	"${FILESDIR}"/${PN}-2.2.1-support-minizip-ng-4.patch
+)
 
 pkg_setup() {
 	use python && python-single-r1_pkg_setup
@@ -121,11 +124,6 @@ src_configure() {
 		-DPython_EXECUTABLE="${PYTHON}"
 		-DPYTHON_VARIANT_PATH=$(python_get_sitedir)
 	)
-
-	# We need this to work around asserts that can trigger even in proper use cases.
-	# See https://github.com/AcademySoftwareFoundation/OpenColorIO/issues/1235
-	# TODO: Do we still need this? The above bug seems to have been solved.
-	append-flags -DNDEBUG
 
 	cmake_src_configure
 }
