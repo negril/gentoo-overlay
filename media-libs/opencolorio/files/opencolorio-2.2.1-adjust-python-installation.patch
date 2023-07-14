@@ -15,6 +15,3 @@ Signed-off-by: Bernd Waibel <waebbl-gentoo@posteo.net>
  endif()
  
  # Create an internal global variable to access it in another scope but not publicly visible
--- 
-2.39.2
-

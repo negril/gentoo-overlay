@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{9..11} )
+PYTHON_COMPAT=( python3_{10..11} )
 
 inherit cmake python-single-r1 virtualx
 
@@ -13,8 +13,6 @@ SRC_URI="https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/refs/t
 S="${WORKDIR}/OpenColorIO-${PV}"
 
 LICENSE="BSD"
-# TODO: drop .1 on next SONAME bump (2.1 -> 2.2?) as we needed to nudge it
-# to force rebuild of consumers due to changing to openexr 3 changing API.
 SLOT="0/$(ver_cut 1-2)"
 # minizip-ng: ~arm ~arm64 ~ppc64 ~riscv
 # osl: ~riscv
@@ -28,8 +26,6 @@ REQUIRED_USE="
 	test? ( opengl )
 "
 
-#		>=media-libs/openimageio-2.3.12.0-r3:=
-#	dev-libs/tinyxml
 RDEPEND="
 	dev-cpp/pystring
 	>=dev-cpp/yaml-cpp-0.7.0:=
@@ -61,8 +57,10 @@ BDEPEND="
 		$(python_gen_cond_dep '
 			dev-python/breathe[${PYTHON_USEDEP}]
 			dev-python/recommonmark[${PYTHON_USEDEP}]
+			dev-python/six[${PYTHON_USEDEP}]
 			dev-python/sphinx[${PYTHON_USEDEP}]
 			dev-python/sphinx-tabs[${PYTHON_USEDEP}]
+			dev-python/sphinx-press-theme[${PYTHON_USEDEP}]
 			dev-python/testresources[${PYTHON_USEDEP}]
 		')
 	)
@@ -71,12 +69,11 @@ BDEPEND="
 		media-libs/glew:=
 		media-libs/libglvnd
 	)
+	test? (
+		>=media-libs/openimageio-2.2.14
+		>=media-libs/osl-1.11
+	)
 "
-#	test? (
-#		>=media-libs/openimageio-2.2.14
-#		>=media-libs/osl-1.11
-#	)
-#"
 
 # Restricting tests, bugs #439790 and #447908
 RESTRICT="!test? ( test )"
