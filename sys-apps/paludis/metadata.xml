@@ -6,8 +6,8 @@
   </maintainer>
   <use>
     <!--<flag name="eapi7">Enable experimental support for EAPI7</flag>-->
-    <flag name="pbins">pbins</flag>
-    <flag name="pink">ping</flag>
+    <flag name="pbins">Support binary package creation</flag>
+    <flag name="pink">pink color-scheme</flag>
     <flag name="search-index">search-index</flag>
   </use>
 </pkgmetadata>

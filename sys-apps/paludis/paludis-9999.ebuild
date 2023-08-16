@@ -16,7 +16,7 @@ inherit ruby-ng
 S="$_S"
 
 DESCRIPTION="paludis, the other package mangler"
-HOMEPAGE="https://paludis.exherbo.org/"
+HOMEPAGE="https://paludis.exherbolinux.org"
 
 if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
@@ -73,7 +73,7 @@ BDEPEND="
 	doc? (
 		app-doc/doxygen
 		python? ( dev-python/sphinx[${PYTHON_USEDEP}] )
-		ruby? ( dev-ruby/syntax$(ruby_samelib) )
+		ruby? ( dev-ruby/syntax$(ruby_samelib) dev-ruby/rdoc$(ruby_samelib) )
 	)
 	${COMMON_DEPEND}
 	test? (
@@ -134,18 +134,18 @@ src_prepare() {
 src_configure() {
 	# TODO cmake
 	local mycmakeargs=(
-		-DENABLE_DOXYGEN=$(usex doc)
-		-DENABLE_GTEST=$(usex test)
-		-DENABLE_PBINS=$(usex pbins)
-		-DENABLE_PYTHON=$(usex python)
-		-DENABLE_PYTHON_DOCS=$(usex doc) # USE=python implicit
-		-DENABLE_RUBY=$(usex ruby)
-		-DENABLE_RUBY_DOCS=$(usex doc) # USE=ruby implicit
-		-DENABLE_SEARCH_INDEX=$(usex search-index)
-		-DENABLE_VIM=$(usex vim-syntax)
-		-DENABLE_XML=$(usex xml)
+		-DENABLE_DOXYGEN="$(usex doc)"
+		-DENABLE_GTEST="$(usex test)"
+		-DENABLE_PBINS="$(usex pbins)"
+		-DENABLE_PYTHON="$(usex python)"
+		-DENABLE_PYTHON_DOCS="$(usex doc)"
+		-DENABLE_RUBY="$(usex ruby)"
+		-DENABLE_RUBY_DOCS="$(usex doc)"
+		-DENABLE_SEARCH_INDEX="$(usex search-index)"
+		-DENABLE_VIM="$(usex vim-syntax)"
+		-DENABLE_XML="$(usex xml)"
 
-		-DPALUDIS_COLOUR_PINK=$(usex pink)
+		-DPALUDIS_COLOUR_PINK="$(usex pink)"
 		-DPALUDIS_ENVIRONMENTS=all
 		-DPALUDIS_DEFAULT_DISTRIBUTION=gentoo
 		-DPALUDIS_CLIENTS=all

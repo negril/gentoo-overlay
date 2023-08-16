@@ -16,7 +16,7 @@ inherit ruby-ng
 S="$_S"
 
 DESCRIPTION="paludis, the other package mangler"
-HOMEPAGE="https://paludis.exherbo.org/"
+HOMEPAGE="https://paludis.exherbolinux.org"
 
 if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
