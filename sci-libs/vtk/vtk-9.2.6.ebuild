@@ -172,26 +172,24 @@ DOCS=( CONTRIBUTING.md README.md )
 
 vtk_check_reqs() {
 	local dsk=4096
-	local mem=$(( $(usex cuda 7168 0) ))
 
-	dsk=$(( $(usex doc 3072 0) + ${dsk} ))
-	dsk=$(( $(usex examples 3072 0) + ${dsk} ))
-	dsk=$(( $(usex cuda 8192 0) + ${dsk} ))
+	dsk=$(( $(usex doc 3072 0) + dsk ))
+	dsk=$(( $(usex examples 3072 0) + dsk ))
+	dsk=$(( $(usex cuda 8192 0) + dsk ))
+	export CHECKREQS_DISK_BUILD="${dsk}M"
 
 	# In case users are not aware of the extra NINJAOPTS, check
 	# for the more common MAKEOPTS, in case NINJAOPTS is empty
-	local jobs=1
-	if [[ -n "${NINJAOPTS}" ]]; then
-		jobs=$(makeopts_jobs "${NINJAOPTS}" "$(get_nproc)")
-	else
-		if [[ -n "${MAKEOPTS}" ]]; then
+	if use cuda; then
+		local jobs=1
+		local mem=7168
+		if [[ -n "${NINJAOPTS}" ]]; then
+			jobs=$(makeopts_jobs "${NINJAOPTS}" "$(get_nproc)")
+		elif [[ -n "${MAKEOPTS}" ]]; then
 			jobs=$(makeopts_jobs "${MAKEOPTS}" "$(get_nproc)")
 		fi
+		export CHECKREQS_MEMORY="$(( mem * $(( jobs > 4 ? 4 : jobs )) ))M"
 	fi
-	mem=$(( ${mem} * $(( ${jobs} > 4 ? 4 : ${jobs} )) ))
-
-	use cuda && export CHECKREQS_MEMORY=${mem}M
-	export CHECKREQS_DISK_BUILD=${dsk}M
 
 	"check-reqs_pkg_${EBUILD_PHASE}"
 }
