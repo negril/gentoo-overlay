@@ -117,10 +117,12 @@ RDEPEND="
 		dev-qt/qtwidgets:5
 	)
 	qt6? (
-		dev-qt/qtbase:6[gui,opengl,sql,widgets]
-		dev-qt/qtdeclarative:6[opengl]
-		dev-qt/qtshadertools:6
-		x11-libs/libxkbcommon
+		!qt5? (
+			dev-qt/qtbase:6[gui,opengl,sql,widgets]
+			dev-qt/qtdeclarative:6[opengl]
+			dev-qt/qtshadertools:6
+			x11-libs/libxkbcommon
+		)
 	)
 	sdl? ( media-libs/libsdl2 )
 	rendering? (
@@ -236,9 +238,7 @@ pkg_pretend() {
 		ewarn "See bug #820593"
 	fi
 
-	if use qt6 && use qt5; then
-		ewarn "Both qt5 and qt6 USE flags have been selected. Using qt5!"
-	fi
+	use qt6 && use qt5 && ewarn "Both qt5 and qt6 USE flags have been selected. Using qt5!"
 
 	use cuda && vtk_check_cuda
 
@@ -254,9 +254,7 @@ pkg_setup() {
 		ewarn "See bug #820593"
 	fi
 
-	if use qt6 && use qt5; then
-		ewarn "Both qt5 and qt6 USE flags have been selected. Using qt5!"
-	fi
+	use qt6 && use qt5 && ewarn "Both qt5 and qt6 USE flags have been selected. Using qt5!"
 
 	use cuda && vtk_check_cuda
 
@@ -536,26 +534,29 @@ src_configure() {
 		use rendering && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_PythonContext2D="WANT" )
 	fi
 
-	if use qt5 && use qt6; then
+	if use qt5; then
 		# prefer Qt5: https://wiki.gentoo.org/wiki/Project:qt/Policies
 		mycmakeargs+=(
 			-DCMAKE_INSTALL_QMLDIR="${EPREFIX}/usr/$(get_libdir)/qt5/qml"
 			-DVTK_QT_VERSION="5"
 		)
+		has_version "dev-qt/qtopengl:5[gles2-only]" && mycmakeargs+=(
+			# Force using EGL & GLES
+			-DVTK_OPENGL_HAS_EGL=ON
+			-DVTK_OPENGL_USE_GLES=ON
+		)
+	elif use qt6; then
+		mycmakeargs+=(
+			-DCMAKE_INSTALL_QMLDIR="${EPFREIX}/usr/$(get_libdir)/qt6/qml"
+			-DVTK_QT_VERSION="6"
+		)
+		has_version "dev-qt/qtbase:6[gles2-only]" && mycmakeargs+=(
+			# Force using EGL & GLES
+			-DVTK_OPENGL_HAS_EGL=ON
+			-DVTK_OPENGL_USE_GLES=ON
+		)
 	else
-		if use qt5; then
-			mycmakeargs+=(
-				-DCMAKE_INSTALL_QMLDIR="${EPREFIX}/usr/$(get_libdir)/qt5/qml"
-				-DVTK_QT_VERSION="5"
-			)
-		elif use qt6; then
-			mycmakeargs+=(
-				-DCMAKE_INSTALL_QMLDIR="${EPFREIX}/usr/$(get_libdir)/qt6/qml"
-				-DVTK_QT_VERSION="6"
-			)
-		else
-			mycmakeargs+=( -DVTK_GROUP_ENABLE_Qt="NO" )
-		fi
+		mycmakeargs+=( -DVTK_GROUP_ENABLE_Qt="NO" )
 	fi
 
 	if use qt5 || use qt6; then
