@@ -194,6 +194,39 @@ vtk_check_reqs() {
 	check-reqs_pkg_${EBUILD_PHASE}
 }
 
+vtk_check_cuda() {
+	# TODO: checks this on updates of nvidia-cuda-toolkit and update
+	# the list of available arches if necessary, i.e. add new arches
+	# once they are released at the end of the list before all.
+	# See https://en.wikipedia.org/wiki/CUDA#GPUs_supported
+	# CUDA 11.8 supports Ada Lovelace and Hopper arches, but cmake,
+	# as of 3.25.1 doesn't recognize these keywords.
+	# FIXME: better use numbers than names?
+	case ${VTK_CUDA_ARCH:-native} in
+		# we ignore fermi arch, because current nvidia-cuda-toolkit-11*
+		# no longer supports it
+		# "^([0-9]+a?(-real|-virtual)?(;[0-9]+a?(-real|-virtual)?|;)*|all|all-major|native)$"
+		kepler|maxwell|pascal|volta|turing|ampere|ada|all)
+			einfo "Using CUDA architecture '${VTK_CUDA_ARCH}'"
+			;;
+		native)
+			# bug #835659
+			eerror "Using native CUDA arches is currently broken."
+			eerror "Please set it to one of the common arch names:"
+			eerror "kepler, maxwell, pascal, volta, turing, ampere, ada or all."
+			die "Please set VTK_CUDA_ARCH environment variable!"
+			ewarn "If auto detection fails for you, please try and export the"
+			ewarn "VTK_CUDA_ARCH environment variable to one of the common arch"
+			ewarn "names: kepler, maxwell, pascal, volta, turing, ampere, ada or all."
+			;;
+		*)
+			eerror "Please properly set the VTK_CUDA_ARCH environment variable to"
+			eerror "one of: kepler, maxwell, pascal, volta, turing, ampere, ada, all"
+			die "Invalid CUDA architecture given: '${VTK_CUDA_ARCH}'!"
+			;;
+	esac
+}
+
 pkg_pretend() {
 	[[ ${MERGE_TYPE} != binary ]] && has openmp && tc-check-openmp
 
@@ -207,15 +240,7 @@ pkg_pretend() {
 		ewarn "Both qt5 and qt6 USE flags have been selected. Using qt5!"
 	fi
 
-	# bug #835659
-	if use cuda; then
-		if [[ ${VTK_CUDA_ARCH} = native ]]; then
-			eerror "Using native CUDA arches is currently broken."
-			eerror "Please set it to one of the common arch names:"
-			eerror "kepler, maxwell, pascal, turing or ampere."
-			die "Please set VTK_CUDA_ARCH environment variable!"
-		fi
-	fi
+	use cuda && vtk_check_cuda
 
 	vtk_check_reqs
 }
@@ -233,15 +258,7 @@ pkg_setup() {
 		ewarn "Both qt5 and qt6 USE flags have been selected. Using qt5!"
 	fi
 
-	# bug #835659
-	if use cuda; then
-		if [[ ${VTK_CUDA_ARCH} = native ]]; then
-			eerror "Using native CUDA arches is currently broken."
-			eerror "Please set it to one of the common arch names:"
-			eerror "kepler, maxwell, pascal, turing or ampere."
-			die "Please set VTK_CUDA_ARCH environment variable!"
-		fi
-	fi
+	use cuda && vtk_check_cuda
 
 	vtk_check_reqs
 
@@ -412,37 +429,7 @@ src_configure() {
 		)
 	fi
 
-	# TODO: checks this on updates of nvidia-cuda-toolkit and update
-	# the list of available arches if necessary, i.e. add new arches
-	# once they are released at the end of the list before all.
-	# See https://en.wikipedia.org/wiki/CUDA#GPUs_supported
-	# CUDA 11.8 supports Ada Lovelace and Hopper arches, but cmake,
-	# as of 3.25.1 doesn't recognize these keywords.
-	# FIXME: better use numbers than names?
-	if use cuda; then
-		local cuda_arch=
-		case ${VTK_CUDA_ARCH:-native} in
-			# we ignore fermi arch, because current nvidia-cuda-toolkit-11*
-			# no longer supports it
-			kepler|maxwell|pascal|volta|turing|ampere|all)
-				cuda_arch=${VTK_CUDA_ARCH}
-				;;
-#			native)
-#				ewarn "If auto detection fails for you, please try and export the"
-#				ewarn "VTK_CUDA_ARCH environment variable to one of the common arch"
-#				ewarn "names: kepler, maxwell, pascal, volta, turing, ampere or all."
-#				cuda_arch=native
-#				;;
-			*)
-				eerror "Please properly set the VTK_CUDA_ARCH environment variable to"
-				eerror "one of: kepler, maxwell, pascal, volta, turing, ampere, all"
-				die "Invalid CUDA architecture given: '${VTK_CUDA_ARCH}'!"
-				;;
-		esac
-		ewarn "Using CUDA architecture '${cuda_arch}'"
-
-		mycmakeargs+=( -DVTKm_CUDA_Architecture=${cuda_arch} )
-	fi
+	use cuda && mycmakeargs+=( -DCMAKE_CUDA_ARCHITECTURES="${VTK_CUDA_ARCH}" )
 
 	if use debug; then
 		mycmakeargs+=(
