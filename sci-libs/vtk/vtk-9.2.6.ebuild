@@ -39,7 +39,7 @@ LICENSE="BSD LGPL-2"
 SLOT="0/${MY_PV}"
 KEYWORDS="~amd64 ~arm ~arm64 ~x86 ~amd64-linux ~x86-linux"
 # TODO: Like to simplifiy these. Mostly the flags related to Groups.
-IUSE="all-modules boost cuda debug doc examples ffmpeg freetype gdal imaging
+IUSE="all-modules boost cuda debug doc examples ffmpeg freetype gdal gles2 imaging
 	java las +logging mpi mysql odbc openmp openvdb pdal postgres python qt5
 	qt6 +rendering sdl tbb test +threads tk video_cards_nvidia views vtkm web"
 
@@ -533,12 +533,11 @@ src_configure() {
 	fi
 
 	if use qt5; then
-		# prefer Qt5: https://wiki.gentoo.org/wiki/Project:qt/Policies
 		mycmakeargs+=(
 			-DCMAKE_INSTALL_QMLDIR="${EPREFIX}/usr/$(get_libdir)/qt5/qml"
 			-DVTK_QT_VERSION="5"
 		)
-		has_version "dev-qt/qtopengl:5[gles2-only]" && mycmakeargs+=(
+		has_version "dev-qt/qtopengl:5[gles2-only]" || use gles2 && mycmakeargs+=(
 			# Force using EGL & GLES
 			-DVTK_OPENGL_HAS_EGL=ON
 			-DVTK_OPENGL_USE_GLES=ON
@@ -548,7 +547,7 @@ src_configure() {
 			-DCMAKE_INSTALL_QMLDIR="${EPFREIX}/usr/$(get_libdir)/qt6/qml"
 			-DVTK_QT_VERSION="6"
 		)
-		has_version "dev-qt/qtbase:6[gles2-only]" && mycmakeargs+=(
+		has_version "dev-qt/qtbase:6[gles2-only]" || use gles2 && mycmakeargs+=(
 			# Force using EGL & GLES
 			-DVTK_OPENGL_HAS_EGL=ON
 			-DVTK_OPENGL_USE_GLES=ON
