@@ -158,12 +158,12 @@ DEPEND="
 BDEPEND="virtual/pkgconfig"
 
 PATCHES=(
-	"${FILESDIR}"/${PN}-9.2.2-vtkGeometryFilter-add-missing-mutex-header-file.patch
-	"${FILESDIR}"/${PN}-9.2.2-VTKm-respect-user-CXXFLAGS.patch
-	"${FILESDIR}"/${PN}-9.2.2-link-with-glut-library-for-freeglut.patch
-	"${FILESDIR}"/${PN}-9.2.5-Add-include-cstdint-to-compile-with-gcc-13.patch
-	"${FILESDIR}"/${PN}-9.2.5-Fix-compilation-error-with-CUDA-12.patch
-	"${FILESDIR}"/${PN}-9.2.5-More-include-cstdint-to-compile-with-gcc13.patch
+	"${FILESDIR}/${PN}-9.2.2-vtkGeometryFilter-add-missing-mutex-header-file.patch"
+	"${FILESDIR}/${PN}-9.2.2-VTKm-respect-user-CXXFLAGS.patch"
+	"${FILESDIR}/${PN}-9.2.2-link-with-glut-library-for-freeglut.patch"
+	"${FILESDIR}/${PN}-9.2.5-Add-include-cstdint-to-compile-with-gcc-13.patch"
+	"${FILESDIR}/${PN}-9.2.5-Fix-compilation-error-with-CUDA-12.patch"
+	"${FILESDIR}/${PN}-9.2.5-More-include-cstdint-to-compile-with-gcc13.patch"
 )
 
 DOCS=( CONTRIBUTING.md README.md )
@@ -191,7 +191,7 @@ vtk_check_reqs() {
 	use cuda && export CHECKREQS_MEMORY=${mem}M
 	export CHECKREQS_DISK_BUILD=${dsk}M
 
-	check-reqs_pkg_${EBUILD_PHASE}
+	"check-reqs_pkg_${EBUILD_PHASE}"
 }
 
 vtk_check_cuda() {
@@ -294,8 +294,8 @@ src_prepare() {
 		ebegin "Copying data files to ${BUILD_DIR}"
 		mkdir -p "${BUILD_DIR}/ExternalData" || die
 		pushd "${BUILD_DIR}/ExternalData" >/dev/null || die
-		ln -sf ../../VTK-${PV}/.ExternalData/README.rst . || die
-		ln -sf ../../VTK-${PV}/.ExternalData/SHA512 . || die
+		ln -sf "../../VTK-${PV}/.ExternalData/README.rst" . || die
+		ln -sf "../../VTK-${PV}/.ExternalData/SHA512" . || die
 		popd >/dev/null || die
 		eend "$?"
 	fi
@@ -311,41 +311,41 @@ src_configure() {
 		-DVTK_ANDROID_BUILD=OFF
 		-DVTK_IOS_BUILD=OFF
 
-		-DVTK_BUILD_ALL_MODULES=$(usex all-modules ON OFF)
+		-DVTK_BUILD_ALL_MODULES="$(usex all-modules ON OFF)"
 		# we use the pre-built documentation and install these with USE=doc
 		-DVTK_BUILD_DOCUMENTATION=OFF
-		-DVTK_BUILD_EXAMPLES=$(usex examples ON OFF)
+		-DVTK_BUILD_EXAMPLES="$(usex examples ON OFF)"
 
 		# no package in the tree: https://github.com/LLNL/conduit
 		-DVTK_ENABLE_CATALYST=OFF
 		-DVTK_ENABLE_KITS=OFF
-		-DVTK_ENABLE_LOGGING=$(usex logging ON OFF)
+		-DVTK_ENABLE_LOGGING="$(usex logging ON OFF)"
 		# defaults to ON: USE flag for this?
 		-DVTK_ENABLE_REMOTE_MODULES=OFF
 
 		# disable fetching files during build
 		-DVTK_FORBID_DOWNLOADS=ON
 
-		-DVTK_GROUP_ENABLE_Imaging=$(usex imaging "YES" "DEFAULT")
-		-DVTK_GROUP_ENABLE_Rendering=$(usex rendering "YES" "DEFAULT")
+		-DVTK_GROUP_ENABLE_Imaging="$(usex imaging "YES" "DEFAULT")"
+		-DVTK_GROUP_ENABLE_Rendering="$(usex rendering "YES" "DEFAULT")"
 		-DVTK_GROUP_ENABLE_StandAlone="YES"
-		-DVTK_GROUP_ENABLE_Views=$(usex views "YES" "DEFAULT")
-		-DVTK_GROUP_ENABLE_Web=$(usex web "YES" "DEFAULT")
+		-DVTK_GROUP_ENABLE_Views="$(usex views "YES" "DEFAULT")"
+		-DVTK_GROUP_ENABLE_Web="$(usex web "YES" "DEFAULT")"
 
 		-DVTK_INSTALL_SDK=ON
 
 		-DVTK_MODULE_ENABLE_VTK_IOCGNSReader="WANT"
 		-DVTK_MODULE_ENABLE_VTK_IOExportPDF="WANT"
-		-DVTK_MODULE_ENABLE_VTK_IOLAS=$(usex las "WANT" "DEFAULT")
+		-DVTK_MODULE_ENABLE_VTK_IOLAS="$(usex las "WANT" "DEFAULT")"
 		-DVTK_MODULE_ENABLE_VTK_IONetCDF="WANT"
 		-DVTK_MODULE_ENABLE_VTK_IOOggTheora="WANT"
-		-DVTK_MODULE_ENABLE_VTK_IOOpenVDB=$(usex openvdb "WANT" "DEFAULT")
+		-DVTK_MODULE_ENABLE_VTK_IOOpenVDB="$(usex openvdb "WANT" "DEFAULT")"
 		-DVTK_MODULE_ENABLE_VTK_IOSQL="WANT" # sqlite
-		-DVTK_MODULE_ENABLE_VTK_IOPDAL=$(usex pdal "WANT" "DEFAULT")
+		-DVTK_MODULE_ENABLE_VTK_IOPDAL="$(usex pdal "WANT" "DEFAULT")"
 		-DVTK_MODULE_ENABLE_VTK_IOXML="WANT"
 		-DVTK_MODULE_ENABLE_VTK_IOXMLParser="WANT"
-		-DVTK_MODULE_ENABLE_VTK_RenderingFreeType=$(usex freetype "WANT" "DEFAULT")
-		-DVTK_MODULE_ENABLE_VTK_RenderingFreeTypeFontConfig=$(usex freetype "WANT" "DEFAULT")
+		-DVTK_MODULE_ENABLE_VTK_RenderingFreeType="$(usex freetype "WANT" "DEFAULT")"
+		-DVTK_MODULE_ENABLE_VTK_RenderingFreeTypeFontConfig="$(usex freetype "WANT" "DEFAULT")"
 		-DVTK_MODULE_ENABLE_VTK_cgns="WANT"
 		-DVTK_MODULE_ENABLE_VTK_doubleconversion="WANT"
 		-DVTK_MODULE_ENABLE_VTK_eigen="WANT"
@@ -370,7 +370,7 @@ src_configure() {
 		-DVTK_MODULE_ENABLE_VTK_theora="WANT"
 		-DVTK_MODULE_ENABLE_VTK_tiff="WANT"
 		-DVTK_MODULE_ENABLE_VTK_utf8="WANT"
-		-DVTK_MODULE_ENABLE_VTK_vtkm=$(usex vtkm "WANT" "DEFAULT")
+		-DVTK_MODULE_ENABLE_VTK_vtkm="$(usex vtkm "WANT" "DEFAULT")"
 		-DVTK_MODULE_ENABLE_VTK_zlib="WANT"
 
 		# not packaged in Gentoo
@@ -380,25 +380,25 @@ src_configure() {
 
 		-DVTK_RELOCATABLE_INSTALL=ON
 
-		-DVTK_SMP_ENABLE_OPENMP=$(usex openmp ON OFF)
-		-DVTK_SMP_ENABLE_STDTHREAD=$(usex threads ON OFF)
-		-DVTK_SMP_ENABLE_TBB=$(usex tbb ON OFF)
+		-DVTK_SMP_ENABLE_OPENMP="$(usex openmp ON OFF)"
+		-DVTK_SMP_ENABLE_STDTHREAD="$(usex threads ON OFF)"
+		-DVTK_SMP_ENABLE_TBB="$(usex tbb ON OFF)"
 
 		-DVTK_UNIFIED_INSTALL_TREE=ON
 
-		-DVTK_USE_CUDA=$(usex cuda ON OFF)
+		-DVTK_USE_CUDA="$(usex cuda ON OFF)"
 		# use system libraries where possible
 		-DVTK_USE_EXTERNAL=ON
 		# avoid finding package from either ::guru or ::sci
 		-DVTK_USE_MEMKIND=OFF
-		-DVTK_USE_MPI=$(usex mpi ON OFF)
-		-DVTK_USE_TK=$(usex tk ON OFF)
+		-DVTK_USE_MPI="$(usex mpi ON OFF)"
+		-DVTK_USE_TK="$(usex tk ON OFF)"
 		-DVTK_USE_X=ON
 
 		-DVTK_WHEEL_BUILD=OFF
 
-		-DVTK_WRAP_JAVA=$(usex java ON OFF)
-		-DVTK_WRAP_PYTHON=$(usex python ON OFF)
+		-DVTK_WRAP_JAVA="$(usex java ON OFF)"
+		-DVTK_WRAP_PYTHON="$(usex python ON OFF)"
 	)
 
 	if use all-modules; then
@@ -602,7 +602,7 @@ src_configure() {
 			-DVTK_MODULE_ENABLE_VTK_glew="WANT"
 			-DVTK_MODULE_ENABLE_VTK_opengl="WANT"
 
-			-DVTK_USE_SDL2=$(usex sdl "YES" "NO")
+			-DVTK_USE_SDL2="$(usex sdl "YES" "NO")"
 		)
 		use tk && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_RenderingTk="WANT" )
 		use views && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_ViewsContext2D="WANT" )
@@ -699,17 +699,17 @@ src_install() {
 
 	cmake_src_install
 
-	use java && java-pkg_regjar "${ED}"/usr/share/${PN}/${PN}.jar
+	use java && java-pkg_regjar "${ED}/usr/share/${PN}/${PN}.jar"
 
 	# install examples
 	if use examples; then
 		einfo "Installing examples"
 		mv -v {E,e}xamples || die
 		dodoc -r examples
-		docompress -x /usr/share/doc/${PF}/examples
+		docompress -x "/usr/share/doc/${PF}/examples"
 
 		einfo "Installing datafiles"
-		insinto /usr/share/${PN}/data
+		insinto "/usr/share/${PN}/data"
 		doins -r "${S}/.ExternalData"
 	fi
 
