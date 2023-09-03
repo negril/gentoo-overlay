@@ -19,7 +19,7 @@
     <flag name="cuda">Add support for CUDA</flag>
     <flag name="freetype">Build support for font rendering</flag>
     <flag name="gdal">Support for gdal formated data</flag>
-    <flag name="gles2">Enable GLESv2 support.</flag>
+    <flag name="gles2">Force building for GLESv2.</flag>
     <flag name="imaging">Building Imaging modules</flag>
     <flag name="las">Build support for LiDAR files</flag>
     <flag name="logging">Build the logging module</flag>

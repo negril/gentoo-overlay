@@ -16,30 +16,31 @@ inherit check-reqs cmake cuda java-pkg-opt-2 multiprocessing python-single-r1 to
 
 # Short package version
 MY_PV="$(ver_cut 1-2)"
+MY_PV2="${PV/_rc/.rc}"
 
 DESCRIPTION="The Visualization Toolkit"
 HOMEPAGE="https://www.vtk.org/"
 SRC_URI="
-	https://www.vtk.org/files/release/${MY_PV}/VTK-${PV}.tar.gz
-	https://www.vtk.org/files/release/${MY_PV}/VTKData-${PV}.tar.gz
-	https://www.vtk.org/files/release/${MY_PV}/VTKDataFiles-${PV}.tar.gz
-	doc? ( https://www.vtk.org/files/release/${MY_PV}/vtkDocHtml-${PV}.tar.gz )
+	https://www.vtk.org/files/release/${MY_PV}/VTK-${MY_PV2}.tar.gz
+	https://www.vtk.org/files/release/${MY_PV}/VTKData-${MY_PV2}.tar.gz
+	https://www.vtk.org/files/release/${MY_PV}/VTKDataFiles-${MY_PV2}.tar.gz
+	doc? ( https://www.vtk.org/files/release/${MY_PV}/vtkDocHtml-${MY_PV2}.tar.gz )
 	examples? (
-		https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
-		https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
+		https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${MY_PV2}.tar.gz
+		https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${MY_PV2}.tar.gz
 	)
 	test? (
-		https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
-		https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
+		https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${MY_PV2}.tar.gz
+		https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${MY_PV2}.tar.gz
 	)
 "
-S="${WORKDIR}/VTK-${PV}"
+S="${WORKDIR}/VTK-${MY_PV2}"
 
 LICENSE="BSD LGPL-2"
 SLOT="0/${MY_PV}"
 KEYWORDS="~amd64 ~arm ~arm64 ~x86 ~amd64-linux ~x86-linux"
 # TODO: Like to simplifiy these. Mostly the flags related to Groups.
-IUSE="all-modules boost cuda debug doc examples ffmpeg freetype gdal gles2 imaging
+IUSE="all-modules boost cuda debug doc examples ffmpeg freetype gdal imaging
 	java las +logging mpi mysql odbc openmp openvdb pdal postgres python qt5
 	qt6 +rendering sdl tbb test +threads tk video_cards_nvidia views vtkm web"
 
@@ -160,12 +161,12 @@ DEPEND="
 BDEPEND="virtual/pkgconfig"
 
 PATCHES=(
-	"${FILESDIR}/${PN}-9.2.2-vtkGeometryFilter-add-missing-mutex-header-file.patch"
-	"${FILESDIR}/${PN}-9.2.2-VTKm-respect-user-CXXFLAGS.patch"
-	"${FILESDIR}/${PN}-9.2.2-link-with-glut-library-for-freeglut.patch"
-	"${FILESDIR}/${PN}-9.2.5-Add-include-cstdint-to-compile-with-gcc-13.patch"
-	"${FILESDIR}/${PN}-9.2.5-Fix-compilation-error-with-CUDA-12.patch"
-	"${FILESDIR}/${PN}-9.2.5-More-include-cstdint-to-compile-with-gcc13.patch"
+	# "${FILESDIR}/${PN}-9.2.2-vtkGeometryFilter-add-missing-mutex-header-file.patch"
+	# "${FILESDIR}/${PN}-9.2.2-VTKm-respect-user-CXXFLAGS.patch"
+	# "${FILESDIR}/${PN}-9.2.2-link-with-glut-library-for-freeglut.patch"
+	# "${FILESDIR}/${PN}-9.2.5-Add-include-cstdint-to-compile-with-gcc-13.patch"
+	# "${FILESDIR}/${PN}-9.2.5-Fix-compilation-error-with-CUDA-12.patch"
+	# "${FILESDIR}/${PN}-9.2.5-More-include-cstdint-to-compile-with-gcc13.patch"
 )
 
 DOCS=( CONTRIBUTING.md README.md )
@@ -289,8 +290,8 @@ src_prepare() {
 		ebegin "Copying data files to ${BUILD_DIR}"
 		mkdir -p "${BUILD_DIR}/ExternalData" || die
 		pushd "${BUILD_DIR}/ExternalData" >/dev/null || die
-		ln -sf "../../VTK-${PV}/.ExternalData/README.rst" . || die
-		ln -sf "../../VTK-${PV}/.ExternalData/SHA512" . || die
+		ln -sf "../../VTK-${MY_PV2}/.ExternalData/README.rst" . || die
+		ln -sf "../../VTK-${MY_PV2}/.ExternalData/SHA512" . || die
 		popd >/dev/null || die
 		eend "$?"
 	fi
@@ -371,6 +372,7 @@ src_configure() {
 		-DVTK_MODULE_ENABLE_VTK_zlib="WANT"
 
 		# not packaged in Gentoo
+		-DVTK_MODULE_USE_EXTERNAL_VTK_fast_float=OFF
 		-DVTK_MODULE_USE_EXTERNAL_VTK_exprtk=OFF
 		-DVTK_MODULE_USE_EXTERNAL_VTK_ioss=OFF
 		-DVTK_MODULE_USE_EXTERNAL_VTK_verdict=OFF
@@ -535,11 +537,12 @@ src_configure() {
 	fi
 
 	if use qt5; then
+		# prefer Qt5: https://wiki.gentoo.org/wiki/Project:qt/Policies
 		mycmakeargs+=(
 			-DCMAKE_INSTALL_QMLDIR="${EPREFIX}/usr/$(get_libdir)/qt5/qml"
 			-DVTK_QT_VERSION="5"
 		)
-		has_version "dev-qt/qtopengl:5[gles2-only]" || use gles2 && mycmakeargs+=(
+		has_version "dev-qt/qtopengl:5[gles2-only]" && mycmakeargs+=(
 			# Force using EGL & GLES
 			-DVTK_OPENGL_HAS_EGL=ON
 			-DVTK_OPENGL_USE_GLES=ON
@@ -549,7 +552,7 @@ src_configure() {
 			-DCMAKE_INSTALL_QMLDIR="${EPFREIX}/usr/$(get_libdir)/qt6/qml"
 			-DVTK_QT_VERSION="6"
 		)
-		has_version "dev-qt/qtbase:6[gles2-only]" || use gles2 && mycmakeargs+=(
+		has_version "dev-qt/qtbase:6[gles2-only]" && mycmakeargs+=(
 			# Force using EGL & GLES
 			-DVTK_OPENGL_HAS_EGL=ON
 			-DVTK_OPENGL_USE_GLES=ON
