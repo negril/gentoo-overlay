@@ -6,7 +6,7 @@ EAPI=8
 inherit git-r3 cmake
 
 DESCRIPTION="Library for working with MIME messages and Internet messaging services"
-HOMEPAGE="http://www.vmime.org"
+HOMEPAGE="https://www.vmime.org"
 EGIT_REPO_URI="https://github.com/kisli/vmime.git"
 
 LICENSE="GPL-3"
@@ -19,7 +19,7 @@ RESTRICT="!test? ( test )"
 RDEPEND="
 	gnutls? ( >=net-libs/gnutls-1.2.0 )
 	icu? ( dev-libs/icu:= )
-	sasl? ( virtual/gsasl )
+	sasl? ( >=net-misc/gsasl-2.0.0 )
 	sendmail? ( virtual/mta )
 	ssl? (
 		!gnutls? ( dev-libs/openssl:= )
@@ -33,10 +33,6 @@ BDEPEND="
 	doc? ( app-doc/doxygen )
 "
 
-PATCHES=(
-	"${FILESDIR}/libvmime-9999-cmake.patch"
-)
-
 src_configure() {
 	local mycmakeargs=(
 	"-DVMIME_BUILD_DOCUMENTATION=$(usex doc)"
@@ -47,7 +43,7 @@ src_configure() {
 	"-DVMIME_CHARSETCONV_LIB=$(usex icu icu iconv)"
 
 	"-DVMIME_HAVE_FILESYSTEM_FEATURES=$(usex maildir)"
-	"-DVMIME_HAVE_MESSAGING_FEATURES=$(usex imap yes $(usex maildir yes $(usex pop yes $(usex sendmail yes $(usex smtp yes no)))))"
+	"-DVMIME_HAVE_MESSAGING_FEATURES=$(usex imap yes "$(usex maildir yes "$(usex pop yes "$(usex sendmail yes "$(usex smtp yes no)")")")")"
 
 	"-DVMIME_HAVE_MESSAGING_PROTO_IMAP=$(usex imap)"
 	"-DVMIME_HAVE_MESSAGING_PROTO_MAILDIR=$(usex maildir)"
@@ -56,9 +52,9 @@ src_configure() {
 	"-DVMIME_HAVE_MESSAGING_PROTO_SMTP=$(usex smtp)"
 
 	"-DVMIME_HAVE_SASL_SUPPORT=$(usex sasl)"
-	"-DVMIME_HAVE_TLS_SUPPORT=$(usex ssl yes $(usex gnutls))"
+	"-DVMIME_HAVE_TLS_SUPPORT=$(usex ssl yes "$(usex gnutls)")"
 
-	"-DVMIME_TLS_SUPPORT_LIB=$(usex ssl openssl $(usex gnutls gnutls))"
+	"-DVMIME_TLS_SUPPORT_LIB=$(usex ssl openssl "$(usex gnutls gnutls)")"
 	)
 
 	if use debug; then
@@ -74,13 +70,7 @@ src_install() {
 	dodoc AUTHORS
 
 	local HTML_DOCS=( "doc/html" )
-	if use doc ; then
-		einstalldocs
-	fi
+	use doc && einstalldocs
 
-	if use examples ; then
-		dodoc examples
-	fi
-	# mv "${D}"/usr/include/var/tmp/paludis/dev-cpp-libvmime-9999/work/libvmime-9999_build/src/vmime/* "${D}"/usr/include/vmime/
-	# rm -rf "${D}"/usr/include/var/
+	use examples && dodoc examples
 }
