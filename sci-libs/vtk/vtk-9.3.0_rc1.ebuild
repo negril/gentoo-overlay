@@ -39,8 +39,32 @@ S="${WORKDIR}/VTK-${MY_PV2}"
 LICENSE="BSD LGPL-2"
 SLOT="0/${MY_PV}"
 KEYWORDS="~amd64 ~arm ~arm64 ~x86 ~amd64-linux ~x86-linux"
+
+CUDA_TARGETS=(
+	# Maxwell
+	50
+	52
+	53
+	# Pascal
+	60
+	61
+	62
+	# Volta
+	70
+	72
+	# Turing
+	75
+	# Ampere
+	80
+	86
+	87
+	# Ada
+	89
+	# Hopper
+	90
+)
 # TODO: Like to simplifiy these. Mostly the flags related to Groups.
-IUSE="all-modules boost cuda debug doc examples ffmpeg freetype gdal imaging
+IUSE="all-modules boost cuda ${CUDA_TARGETS[*]/#/video_cards_nvidia-sm} debug doc examples ffmpeg freetype gdal gles2 imaging
 	java las +logging mpi mysql odbc openmp openvdb pdal postgres python qt5
 	qt6 +rendering sdl tbb test +threads tk video_cards_nvidia views vtkm web"
 
@@ -61,15 +85,11 @@ REQUIRED_USE="
 	web? ( python )
 "
 
-# for <pegtl-3 dependency see
-# https://discourse.vtk.org/t/compilation-errors-related-to-pegtl-proj/5929
 # eigen, nlohmann_json, pegtl and utfcpp are referenced in the cmake files
 # and need to be available when VTK consumers configure the dependencies.
 RDEPEND="
 	app-arch/lz4:=
 	app-arch/xz-utils
-	dev-cpp/eigen
-	dev-cpp/nlohmann_json
 	dev-db/sqlite:3
 	dev-libs/double-conversion:=
 	dev-libs/expat
@@ -78,12 +98,10 @@ RDEPEND="
 	>=dev-libs/libfmt-8.1.1:=
 	dev-libs/libxml2:2
 	dev-libs/libzip:=
-	<dev-libs/pegtl-3
 	dev-libs/pugixml
-	dev-libs/utfcpp
 	media-libs/freetype
 	media-libs/libjpeg-turbo
-	>=media-libs/libharu-2.4.2:=
+	>=media-libs/libharu-2.4.0:=
 	media-libs/libogg
 	media-libs/libpng:=
 	media-libs/libtheora
@@ -144,13 +162,11 @@ RDEPEND="
 	web? ( ${WEBAPP_DEPEND} )
 "
 
-# for <pegtl-3 dependency see
-# https://discourse.vtk.org/t/compilation-errors-related-to-pegtl-proj/5929
 DEPEND="
 	${RDEPEND}
 	dev-cpp/eigen
 	dev-cpp/nlohmann_json
-	<dev-libs/pegtl-3
+	dev-libs/pegtl
 	dev-libs/utfcpp
 	test? (
 		media-libs/glew
@@ -167,6 +183,7 @@ PATCHES=(
 	# "${FILESDIR}/${PN}-9.2.5-Add-include-cstdint-to-compile-with-gcc-13.patch"
 	# "${FILESDIR}/${PN}-9.2.5-Fix-compilation-error-with-CUDA-12.patch"
 	# "${FILESDIR}/${PN}-9.2.5-More-include-cstdint-to-compile-with-gcc13.patch"
+	"${FILESDIR}/${PN}-9.2.5-pegtl-3.x.patch"
 )
 
 DOCS=( CONTRIBUTING.md README.md )
@@ -368,7 +385,7 @@ src_configure() {
 		-DVTK_MODULE_ENABLE_VTK_theora="WANT"
 		-DVTK_MODULE_ENABLE_VTK_tiff="WANT"
 		-DVTK_MODULE_ENABLE_VTK_utf8="WANT"
-		-DVTK_MODULE_ENABLE_VTK_vtkm="$(usex vtkm "WANT" "DEFAULT")"
+		-DVTK_MODULE_ENABLE_VTK_vtkvtkm="$(usex vtkm "WANT" "DEFAULT")"
 		-DVTK_MODULE_ENABLE_VTK_zlib="WANT"
 
 		# not packaged in Gentoo
@@ -542,7 +559,7 @@ src_configure() {
 			-DCMAKE_INSTALL_QMLDIR="${EPREFIX}/usr/$(get_libdir)/qt5/qml"
 			-DVTK_QT_VERSION="5"
 		)
-		has_version "dev-qt/qtopengl:5[gles2-only]" && mycmakeargs+=(
+		has_version "dev-qt/qtopengl:5[gles2-only]" || use gles2 && mycmakeargs+=(
 			# Force using EGL & GLES
 			-DVTK_OPENGL_HAS_EGL=ON
 			-DVTK_OPENGL_USE_GLES=ON
@@ -552,7 +569,7 @@ src_configure() {
 			-DCMAKE_INSTALL_QMLDIR="${EPFREIX}/usr/$(get_libdir)/qt6/qml"
 			-DVTK_QT_VERSION="6"
 		)
-		has_version "dev-qt/qtbase:6[gles2-only]" && mycmakeargs+=(
+		has_version "dev-qt/qtbase:6[gles2-only]" || use gles2 && mycmakeargs+=(
 			# Force using EGL & GLES
 			-DVTK_OPENGL_HAS_EGL=ON
 			-DVTK_OPENGL_USE_GLES=ON
