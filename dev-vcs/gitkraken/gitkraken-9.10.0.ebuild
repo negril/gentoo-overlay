@@ -10,7 +10,6 @@ SRC_URI="https://release.axocdn.com/linux/GitKraken-v${PV}.deb"
 
 SLOT="0"
 KEYWORDS="~amd64"
-IUSE=""
 RESTRICT="strip mirror"
 S="${WORKDIR}"
 
