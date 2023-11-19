@@ -38,7 +38,7 @@ S="${WORKDIR}/VTK-${MY_PV2}"
 
 LICENSE="BSD LGPL-2"
 SLOT="0/${MY_PV}"
-KEYWORDS="~amd64 ~arm ~arm64 ~x86 ~amd64-linux ~x86-linux"
+KEYWORDS="~amd64 ~arm ~arm64 ~x86"
 
 CUDA_TARGETS=(
 	# Maxwell
