@@ -71,6 +71,8 @@ src_install() {
 	fperms 755 /usr/share/gitkraken/gitkraken
 	fperms 755 /usr/share/gitkraken/libffmpeg.so
 	fperms 755 /usr/share/gitkraken/resources/bin/gitkraken.sh
+	fperms 755 /usr/share/gitkraken/resources/app.asar.unpacked/src/js/redux/domain/AskPass/AskPass.sh
+	fperms 755 /usr/share/gitkraken/resources/app.asar.unpacked/node_modules/nodegit-large-file-storage/askpass.sh
 }
 
 pkg_postinst() {
