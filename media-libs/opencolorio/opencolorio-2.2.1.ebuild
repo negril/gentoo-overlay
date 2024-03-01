@@ -53,7 +53,7 @@ DEPEND="${RDEPEND}"
 BDEPEND="
 	virtual/pkgconfig
 	doc? (
-		app-doc/doxygen
+		app-text/doxygen
 		$(python_gen_cond_dep '
 			dev-python/breathe[${PYTHON_USEDEP}]
 			dev-python/recommonmark[${PYTHON_USEDEP}]

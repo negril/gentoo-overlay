@@ -71,7 +71,7 @@ BDEPEND="
 	>=sys-devel/gcc-8
 	virtual/pkgconfig
 	doc? (
-		app-doc/doxygen
+		app-text/doxygen
 		python? ( dev-python/sphinx[${PYTHON_USEDEP}] )
 		ruby? ( dev-ruby/syntax$(ruby_samelib) dev-ruby/rdoc$(ruby_samelib) )
 	)

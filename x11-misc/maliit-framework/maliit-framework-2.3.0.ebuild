@@ -22,7 +22,7 @@ DEPEND="
     dev-qt/qtdbus:5=
     dev-qt/qtdeclarative:5=
     dev-qt/qtgui:5=
-    doc? ( app-doc/doxygen )
+    doc? ( app-text/doxygen )
     glib? ( dev-libs/glib )
     hwkeyboard? ( virtual/udev )
     wayland? (
