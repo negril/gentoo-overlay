@@ -3,7 +3,7 @@
 
 EAPI=8
 
-inherit unpacker xdg
+inherit pax-utils unpacker xdg
 DESCRIPTION="cross-platform Git client"
 HOMEPAGE="https://www.gitkraken.com"
 SRC_URI="https://release.axocdn.com/linux/GitKraken-v${PV}.deb"
@@ -68,11 +68,23 @@ src_install() {
 
 	dodoc usr/share/doc/gitkraken/copyright
 
-	fperms 755 /usr/share/gitkraken/gitkraken
-	fperms 755 /usr/share/gitkraken/libffmpeg.so
-	fperms 755 /usr/share/gitkraken/resources/bin/gitkraken.sh
-	fperms 755 /usr/share/gitkraken/resources/app.asar.unpacked/src/js/redux/domain/AskPass/AskPass.sh
-	fperms 755 /usr/share/gitkraken/resources/app.asar.unpacked/node_modules/nodegit-large-file-storage/askpass.sh
+	EXEFILES=(
+		/usr/share/gitkraken/chrome-sandbox
+		/usr/share/gitkraken/chrome_crashpad_handler
+		/usr/share/gitkraken/gitkraken
+		/usr/share/gitkraken/libffmpeg.so
+		/usr/share/gitkraken/libvk_swiftshader.so
+		/usr/share/gitkraken/resources/app.asar.unpacked/node_modules/@axosoft/node-spawn-server/target/release/node-spawn-server
+		/usr/share/gitkraken/resources/app.asar.unpacked/node_modules/@axosoft/rust-socket-bridge/target/release/rust-socket-bridge
+		/usr/share/gitkraken/resources/app.asar.unpacked/resources/cli/unix/gkc
+		/usr/share/gitkraken/resources/app.asar.unpacked/resources/hooks/hook.template
+		/usr/share/gitkraken/resources/app.asar.unpacked/src/js/redux/domain/AskPass/AskPass.sh
+		/usr/share/gitkraken/resources/bin/gitkraken.sh
+		/usr/share/lintian/overrides/gitkraken
+	)
+	fperms +x "${EXEFILES[@]}"
+	fperms u+s /usr/share/gitkraken/chrome-sandbox
+	pax-mark m usr/share/gitkraken/gitkraken usr/share/gitkraken/chrome-sandbox
 }
 
 pkg_postinst() {
