@@ -5,7 +5,7 @@ EAPI=8
 
 SDK="8.0.204"
 
-DESCRIPTION=".NET Standard targeting pack (binary)"
+DESCRIPTION=".NET Core App Host pack for linux x64 (binary)"
 HOMEPAGE="https://dotnet.microsoft.com/"
 
 SRC_URI="
@@ -17,7 +17,7 @@ SRC_URI="
 S=${WORKDIR}
 
 LICENSE="MIT"
-SLOT="2.1"
+SLOT="8.0"
 KEYWORDS="~amd64 ~arm ~arm64"
 QA_PREBUILT="*"
 RESTRICT+=" splitdebug"
@@ -29,5 +29,5 @@ src_install() {
 	dodir "${dotnet_root%/*}"
 
 	insinto "${dotnet_root}/packs"
-	doins -r packs/NETStandard.Library.Ref
+	doins -r packs/Microsoft.NETCore.App.Host.linux-x64
 }

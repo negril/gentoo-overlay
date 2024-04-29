@@ -2,12 +2,12 @@
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 
 <pkgmetadata>
-  <maintainer type="person">
-    <email>xgqt@gentoo.org</email>
-    <name>Maciej Barć</name>
+  <maintainer type="project">
+    <email>dotnet@gentoo.org</email>
+    <name>Gentoo Dotnet Project</name>
   </maintainer>
   <upstream>
     <doc>https://learn.microsoft.com/en-us/dotnet/</doc>
-    <remote-id type="github">dotnet/sdk</remote-id>
+    <remote-id type="github">dotnet/core</remote-id>
   </upstream>
 </pkgmetadata>

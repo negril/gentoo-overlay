@@ -3,9 +3,9 @@
 
 EAPI=8
 
-SDK="8.0.204"
+SDK="6.0.421"
 
-DESCRIPTION=".NET Standard targeting pack (binary)"
+DESCRIPTION=".NET Templates (binary)"
 HOMEPAGE="https://dotnet.microsoft.com/"
 
 SRC_URI="
@@ -17,7 +17,7 @@ SRC_URI="
 S=${WORKDIR}
 
 LICENSE="MIT"
-SLOT="2.1"
+SLOT="6.0"
 KEYWORDS="~amd64 ~arm ~arm64"
 QA_PREBUILT="*"
 RESTRICT+=" splitdebug"
@@ -28,6 +28,6 @@ src_install() {
 	local dotnet_root="opt/dotnet"
 	dodir "${dotnet_root%/*}"
 
-	insinto "${dotnet_root}/packs"
-	doins -r packs/NETStandard.Library.Ref
+	insinto "${dotnet_root}"
+	doins -r templates
 }

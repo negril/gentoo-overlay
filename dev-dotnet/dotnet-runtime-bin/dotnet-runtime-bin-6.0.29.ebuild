@@ -3,9 +3,9 @@
 
 EAPI=8
 
-SDK="8.0.204"
+SDK="6.0.421"
 
-DESCRIPTION=".NET Standard targeting pack (binary)"
+DESCRIPTION=".NET Core runtime (binary)"
 HOMEPAGE="https://dotnet.microsoft.com/"
 
 SRC_URI="
@@ -17,17 +17,21 @@ SRC_URI="
 S=${WORKDIR}
 
 LICENSE="MIT"
-SLOT="2.1"
+SLOT="6.0"
 KEYWORDS="~amd64 ~arm ~arm64"
 QA_PREBUILT="*"
 RESTRICT+=" splitdebug"
 
 REQUIRED_USE="|| ( elibc_glibc elibc_musl )"
 
+RDEPEND="
+	>=dev-dotnet/dotnet-hostfxr-bin-6.0.29:6.0
+"
+
 src_install() {
 	local dotnet_root="opt/dotnet"
 	dodir "${dotnet_root%/*}"
 
-	insinto "${dotnet_root}/packs"
-	doins -r packs/NETStandard.Library.Ref
+	insinto "${dotnet_root}/shared"
+	doins -r shared/Microsoft.NETCore.App
 }
