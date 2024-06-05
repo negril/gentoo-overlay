@@ -7,11 +7,12 @@ inherit pax-utils unpacker xdg
 DESCRIPTION="cross-platform Git client"
 HOMEPAGE="https://www.gitkraken.com"
 SRC_URI="https://release.axocdn.com/linux/GitKraken-v${PV}.deb"
+S="${WORKDIR}"
 
+LICENSE="Axosoft"
 SLOT="0"
 KEYWORDS="~amd64"
 RESTRICT="strip mirror"
-S="${WORKDIR}"
 
 RDEPEND="
 	>=net-print/cups-1.7.0
@@ -41,8 +42,6 @@ RDEPEND="
 	x11-misc/xdg-utils
 "
 
-LICENSE="Axosoft"
-
 QA_PREBUILT="*"
 
 src_prepare() {
@@ -56,7 +55,7 @@ src_prepare() {
 		# usr/share/gitkraken/chrome_crashpad_handler
 		# usr/share/gitkraken/libvk_swiftshader.so
 	)
-	rm -Rf "${FILES[@]}"
+	rm -Rf "${FILES[@]}" || die
 }
 
 src_install() {
@@ -67,6 +66,8 @@ src_install() {
 	doins -r usr/share/{gitkraken,applications,pixmaps,lintian}
 
 	dodoc usr/share/doc/gitkraken/copyright
+
+	find "${S}" -type f -executable -ls
 
 	EXEFILES=(
 		/usr/share/gitkraken/chrome-sandbox
