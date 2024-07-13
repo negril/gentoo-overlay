@@ -1,4 +1,4 @@
-# Copyright 1999-2023 Gentoo Foundation
+# Copyright 1999-2024 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -12,7 +12,7 @@ S="${WORKDIR}"
 LICENSE="Axosoft"
 SLOT="0"
 KEYWORDS="~amd64"
-RESTRICT="strip mirror"
+RESTRICT="bindist mirror test strip"
 
 RDEPEND="
 	>=net-print/cups-1.7.0
@@ -80,6 +80,7 @@ src_install() {
 		/usr/share/gitkraken/resources/app.asar.unpacked/resources/cli/unix/gkc
 		/usr/share/gitkraken/resources/app.asar.unpacked/resources/hooks/hook.template
 		/usr/share/gitkraken/resources/app.asar.unpacked/src/js/redux/domain/AskPass/AskPass.sh
+		/usr/share/gitkraken/resources/app.asar.unpacked/src/js/redux/domain/Rebase/GitSequenceEditor.sh
 		/usr/share/gitkraken/resources/bin/gitkraken.sh
 		/usr/share/lintian/overrides/gitkraken
 	)
