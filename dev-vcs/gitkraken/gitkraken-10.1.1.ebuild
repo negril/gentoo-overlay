@@ -67,8 +67,6 @@ src_install() {
 
 	dodoc usr/share/doc/gitkraken/copyright
 
-	find "${S}" -type f -executable -ls
-
 	EXEFILES=(
 		/usr/share/gitkraken/chrome-sandbox
 		/usr/share/gitkraken/chrome_crashpad_handler
@@ -87,6 +85,10 @@ src_install() {
 	fperms +x "${EXEFILES[@]}"
 	fperms u+s /usr/share/gitkraken/chrome-sandbox
 	pax-mark m usr/share/gitkraken/gitkraken usr/share/gitkraken/chrome-sandbox
+
+	if [[ $(find "${S}" -type f -executable -ls | wc -l) -ne ${#EXEFILES[@]} ]]; then
+		eqawarn "incomplete EXEFILES"
+	fi
 }
 
 pkg_postinst() {
