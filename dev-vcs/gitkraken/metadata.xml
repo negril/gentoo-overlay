@@ -5,4 +5,8 @@
     <email>negril.nx+gentoo@gmail.com</email>
     <name>Paul Zander</name>
   </maintainer>
+  <use>
+    <flag name="system-chromium">Use system chromium</flag>
+    <flag name="system-ffmpeg">Use system ffmpeg</flag>
+  </use>
 </pkgmetadata>

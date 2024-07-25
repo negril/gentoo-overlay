@@ -12,6 +12,9 @@ S="${WORKDIR}"
 LICENSE="Axosoft"
 SLOT="0"
 KEYWORDS="~amd64"
+
+IUSE="system-chromium system-ffmpeg"
+
 RESTRICT="bindist mirror test strip"
 
 RDEPEND="
@@ -40,22 +43,64 @@ RDEPEND="
 	x11-libs/libxkbfile
 	dev-libs/glib
 	x11-misc/xdg-utils
+
+	system-chromium? (
+		www-client/chromium
+	)
+	system-ffmpeg? (
+		media-video/ffmpeg[chromium]
+	)
 "
 
 QA_PREBUILT="*"
 
 src_prepare() {
-	FILES=(
-		usr/share/gitkraken/resources/app.asar.unpacked/git
-		usr/share/gitkraken/resources/app.asar.unpacked/resources/cli/win
+	SYSTEMLIBS=(
 		usr/share/gitkraken/libEGL.so
 		usr/share/gitkraken/libGLESv2.so
 		usr/share/gitkraken/libvulkan.so.1
-		# usr/share/gitkraken/chrome-sandbox
-		# usr/share/gitkraken/chrome_crashpad_handler
+		# TODO https://github.com/google/swiftshader
 		# usr/share/gitkraken/libvk_swiftshader.so
+		# usr/share/gitkraken/vk_swiftshader_icd.json
 	)
+
+	local FILES=(
+		usr/share/gitkraken/resources/app.asar.unpacked/git
+		usr/share/gitkraken/resources/app.asar.unpacked/resources/cli/win
+	)
+
+	if use system-chromium; then
+		FILES+=(
+			# www-client/chromium
+			usr/share/gitkraken/chrome_100_percent.pak
+			usr/share/gitkraken/chrome_200_percent.pak
+			usr/share/gitkraken/chrome_crashpad_handler
+			usr/share/gitkraken/chrome-sandbox
+			usr/share/gitkraken/LICENSE.electron
+			usr/share/gitkraken/LICENSES.chromium.html
+		)
+	fi
+
+	if use system-ffmpeg; then
+		SYSTEMLIBS+=(
+			# media-video/ffmpeg[chromium]
+			usr/share/gitkraken/libffmpeg.so
+		)
+	fi
+
+	FILES+=(
+		"${SYSTEMLIBS[@]}"
+	)
+
 	rm -Rf "${FILES[@]}" || die
+}
+
+src_configure() {
+	:
+}
+
+src_compile() {
+	:
 }
 
 src_install() {
@@ -67,11 +112,9 @@ src_install() {
 
 	dodoc usr/share/doc/gitkraken/copyright
 
+	local EXEFILES NODEFILES
 	EXEFILES=(
-		/usr/share/gitkraken/chrome-sandbox
-		/usr/share/gitkraken/chrome_crashpad_handler
 		/usr/share/gitkraken/gitkraken
-		/usr/share/gitkraken/libffmpeg.so
 		/usr/share/gitkraken/libvk_swiftshader.so
 		/usr/share/gitkraken/resources/app.asar.unpacked/node_modules/@axosoft/node-spawn-server/target/release/node-spawn-server
 		/usr/share/gitkraken/resources/app.asar.unpacked/node_modules/@axosoft/rust-socket-bridge/target/release/rust-socket-bridge
@@ -82,13 +125,34 @@ src_install() {
 		/usr/share/gitkraken/resources/bin/gitkraken.sh
 		/usr/share/lintian/overrides/gitkraken
 	)
-	fperms +x "${EXEFILES[@]}"
-	fperms u+s /usr/share/gitkraken/chrome-sandbox
-	pax-mark m usr/share/gitkraken/gitkraken usr/share/gitkraken/chrome-sandbox
 
-	if [[ $(find "${S}" -type f -executable -ls | wc -l) -ne ${#EXEFILES[@]} ]]; then
+	readarray -t NODEFILES <<<"$(find usr/share/gitkraken/resources/app.asar.unpacked/node_modules/ -name '*.node' )"
+
+	if ! use system-chromium; then
+		EXEFILES+=(
+			/usr/share/gitkraken/chrome_crashpad_handler
+			/usr/share/gitkraken/chrome-sandbox
+		)
+		fperms u+s /usr/share/gitkraken/chrome-sandbox
+		pax-mark m usr/share/gitkraken/chrome-sandbox
+	fi
+
+	if ! use system-ffmpeg; then
+		EXEFILES+=(
+			/usr/share/gitkraken/libffmpeg.so
+		)
+	fi
+
+	fperms +x "${EXEFILES[@]}" "${NODEFILES[@]}"
+	pax-mark m usr/share/gitkraken/gitkraken
+
+	if [[ $(find "${S}" -type f -executable -ls | wc -l) -ne $(( ${#EXEFILES[@]} + ${#NODEFILES[@]} )) ]]; then
 		eqawarn "incomplete EXEFILES"
 	fi
+
+	for lib in "${SYSTEMLIBS[@]}"; do
+		dosym -r "/usr/lib64/$(basename "${lib}")" "${lib}"
+	done
 }
 
 pkg_postinst() {
