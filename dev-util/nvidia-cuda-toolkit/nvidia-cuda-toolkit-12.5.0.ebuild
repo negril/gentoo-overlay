@@ -4,7 +4,7 @@
 EAPI=8
 
 PYTHON_COMPAT=( python3_{10..12} )
-inherit check-reqs toolchain-funcs unpacker python-r1
+inherit check-reqs unpacker python-r1
 
 DRIVER_PV="555.42.02"
 

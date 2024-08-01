@@ -6,7 +6,7 @@ EAPI=8
 PYTHON_COMPAT=( python3_{10..12} )
 inherit check-reqs desktop unpacker python-r1
 
-DRIVER_PV="555.42.02"
+DRIVER_PV="550.54.14"
 # grep "unsupported (GNU|clang) version" builds/cuda_nvcc/targets/x86_64-linux/include/crt/host_config.h
 GCC_MAX_VER="13"
 CLANG_MAX_VER="17"
