@@ -43,9 +43,13 @@ RDEPEND="
 		dev-libs/libei
 		x11-libs/libxkbcommon
 		dev-libs/glib
-		dev-libs/libportal[qt6?]
 		gui? (
-			dev-libs/libportal[qt5]
+			!qt6? (
+				dev-libs/libportal[qt5]
+			)
+			qt6? (
+				dev-libs/libportal[qt6]
+			)
 		)
 	)
 	dev-libs/openssl:0=
