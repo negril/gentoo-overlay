@@ -88,7 +88,7 @@ src_prepare() {
 	default
 
 	# safe some space, we don't need the driver
-	rm builds/NVIDIA-Linux-*-${DRIVER_PV}.run || die
+	rm builds/NVIDIA-Linux-*-"${DRIVER_PV}".run || die
 }
 
 src_install() {
@@ -104,10 +104,11 @@ src_install() {
 	! use sanitizer    && SKIP_COMPONENTS+=( "compute-sanitizer" )
 	! use vis-profiler && SKIP_COMPONENTS+=( "nvvp" )
 
+	local ldpathextradirs pathextradirs
 	local cudadir=/opt/cuda-${PV}
 	local ecudadir="${EPREFIX}${cudadir}"
-	dodir ${cudadir}
-	into ${cudadir}
+	dodir "${cudadir}"
+	into "${cudadir}"
 
 	local ncu_dir_host ncu_dir_target nsys_dir_host nsys_dir_target
 
@@ -153,8 +154,9 @@ src_install() {
 
 			readarray -t fs < <( find "${file}" -type f -executable )
 			for f in "${fs[@]}"; do
-				local _SRCFILE="$(pwd)/${f}"
-				local _DESTFILE="${_DESTDIR}$( realpath -s --relative-to="$(dirname "${1}")" "${f}" )"
+				local _DESTFILE _SRCFILE
+				_SRCFILE="$(pwd)/${f}"
+				_DESTFILE="${_DESTDIR}$( realpath -s --relative-to="$(dirname "${1}")" "${f}" )"
 
 				ebegin "${_DESTFILE} setting permissions" # {{{
 				chmod -R --reference="${f}" "${ED}${_DESTFILE}" \
@@ -165,11 +167,11 @@ src_install() {
 	}
 
 	dopcfile() {
-		dodir ${cudadir}/pkgconfig
-		cat > "${ED}${cudadir}/pkgconfig/${1}.pc" <<-EOF || die
-			cudaroot=${cudadir}
-			libdir=${cudaroot}/targets/${arch}-linux/libdir${4}
-			includedir=${cudaroot}/targets/${arch}-linux/include
+		dodir "${ecudadir}/pkgconfig"
+		cat > "${ecudadir}/pkgconfig/${1}.pc" <<-EOF || die
+			cudaroot=${ecudadir}
+			libdir=\${cudaroot}/targets/${narch}-linux/libdir${4}
+			includedir=\${cudaroot}/targets/${narch}-linux/include
 
 			Name: ${1}
 			Description: ${3}
@@ -184,7 +186,7 @@ src_install() {
 		if [[ "$(dirname "${6}")" == "bin" ]]; then
 			ver="${PV}"
 		else
-			ver="$(echo ${6} | cut -d '/' -f 1 | rev | cut -d '-' -f 1 | rev)"
+			ver="$(echo "${6}" | cut -d '/' -f 1 | rev | cut -d '-' -f 1 | rev)"
 		fi
 		name="${1}-${ver}"
 
@@ -325,8 +327,8 @@ src_install() {
 		)
 
 		for lib in "${libs[@]}"; do
-			ebegin "removing" ${lib}
-			rm -r ${lib}
+			ebegin "removing ${lib}"
+			rm -r "${lib}"
 			eend $? || die "failed to remove ${lib}"
 		done
 
@@ -539,15 +541,20 @@ src_install() {
 	# rm ${ED}${cudadir}/bin/*-uninstaller
 
 	# Add include and lib symlinks
-	dosym "targets/${narch}-linux/include" ${cudadir}/include
-	dosym "targets/${narch}-linux/lib" ${cudadir}/lib64
+	dosym "targets/${narch}-linux/include" "${cudadir}/include"
+	dosym "targets/${narch}-linux/lib" "${cudadir}/lib64"
 
 	find "${ED}/${cudadir}" -empty -delete || die
 
 	local revord=$(( 999999 - $(printf "%02d%02d%02d" $(echo "${PV}" | tr '.' ' ')) ))
 
+	use debugger && ldpathextradirs+=":${ecudadir}/extras/Debugger/lib64"
+	use profiler && ldpathextradirs+=":${ecudadir}/extras/CUPTI/lib64"
+	use vis-profiler && pathextradirs+=":${ecudadir}/libnvvp"
+
 	newenvd - "99cuda${revord}" <<-EOF
 		PKG_CONFIG_PATH=${ecudadir}/pkgconfig
+		LDPATH=${ecudadir}/lib64:${ecudadir}/nvvm/lib64${ldpathextradirs}
 	EOF
 
 	# Cuda prepackages libraries, don't revdep-build on them
