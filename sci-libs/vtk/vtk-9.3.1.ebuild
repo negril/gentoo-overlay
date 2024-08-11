@@ -164,6 +164,8 @@ PATCHES=(
 	"${FILESDIR}/${PN}-9.3.0-java.patch"
 	"${FILESDIR}/${PN}-9.3.0-opencascade.patch"
 	"${FILESDIR}/${PN}-9.3.0-ThrustPatches.patch"
+	"${FILESDIR}/${PN}-9.3.0-core-octree_node.txx.patch"
+	"${FILESDIR}/${PN}-9.3.0-ThirdParty-gcc15.patch"
 )
 
 DOCS=( CONTRIBUTING.md README.md )
