@@ -693,9 +693,35 @@ src_configure() {
 			-DVTK_MODULE_ENABLE_VTK_AcceleratorsVTKmFilters="YES"
 
 			-DVTKm_NO_INSTALL_README_LICENSE=ON # bug #793221
-			-DVTKm_Vectorization=native
-			-DVTKm_MODULE_ENABLE_vtkm_cont_kokkos="$(usex kokkos "YES" "NO")"
-			-DVTKm_MODULE_ENABLE_vtkm_exec_kokkos="$(usex kokkos "YES" "NO")"
+			-DVTKm_Vectorization="native"
+			# -DVTKm_MODULE_ENABLE_vtkm_cont_kokkos="$(usex kokkos "YES" "NO")"
+			# -DVTKm_MODULE_ENABLE_vtkm_exec_kokkos="$(usex kokkos "YES" "NO")"
+
+			-DVTKm_ENABLE_CUDA="$(usex cuda)" # "Enable Cuda support" OFF
+			-DVTKm_ENABLE_KOKKOS="$(usex kokkos)" # "Enable Kokkos support" OFF
+			-DVTKm_ENABLE_OPENMP="$(usex openmp)" # "Enable OpenMP support" OFF
+			-DVTKm_ENABLE_TBB="$(usex tbb)" # "Enable TBB support" OFF
+			-DVTKm_ENABLE_RENDERING="$(usex rendering)" # "Enable rendering library" ON
+			-DVTKm_ENABLE_BENCHMARKS="no" # "Enable VTKm Benchmarking" OFF
+			-DVTKm_ENABLE_MPI="$(usex mpi)" # "Enable MPI support" OFF
+			-DVTKm_ENABLE_DOCUMENTATION="$(usex doc)" # "Build Doxygen documentation" OFF
+			-DVTKm_ENABLE_EXAMPLES="$(usex examples)" # "Build examples" OFF
+			-DVTKm_ENABLE_TUTORIALS="no" # "Build tutorials" OFF
+			-DVTKm_ENABLE_TESTING="$(usex test)" # "Enable VTKm Testing" ON
+			# -DVTKm_BUILD_ALL_LIBRARIES="no" # "Build all libraries by default. (Can be overridden for each library.)" ON
+			-DVTKm_USE_DOUBLE_PRECISION="no" # "Use double precision for floating point calculations" OFF
+			# -DVTKm_USE_64BIT_IDS # "Use 64-bit indices." ON
+			-DVTKm_ENABLE_HDF5_IO="yes" # "Enable HDF5 support" OFF
+			-DVTKm_ENABLE_LOGGING="$(usex logging)" # "Enable VTKm Logging" ON
+			-DVTKm_NO_ASSERT="no" # "Disable assertions in debugging builds." OFF
+			-DVTKm_NO_ASSERT_CUDA="yes" # "Disable assertions for CUDA devices." ON
+			-DVTKm_NO_ASSERT_HIP="yes" # "Disable assertions for HIP devices." ON
+			# -DVTKm_INSTALL_ONLY_LIBRARIES="no" # "install only vtk-m libraries and no headers" OFF
+			# -DVTKm_HIDE_PRIVATE_SYMBOLS="yes" # "Hide symbols from libraries." ON
+			# -DVTKm_ENABLE_DEVELOPER_FLAGS="no" # "Enable compiler flags that are useful while developing VTK-m" ON
+			# -DVTKm_NO_INSTALL_README_LICENSE # "disable the installation of README and LICENSE files" OFF
+			-DVTKm_SKIP_LIBRARY_VERSIONS="no" # "Skip versioning VTK-m libraries" OFF
+			-DVTKm_ENABLE_CPACK="no" # "Enable CPack packaging of VTKm" ON
 		)
 	fi
 
@@ -856,10 +882,8 @@ src_test() {
 		"${RANDOM_FAIL_TESTS[@]}"
 		"${TIMEOUTED_TESTS[@]}"
 	)
-	myctestargs=(
-		-j1
-	)
-	virtx cmake_src_test
+
+	virtx cmake_src_test -j1
 }
 
 src_install() {
