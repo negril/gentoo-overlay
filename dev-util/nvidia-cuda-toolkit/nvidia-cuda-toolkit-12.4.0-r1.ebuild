@@ -105,7 +105,7 @@ src_install() {
 	! use vis-profiler && SKIP_COMPONENTS+=( "nvvp" )
 
 	local ldpathextradirs pathextradirs
-	local cudadir=/opt/cuda-${PV}
+	local cudadir="/opt/cuda-${PV}"
 	local ecudadir="${EPREFIX}${cudadir}"
 	dodir "${cudadir}"
 	into "${cudadir}"
@@ -168,9 +168,9 @@ src_install() {
 
 	dopcfile() {
 		dodir "${ecudadir}/pkgconfig"
-		cat > "${ecudadir}/pkgconfig/${1}.pc" <<-EOF || die
+		cat > "${D}${ecudadir}/pkgconfig/${1}.pc" <<-EOF || die
 			cudaroot=${ecudadir}
-			libdir=\${cudaroot}/targets/${narch}-linux/libdir${4}
+			libdir=\${cudaroot}/targets/${narch}-linux/lib${4}
 			includedir=\${cudaroot}/targets/${narch}-linux/include
 
 			Name: ${1}
