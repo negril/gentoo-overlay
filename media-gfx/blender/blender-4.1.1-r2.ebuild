@@ -27,7 +27,7 @@ else
 	# 		https://projects.blender.org/blender/blender-test-data/archive/blender-v$(ver_cut 1-2)-release.tar.gz
 	# 	)
 	# "
-	KEYWORDS="~amd64 ~arm ~arm64"
+	KEYWORDS="amd64 ~arm ~arm64"
 	RESTRICT="test" # the test archive returns LFS references.
 fi
 
@@ -85,7 +85,14 @@ RDEPEND="${PYTHON_DEPS}
 	fftw? ( sci-libs/fftw:3.0= )
 	gmp? ( dev-libs/gmp )
 	gnome? ( gui-libs/libdecor )
-	hip? ( >=dev-util/hip-5.7:= )
+	hip? (
+		llvm_slot_17? (
+			dev-util/hip:0/5.7
+		)
+		llvm_slot_18? (
+			>=dev-util/hip-6.1:=[llvm_slot_18(-)]
+		)
+	)
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
 	jpeg2k? ( media-libs/openjpeg:2= )
@@ -95,7 +102,7 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
-	oidn? ( >=media-libs/oidn-2.1.0 )
+	oidn? ( >=media-libs/oidn-2.1.0[${LLVM_USEDEP}] )
 	oneapi? ( dev-libs/intel-compute-runtime[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
@@ -109,23 +116,8 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	optix? ( dev-libs/optix )
 	osl? (
-		>=media-libs/osl-1.13:=
-		llvm_slot_15? (
-			>=media-libs/osl-1.13[llvm_slot_15]
-			media-libs/mesa[llvm_slot_15]
-		)
-		llvm_slot_16? (
-			>=media-libs/osl-1.13[llvm_slot_16]
-			media-libs/mesa[llvm_slot_16]
-		)
-		llvm_slot_17? (
-			>=media-libs/osl-1.13[llvm_slot_17]
-			media-libs/mesa[llvm_slot_17]
-		)
-		llvm_slot_18? (
-			>=media-libs/osl-1.13.10[llvm_slot_18]
-			>=media-libs/mesa-24.1.0-r1[llvm_slot_18]
-		)
+		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
+		media-libs/mesa[${LLVM_USEDEP}]
 	)
 	pdf? ( media-libs/libharu )
 	potrace? ( media-gfx/potrace )
@@ -194,6 +186,8 @@ BDEPEND="
 PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-FindClang.patch"
 	"${FILESDIR}/${PN}-4.0.2-CUDA_NVCC_FLAGS.patch"
+	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
+	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
 )
 
 blender_check_requirements() {
@@ -400,6 +394,13 @@ src_configure() {
 		-DWITH_VULKAN_BACKEND="$(usex vulkan)"
 		-DWITH_XR_OPENXR=no
 	)
+	if has_version ">=dev-python/numpy-2"; then
+		mycmakeargs+=(
+			-DPYTHON_NUMPY_INCLUDE_DIRS="$(python_get_sitedir)/numpy/_core/include"
+			-DPYTHON_NUMPY_PATH="$(python_get_sitedir)/numpy/_core/include"
+		)
+		echo "asdf $(python_get_sitedir)/numpy/_core/include"
+	fi
 
 	# requires dev-vcs/git
 	if [[ ${PV} = *9999* ]] ; then
@@ -483,13 +484,13 @@ src_test() {
 
 	# Sanity check that the script and datafile path is valid.
 	# If they are not vaild, blender will fallback to the default path which is not what we want.
-	[ -d "$BLENDER_SYSTEM_SCRIPTS" ] || die "The custom script path is invalid, fix the ebuild!"
-	[ -d "$BLENDER_SYSTEM_DATAFILES" ] || die "The custom datafiles path is invalid, fix the ebuild!"
+	[[ -d "$BLENDER_SYSTEM_SCRIPTS" ]] || die "The custom script path is invalid, fix the ebuild!"
+	[[ -d "$BLENDER_SYSTEM_DATAFILES" ]] || die "The custom datafiles path is invalid, fix the ebuild!"
 
 	if use cuda; then
 		cuda_add_sandbox -w
-		addwrite "/dev/dri/renderD128"
-		addwrite "/dev/char/"
+		# addwrite "/dev/dri/renderD128"
+		# addwrite "/dev/char/"
 	fi
 
 	if use X; then
@@ -521,7 +522,7 @@ src_install() {
 		export BLENDER_SYSTEM_SCRIPTS=${ED}/usr/share/blender/${BV}/scripts
 		export BLENDER_SYSTEM_DATAFILES=${ED}/usr/share/blender/${BV}/datafiles
 
-		# Workaround for binary drivers.
+		# Workaround for binary drivers. # TODO
 		addpredict /dev/ati
 		addpredict /dev/dri
 		addpredict /dev/nvidiactl
