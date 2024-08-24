@@ -83,6 +83,11 @@ BDEPEND="
 	virtual/pkgconfig
 "
 
+PATCHES=(
+	"${FILESDIR}/${PN}-1.13.10.0-dz-m_dz-type.patch"
+	"${FILESDIR}/${PN}-1.13.10.0-include-cstdint.patch"
+)
+
 pkg_setup() {
 	llvm-r1_pkg_setup
 
