@@ -1,0 +1,16 @@
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 21 Aug 2024 16:43:50 +0200
+Subject: [PATCH] drop obsolete isActive
+
+See-also: https://bugs.gentoo.org/938253
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+--- a/nanovdb/nanovdb/util/GridBuilder.h
++++ b/nanovdb/nanovdb/util/GridBuilder.h
+@@ -1158,7 +1158,6 @@ struct LeafNode
+         ValueIterator& operator=(const ValueIterator&) = default;
+         ValueType operator*() const { NANOVDB_ASSERT(*this); return mParent->mValues[mPos];}
+         Coord getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(mPos);}
+-        bool isActive() const { NANOVDB_ASSERT(*this); return mParent->isActive(mPos);}
+         operator bool() const {return mPos < SIZE;}
+         ValueIterator& operator++() {++mPos; return *this;}
+         ValueIterator operator++(int) {

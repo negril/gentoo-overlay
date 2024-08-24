@@ -110,6 +110,7 @@ PATCHES=(
 
 	"${FILESDIR}/${PN}-11.0.0-constexpr-version.patch"
 	"${FILESDIR}/${PN}-11.0.0-cmake_fixes.patch"
+	"${FILESDIR}/${PN}-11.0.0-gcc15.patch"
 )
 
 cuda_set_CUDAHOSTCXX() {
@@ -331,6 +332,20 @@ my_src_configure() {
 	fi
 
 	cmake_src_configure
+		# local default_compiler="${compiler}-$(${compiler}-major-version)"
+
+	if use cuda; then
+		cmake_ver="$(cmake --version | head -n1  | sed -e 's/cmake version //')"
+		local compiler=$(tc-get-compiler-type)
+    local compiler_version="$("${compiler}-major-version")"
+
+		sed \
+			-e "s#CMAKE_CUDA_HOST_LINK_LAUNCHER .*#CMAKE_CUDA_HOST_LINK_LAUNCHER \"/usr/x86_64-pc-linux-gnu/gcc-bin/${compiler_version}/g++\")#" \
+			-e "s#CMAKE_CUDA_COMPILER_LINKER .*#CMAKE_CUDA_COMPILER_LINKER \"/usr/x86_64-pc-linux-gnu/bin/ld\")#" \
+			-i "${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake" || die
+
+		ewarn "$(grep CMAKE_CUDA_HOST_LINK_LAUNCHER ${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake)"
+	fi
 }
 
 my_src_test() {
