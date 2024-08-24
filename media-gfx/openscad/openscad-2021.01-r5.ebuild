@@ -75,6 +75,8 @@ src_configure() {
 	# https://github.com/openscad/openscad/issues/5239
 	filter-lto
 
+  echo "CONFIG += c++17" >> "${PN}.pro" || die
+
 	if has ccache ${FEATURES}; then
 		eqmake5 "PREFIX = ${ESYSROOT}/usr" "CONFIG += ccache" "${PN}.pro"
 	else
