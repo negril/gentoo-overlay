@@ -68,6 +68,7 @@ PATCHES=(
 	"${FILESDIR}"/${P}-Fix-build-issue-with-overloaded-join.patch
 	"${FILESDIR}"/${P}-Remove-double-quoting-of-the-output-file-parameter-f.patch
 	"${FILESDIR}"/${P}-boost-1.85.patch
+	"${FILESDIR}/${PN}-cpp-include-cstdint.patch"
 )
 
 src_configure() {

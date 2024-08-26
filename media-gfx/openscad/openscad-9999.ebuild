@@ -71,6 +71,10 @@ BDEPEND="
 	virtual/pkgconfig
 "
 
+PATCHES=(
+	"${FILESDIR}/${PN}-cpp-include-cstdint.patch"
+)
+
 DOCS=(
 	README.md
 	RELEASE_NOTES.md

@@ -1,0 +1,17 @@
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Mon, 26 Aug 2024 00:36:37 +0200
+Subject: [PATCH] include cstdint
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/core/str_utf8_wrapper.h b/src/core/str_utf8_wrapper.h
+index c3703e362..4b40a82a1 100644
+--- a/src/core/str_utf8_wrapper.h
++++ b/src/core/str_utf8_wrapper.h
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include <cstdint>
+ #include <memory>
+ 
+ #include <glib.h>
