@@ -51,9 +51,6 @@ PATCHES=(
 )
 
 multilib_src_configure() {
-	# bug 508724 mariadb cannot use ld.gold
-	tc-ld-disable-gold
-
 	filter-lto
 
 	# Hard disable tests
