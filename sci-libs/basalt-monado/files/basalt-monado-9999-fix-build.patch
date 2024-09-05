@@ -1,0 +1,1758 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index dbea255..fa566dc 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,13 +2,12 @@ cmake_minimum_required(VERSION 3.10...3.18)
+ 
+ project(basalt)
+ 
++include(GNUInstallDirs)
++
+ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/" ${CMAKE_MODULE_PATH})
+ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+ 
+-if(NOT EIGEN_ROOT)
+-  set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/basalt-headers/thirdparty/eigen")
+-endif()
+-
++if(UBUNTU)
+ string(TOLOWER "${PROJECT_NAME}" PROJECT_NAME_LOWERCASE)
+ find_program(DPKG_PROGRAM dpkg DOC "dpkg program of Debian-based systems")
+ if(DPKG_PROGRAM)
+@@ -69,11 +68,17 @@ else()
+   message(STATUS "CMAKE_C_COMPILER_LAUNCHER: ${CMAKE_C_COMPILER_LAUNCHER}")
+   message(STATUS "CMAKE_CXX_COMPILER_LAUNCHER: ${CMAKE_CXX_COMPILER_LAUNCHER}")
+ endif()
++endif()
+ 
+ if( NOT CMAKE_BUILD_TYPE )
+   set( CMAKE_BUILD_TYPE Release)
+ endif()
+ 
++IF(NOT APPLE OR NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
++option(BASALT_MARCH_NATIVE "Set -march=native if CXX_MARCH is not set" ON)
++ENDIF()
++
++if(BASALT_MARCH_NATIVE)
+ if(NOT CXX_MARCH)
+   set(CXX_MARCH native)
+ endif()
+@@ -83,6 +88,7 @@ IF(NOT APPLE OR NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+ ELSE()
+   message(STATUS "Running on Apple ${CMAKE_SYSTEM_PROCESSOR}. Disabled -march flag.")
+ ENDIF()
++endif()
+ 
+ 
+ 
+@@ -94,12 +100,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+ 
+ 
+ # Flags used for CHECK_CXX_SOURCE_COMPILES
++if(NOT CUSTOM_FLAGS)
+ set(CMAKE_REQUIRED_FLAGS "-Wno-error")
++endif()
+ 
+ 
+ # save flags passed by user
+ set(BASALT_PASSED_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+ 
++if(NOT CUSTOM_FLAGS)
+ set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")          # cmake default: "-g"
+ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")  # cmake default: "-O2 -g -DNDEBUG"
+ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")                                      # cmake default: "-O3 -DNDEBUG"
+@@ -159,6 +168,9 @@ else()
+     set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -Wno-parentheses")
+   endif()
+ endif()
++else()
++  add_compile_options(-DEIGEN_INITIALIZE_MATRICES_BY_NAN)
++endif(NOT CUSTOM_FLAGS)
+ 
+ 
+ # Set platform / compiler specific compile flags and checks
+@@ -239,7 +251,9 @@ endif()
+ #
+ # Set EIGEN_DONT_PARALLELIZE to be sure it doesn't use openmp,
+ # just in case some dependency enables openmp without us noticing.
++if(NOT CUSTOM_FLAGS)
+ set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -DEIGEN_DONT_PARALLELIZE")
++endif(NOT CUSTOM_FLAGS)
+ 
+ #option(USE_OPENMP "Use OpenMP (e.g. for parallel computation in Eigen)" ${USE_OPENMP_DEFAULT})
+ #if(USE_OPENMP)
+@@ -251,9 +265,17 @@ set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -DEIGEN_DONT_PARALLELIZE")
+ 
+ # Make specialization for double / float optional.
+ # Disabling them can be useful for better compile times during development.
+-option(BASALT_INSTANTIATIONS_DOUBLE "Instatiate templates for Scalar=double." ON)
+-option(BASALT_INSTANTIATIONS_FLOAT "Instatiate templates for Scalar=float." ON)
++option(BASALT_INSTANTIATIONS_DOUBLE "Instantiate templates for Scalar=double." ON)
++option(BASALT_INSTANTIATIONS_FLOAT "Instantiate templates for Scalar=float." ON)
+ option(BASALT_BUILD_SHARED_LIBRARY_ONLY "Build only Basalt shared library" OFF)
++option(BUILD_ROS "Build against ROS" OFF)
++
++option(BASALT_BUILTIN_CLI11      "Use builtin CLI11 from submodule"      ON)
++option(BASALT_BUILTIN_EIGEN      "Use builtin Eigen"                     ON)
++option(BASALT_BUILTIN_JSON       "Use builtin JSON from submodule"       ON)
++option(BASALT_BUILTIN_MAGIC_ENUM "Use builtin magic_enum from submodule" ON)
++option(BASALT_BUILTIN_OPENGV     "Use builtin opengv from submodule"     ON)
++option(BASALT_BUILTIN_PANGOLIN   "Use builtin Pangolin from submodule"   ON)
+ 
+ if (BASALT_BUILD_SHARED_LIBRARY_ONLY)
+   if (NOT DEFINED BASALT_INSTANTIATIONS_DOUBLE)
+@@ -275,9 +297,12 @@ endif()
+ # setup combined compiler flags
+ set(CMAKE_CXX_FLAGS "${BASALT_CXX_FLAGS} ${BASALT_MARCH_FLAGS} ${BASALT_PASSED_CXX_FLAGS}")
+ 
++if(NOT BASALT_BUILTIN_EIGEN AND NOT EIGEN_ROOT)
++  set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/basalt-headers/thirdparty/eigen")
++endif()
+ 
+ set(EIGEN_INCLUDE_DIR_HINTS ${EIGEN_ROOT})
+-find_package(Eigen3 3.4.0 EXACT REQUIRED MODULE)
++find_package(Eigen3 3.4.0 EXACT REQUIRED)
+ message(STATUS "Found Eigen headers in: ${EIGEN3_INCLUDE_DIR}")
+ if(NOT EIGEN3_INCLUDE_DIR MATCHES "^${EIGEN_ROOT}")
+   message(WARNING "Found Eigen headers are outside of specified EIGEN_ROOT '${EIGEN_ROOT}'")
+@@ -312,11 +337,25 @@ target_sources(basalt::vit INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/vit/
+ 
+ # custom scoped cli11 target
+ add_library(basalt::cli11 INTERFACE IMPORTED)
++if(BASALT_BUILTIN_CLI11)
+ set_property(TARGET basalt::cli11 PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/CLI11/include)
++else()
++find_package(CLI11 REQUIRED)
++set_property(TARGET basalt::cli11 PROPERTY INTERFACE_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:CLI11::CLI11,INCLUDE_DIRECTORIES>)
++endif()
+ 
+ # custom scoped magic_enum target
+ add_library(basalt::magic_enum INTERFACE IMPORTED)
++if(BASALT_BUILTIN_MAGIC_ENUM)
+ set_property(TARGET basalt::magic_enum PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/magic_enum/include)
++else()
++find_package(magic_enum REQUIRED)
++set_property(TARGET basalt::magic_enum PROPERTY INTERFACE_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:magic_enum::magic_enum,INCLUDE_DIRECTORIES>)
++endif()
++
++if(NOT BASALT_BUILTIN_PANGOLIN)
++  find_package(Pangolin 0.8 REQUIRED)
++endif(NOT BASALT_BUILTIN_PANGOLIN)
+ 
+ # main library
+ add_library(basalt_internal STATIC)
+@@ -402,12 +441,18 @@ target_sources(basalt_internal
+ )
+ 
+ target_link_libraries(basalt_internal
+-  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::vit basalt::magic_enum
++  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb basalt::cli11 basalt::vit basalt::magic_enum
+   PRIVATE nlohmann::json fmt::fmt)
+ target_include_directories(basalt_internal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+ target_compile_definitions(basalt_internal PUBLIC ${BASALT_COMPILE_DEFINITIONS})
+ #target_compile_definitions(basalt_internal PUBLIC BASALT_DISABLE_ASSERTS)
+ 
++if(BASALT_BUILTIN_PANGOLIN)
++  target_link_libraries(basalt_internal PUBLIC pangolin)
++else()
++  target_link_libraries(basalt_internal PUBLIC pango_display pango_plot)
++endif()
++
+ if (NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
+ target_sources(basalt_internal
+   PUBLIC
+@@ -431,8 +476,11 @@ target_sources(basalt_internal
+     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/dataset_io.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/nfr_mapper.cpp
+ )
+-target_link_libraries(basalt_internal PRIVATE rosbag apriltag opengv)
+-
++target_link_libraries(basalt_internal PRIVATE apriltag opengv)
++if(BUILD_ROS)
++    target_link_libraries(basalt_internal PRIVATE rosbag)
++    target_compile_definitions(basalt_internal PUBLIC BUILD_ROS)
++endif()
+ 
+ endif()
+ 
+@@ -450,36 +498,36 @@ target_link_libraries(basalt basalt_internal)
+ if(NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
+ 
+ add_executable(basalt_calibrate src/calibrate.cpp src/calibration/cam_calib.cpp)
+-target_link_libraries(basalt_calibrate basalt_internal pangolin basalt::cli11)
++target_link_libraries(basalt_calibrate basalt_internal basalt::cli11)
+ 
+ add_executable(basalt_calibrate_imu src/calibrate_imu.cpp src/calibration/cam_imu_calib.cpp)
+-target_link_libraries(basalt_calibrate_imu basalt_internal pangolin basalt::cli11)
++target_link_libraries(basalt_calibrate_imu basalt_internal basalt::cli11)
+ 
+ 
+ add_executable(basalt_vio_sim src/vio_sim.cpp)
+-target_link_libraries(basalt_vio_sim basalt_internal pangolin basalt::cli11)
++target_link_libraries(basalt_vio_sim basalt_internal basalt::cli11)
+ 
+ add_executable(basalt_mapper_sim src/mapper_sim.cpp)
+-target_link_libraries(basalt_mapper_sim basalt_internal pangolin basalt::cli11)
++target_link_libraries(basalt_mapper_sim basalt_internal basalt::cli11)
+ 
+ # mapper sim native doesn't use template free interface
+ if(BASALT_INSTANTIATIONS_DOUBLE)
+   add_executable(basalt_mapper_sim_naive src/mapper_sim_naive.cpp)
+-  target_link_libraries(basalt_mapper_sim_naive basalt_internal pangolin basalt::cli11)
++  target_link_libraries(basalt_mapper_sim_naive basalt_internal basalt::cli11)
+ endif()
+ 
+ add_executable(basalt_mapper src/mapper.cpp)
+-target_link_libraries(basalt_mapper basalt_internal pangolin basalt::cli11)
++target_link_libraries(basalt_mapper basalt_internal basalt::cli11)
+ 
+ 
+ add_executable(basalt_opt_flow src/opt_flow.cpp)
+-target_link_libraries(basalt_opt_flow basalt_internal pangolin basalt::cli11)
++target_link_libraries(basalt_opt_flow basalt_internal basalt::cli11)
+ 
+ add_executable(basalt_vio src/vio.cpp)
+-target_link_libraries(basalt_vio basalt_internal pangolin basalt::cli11)
++target_link_libraries(basalt_vio basalt_internal basalt::cli11)
+ 
+ add_executable(basalt_time_alignment src/time_alignment.cpp)
+-target_link_libraries(basalt_time_alignment basalt_internal pangolin basalt::cli11)
++target_link_libraries(basalt_time_alignment basalt_internal basalt::cli11)
+ 
+ add_executable(basalt_kitti_eval src/kitti_eval.cpp)
+ target_link_libraries(basalt_kitti_eval basalt::basalt-headers basalt::cli11)
+@@ -487,10 +535,10 @@ target_link_libraries(basalt_kitti_eval basalt::basalt-headers basalt::cli11)
+ find_package(realsense2 QUIET)
+ if(realsense2_FOUND)
+   add_executable(basalt_rs_t265_record src/rs_t265_record.cpp src/device/rs_t265.cpp)
+-  target_link_libraries(basalt_rs_t265_record basalt_internal realsense2::realsense2 pangolin basalt::cli11)
++  target_link_libraries(basalt_rs_t265_record basalt_internal realsense2::realsense2 basalt::cli11)
+ 
+   add_executable(basalt_rs_t265_vio src/rs_t265_vio.cpp src/device/rs_t265.cpp)
+-  target_link_libraries(basalt_rs_t265_vio basalt_internal realsense2::realsense2 pangolin basalt::cli11)
++  target_link_libraries(basalt_rs_t265_vio basalt_internal realsense2::realsense2 basalt::cli11)
+ endif()
+ 
+ endif(NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
+@@ -512,35 +560,27 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
+ 
+ if(BASALT_BUILD_SHARED_LIBRARY_ONLY)
+   install(TARGETS basalt
+-    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+-    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+-    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
++  )
+   set(CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/euroc_config.json" "${CMAKE_CURRENT_SOURCE_DIR}/data/euroc_ds_calib.json")
+   set(UNIFIED_CONFIG_FILES euroc.toml)
+ 
+ else()
+ 
+ install(TARGETS basalt basalt_calibrate basalt_calibrate_imu basalt_vio_sim basalt_mapper_sim basalt_mapper basalt_opt_flow basalt_vio basalt_kitti_eval basalt_time_alignment
+-  RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+-  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+-  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
++)
+ 
+ if(BASALT_INSTANTIATIONS_DOUBLE)
+   install(TARGETS basalt_mapper_sim_naive
+-    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+-    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+-    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
++  )
+ endif()
+ 
+ if(realsense2_FOUND)
+     install(TARGETS basalt_rs_t265_record basalt_rs_t265_vio
+-      RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+-      LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+-      ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
++    )
+ endif()
+ 
+ file(GLOB SCRIPTS_TO_INSTALL "${CMAKE_CURRENT_SOURCE_DIR}/scripts/basalt_*.py")
+-install(PROGRAMS ${SCRIPTS_TO_INSTALL} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
++install(PROGRAMS ${SCRIPTS_TO_INSTALL} DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
+ 
+ file(GLOB CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/*.json")
+ file(GLOB ABSOLUTE_UNIFIED_CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/monado/*.toml.in")
+@@ -552,7 +592,7 @@ endforeach()
+ endif(BASALT_BUILD_SHARED_LIBRARY_ONLY)
+ 
+ # Configure and install unified config toml files
+-set(CONFIG_FILE_INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/share/basalt) # Used for unified_config.in
++set(CONFIG_FILE_INSTALL_DESTINATION ${CMAKE_INSTALL_FULL_DATAROOTDIR}/basalt) # Used for unified_config.in
+ foreach(unified_config IN LISTS UNIFIED_CONFIG_FILES)
+   configure_file(
+     ${CMAKE_CURRENT_LIST_DIR}/data/monado/${unified_config}.in
+@@ -569,7 +609,7 @@ configure_file(
+   ${CMAKE_CURRENT_BINARY_DIR}/basalt.pc
+   @ONLY
+ )
+-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/basalt.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
++install(FILES ${CMAKE_CURRENT_BINARY_DIR}/basalt.pc DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}/pkgconfig)
+ 
+ 
+ # Replace install() to do-nothing macro.
+diff --git a/ci/Dockerfile b/ci/Dockerfile
+new file mode 100644
+index 0000000..296c595
+--- /dev/null
++++ b/ci/Dockerfile
+@@ -0,0 +1,6 @@
++FROM ubuntu:22.04
++
++ENV DEBIAN_FRONTEND=noninteractive
++RUN apt update && apt -y install build-essential cmake ninja-build \
++  libeigen3-dev libtbb-dev \
++  libopencv-dev libfmt-dev nlohmann-json3-dev libcereal-dev libgl1-mesa-dev libglew-dev libcli11-dev && rm -rf /var/lib/apt/lists/*
+\ No newline at end of file
+diff --git a/ci/build.sh b/ci/build.sh
+new file mode 100755
+index 0000000..b052be5
+--- /dev/null
++++ b/ci/build.sh
+@@ -0,0 +1,3 @@
++#!/bin/sh
++
++docker build --no-cache --rm --pull -t ubuntu_basalt .
+\ No newline at end of file
+diff --git a/ci/run.sh b/ci/run.sh
+new file mode 100755
+index 0000000..5ae236d
+--- /dev/null
++++ b/ci/run.sh
+@@ -0,0 +1,24 @@
++#!/bin/bash
++
++name="basalt_$(date '+%Y%m%d_%H%M%S')"
++
++opts=(
++  # "-d"
++)
++
++cmd=(
++  "cd /tmp/basalt"
++  "echo BUILD_UBUNTU_2204_JOB_ID=\$CI_JOB_ID >> release.env"
++  "cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBASALT_BUILD_SHARED_LIBRARY_ONLY=on -DCMAKE_CXX_FLAGS=\"-mtune=haswell -march=haswell\" -DCMAKE_C_FLAGS=\"-mtune=haswell -march=haswell\" -DUBUNTU=ON -DBASALT_BUILTIN_EIGEN=OFF -DBASALT_BUILTIN_CEREAL=OFF -DBASALT_BUILTIN_SOPHUS=ON -DEIGEN_ROOT=\"\$(pkg-config eigen3 --cflags-only-I | cut -c3-)\" -DBASALT_BUILTIN_MAGIC_ENUM=ON -DBASALT_BUILTIN_CLI11=OFF"
++  "time cmake --build build"
++  "cd build && cpack"
++  "mv *.deb ../basalt-monado-ubuntu-22.04-haswell-amd64.deb"
++)
++docker run \
++    "${opts[@]}" \
++    -it \
++    --name "${name}" \
++    -v "$(pwd)/..:/tmp/basalt" \
++    "ubuntu_basalt" \
++
++    # "$cmd"
+diff --git a/cmake_modules/FindEigen3.cmake b/cmake_modules/FindEigen3.cmake
+deleted file mode 100644
+index 9826d69..0000000
+--- a/cmake_modules/FindEigen3.cmake
++++ /dev/null
+@@ -1,82 +0,0 @@
+-# - Try to find Eigen3 lib
+-#
+-# This module supports requiring a minimum version, e.g. you can do
+-#   find_package(Eigen3 3.1.2)
+-# to require version 3.1.2 or newer of Eigen3.
+-#
+-# Once done this will define
+-#
+-#  EIGEN3_FOUND - system has eigen lib with correct version
+-#  EIGEN3_INCLUDE_DIR - the eigen include directory
+-#  EIGEN3_VERSION - eigen version
+-
+-# Copyright (c) 2006, 2007 Montel Laurent, <montel@kde.org>
+-# Copyright (c) 2008, 2009 Gael Guennebaud, <g.gael@free.fr>
+-# Copyright (c) 2009 Benoit Jacob <jacob.benoit.1@gmail.com>
+-# Redistribution and use is allowed according to the terms of the 2-clause BSD license.
+-
+-# Adaptations (c) Nikolaus Demmel 2019
+-# - pass NO_DEFAULT_PATH --> only works when passing exact HINTS
+-
+-
+-if(NOT Eigen3_FIND_VERSION)
+-  if(NOT Eigen3_FIND_VERSION_MAJOR)
+-    set(Eigen3_FIND_VERSION_MAJOR 2)
+-  endif(NOT Eigen3_FIND_VERSION_MAJOR)
+-  if(NOT Eigen3_FIND_VERSION_MINOR)
+-    set(Eigen3_FIND_VERSION_MINOR 91)
+-  endif(NOT Eigen3_FIND_VERSION_MINOR)
+-  if(NOT Eigen3_FIND_VERSION_PATCH)
+-    set(Eigen3_FIND_VERSION_PATCH 0)
+-  endif(NOT Eigen3_FIND_VERSION_PATCH)
+-
+-  set(Eigen3_FIND_VERSION "${Eigen3_FIND_VERSION_MAJOR}.${Eigen3_FIND_VERSION_MINOR}.${Eigen3_FIND_VERSION_PATCH}")
+-endif(NOT Eigen3_FIND_VERSION)
+-
+-macro(_eigen3_check_version)
+-  file(READ "${EIGEN3_INCLUDE_DIR}/Eigen/src/Core/util/Macros.h" _eigen3_version_header)
+-
+-  string(REGEX MATCH "define[ \t]+EIGEN_WORLD_VERSION[ \t]+([0-9]+)" _eigen3_world_version_match "${_eigen3_version_header}")
+-  set(EIGEN3_WORLD_VERSION "${CMAKE_MATCH_1}")
+-  string(REGEX MATCH "define[ \t]+EIGEN_MAJOR_VERSION[ \t]+([0-9]+)" _eigen3_major_version_match "${_eigen3_version_header}")
+-  set(EIGEN3_MAJOR_VERSION "${CMAKE_MATCH_1}")
+-  string(REGEX MATCH "define[ \t]+EIGEN_MINOR_VERSION[ \t]+([0-9]+)" _eigen3_minor_version_match "${_eigen3_version_header}")
+-  set(EIGEN3_MINOR_VERSION "${CMAKE_MATCH_1}")
+-
+-  set(EIGEN3_VERSION ${EIGEN3_WORLD_VERSION}.${EIGEN3_MAJOR_VERSION}.${EIGEN3_MINOR_VERSION})
+-  if(${EIGEN3_VERSION} VERSION_LESS ${Eigen3_FIND_VERSION})
+-    set(EIGEN3_VERSION_OK FALSE)
+-  else(${EIGEN3_VERSION} VERSION_LESS ${Eigen3_FIND_VERSION})
+-    set(EIGEN3_VERSION_OK TRUE)
+-  endif(${EIGEN3_VERSION} VERSION_LESS ${Eigen3_FIND_VERSION})
+-
+-  if(NOT EIGEN3_VERSION_OK)
+-
+-    message(STATUS "Eigen3 version ${EIGEN3_VERSION} found in ${EIGEN3_INCLUDE_DIR}, "
+-                   "but at least version ${Eigen3_FIND_VERSION} is required")
+-  endif(NOT EIGEN3_VERSION_OK)
+-endmacro(_eigen3_check_version)
+-
+-if (EIGEN3_INCLUDE_DIR)
+-
+-  # in cache already
+-  _eigen3_check_version()
+-  set(EIGEN3_FOUND ${EIGEN3_VERSION_OK})
+-
+-else (EIGEN3_INCLUDE_DIR)
+-
+-  find_path(EIGEN3_INCLUDE_DIR NAMES signature_of_eigen3_matrix_library
+-      HINTS ${EIGEN_INCLUDE_DIR_HINTS}
+-      NO_DEFAULT_PATH
+-    )
+-
+-  if(EIGEN3_INCLUDE_DIR)
+-    _eigen3_check_version()
+-  endif(EIGEN3_INCLUDE_DIR)
+-
+-  include(FindPackageHandleStandardArgs)
+-  find_package_handle_standard_args(Eigen3 DEFAULT_MSG EIGEN3_INCLUDE_DIR EIGEN3_VERSION_OK)
+-
+-  mark_as_advanced(EIGEN3_INCLUDE_DIR)
+-
+-endif(EIGEN3_INCLUDE_DIR)
+diff --git a/cmake_modules/FindOpenGV.cmake b/cmake_modules/FindOpenGV.cmake
+deleted file mode 100644
+index 6eb59ef..0000000
+--- a/cmake_modules/FindOpenGV.cmake
++++ /dev/null
+@@ -1,84 +0,0 @@
+-
+-# This is FindOPENGV.cmake
+-# CMake module to locate the OPENGV package
+-#
+-# The following cache variables may be set before calling this script:
+-#
+-# OPENGV_DIR (or OPENGV_ROOT): (Optional) The install prefix OR source tree of opengv (e.g. /usr/local or src/opengv)
+-# OPENGV_BUILD_NAME:          (Optional) If compiling against a source tree, the name of the build directory
+-#                            within it (e.g build-debug).  Without this defined, this script tries to
+-#                            intelligently find the build directory based on the project's build directory name
+-#                            or based on the build type (Debug/Release/etc).
+-#
+-# The following variables will be defined:
+-#
+-# OPENGV_FOUND          : TRUE if the package has been successfully found
+-# OPENGV_INCLUDE_DIR    : paths to OPENGV's INCLUDE directories
+-# OPENGV_LIBS           : paths to OPENGV's libraries
+-#
+-# NOTES on compiling against an uninstalled OPENGV build tree:
+-# - A OPENGV source tree will be automatically searched for in the directory
+-#   'opengv' next to your project directory, after searching
+-#   CMAKE_INSTALL_PREFIX and $HOME, but before searching /usr/local and /usr.
+-# - The build directory will be searched first with the same name as your
+-#   project's build directory, e.g. if you build from 'MyProject/build-optimized',
+-#   'opengv/build-optimized' will be searched first.  Next, a build directory for
+-#   your project's build type, e.g. if CMAKE_BUILD_TYPE in your project is
+-#   'Release', then 'opengv/build-release' will be searched next.  Finally, plain
+-#   'opengv/build' will be searched.
+-# - You can control the opengv build directory name directly by defining the CMake
+-#   cache variable 'OPENGV_BUILD_NAME', then only 'opengv/${OPENGV_BUILD_NAME} will
+-#   be searched.
+-# - Use the standard CMAKE_PREFIX_PATH, or OPENGV_DIR, to find a specific opengv
+-#   directory.
+-
+-# Get path suffixes to help look for opengv
+-if(OPENGV_BUILD_NAME)
+-  set(opengv_build_names "${OPENGV_BUILD_NAME}/opengv")
+-else()
+-  # lowercase build type
+-  string(TOLOWER "${CMAKE_BUILD_TYPE}" build_type_suffix)
+-  # build suffix of this project
+-  get_filename_component(my_build_name "${CMAKE_BINARY_DIR}" NAME)
+-
+-  set(opengv_build_names "${my_build_name}/opengv" "build-${build_type_suffix}/opengv" "build/opengv" "build/lib")
+-endif()
+-
+-# Use OPENGV_ROOT or OPENGV_DIR equivalently
+-if(OPENGV_ROOT AND NOT OPENGV_DIR)
+-  set(OPENGV_DIR "${OPENGV_ROOT}")
+-endif()
+-
+-if(OPENGV_DIR)
+-  # Find include dirs
+-  find_path(OPENGV_INCLUDE_DIR opengv/types.hpp
+-    PATHS "${OPENGV_DIR}/include" "${OPENGV_DIR}" NO_DEFAULT_PATH
+-    DOC "OPENGV include directories")
+-
+-  # Find libraries
+-  find_library(OPENGV_LIBS NAMES opengv
+-    HINTS "${OPENGV_DIR}/lib" "${OPENGV_DIR}" NO_DEFAULT_PATH
+-    PATH_SUFFIXES ${opengv_build_names}
+-    DOC "OPENGV libraries")
+-else()
+-  # Find include dirs
+-  set(extra_include_paths ${CMAKE_INSTALL_PREFIX}/include "$ENV{HOME}/include" "${PROJECT_SOURCE_DIR}/../opengv" /usr/local/include /usr/include)
+-  find_path(OPENGV_INCLUDE_DIR opengv/types.hpp
+-    PATHS ${extra_include_paths}
+-    DOC "OPENGV include directories")
+-  if(NOT OPENGV_INCLUDE_DIR)
+-    message(STATUS "Searched for opengv headers in default paths plus ${extra_include_paths}")
+-  endif()
+-
+-  # Find libraries
+-  find_library(OPENGV_LIBS NAMES opengv
+-    HINTS ${CMAKE_INSTALL_PREFIX}/lib "$ENV{HOME}/lib" "${PROJECT_SOURCE_DIR}/../opengv" /usr/local/lib /usr/lib
+-    PATH_SUFFIXES ${opengv_build_names}
+-    DOC "OPENGV libraries")
+-endif()
+-
+-# handle the QUIETLY and REQUIRED arguments and set OPENGV_FOUND to TRUE
+-# if all listed variables are TRUE
+-include(FindPackageHandleStandardArgs)
+-find_package_handle_standard_args(OPENGV DEFAULT_MSG
+-                                  OPENGV_LIBS OPENGV_INCLUDE_DIR)
+diff --git a/cmake_modules/FindTBB.cmake b/cmake_modules/FindTBB.cmake
+deleted file mode 100644
+index 10e540d..0000000
+--- a/cmake_modules/FindTBB.cmake
++++ /dev/null
+@@ -1,468 +0,0 @@
+-# - Find ThreadingBuildingBlocks include dirs and libraries
+-# Use this module by invoking find_package with the form:
+-#  find_package(TBB
+-#    [REQUIRED]             # Fail with error if TBB is not found
+-#    )                      #
+-# Once done, this will define
+-#
+-#  TBB_FOUND - system has TBB
+-#  TBB_INCLUDE_DIRS - the TBB include directories
+-#  TBB_LIBRARIES - TBB libraries to be lined, doesn't include malloc or
+-#                  malloc proxy
+-#  TBB::tbb - imported target for the TBB library
+-#
+-#  TBB_VERSION_MAJOR - Major Product Version Number
+-#  TBB_VERSION_MINOR - Minor Product Version Number
+-#  TBB_INTERFACE_VERSION - Engineering Focused Version Number
+-#  TBB_COMPATIBLE_INTERFACE_VERSION - The oldest major interface version
+-#                                     still supported. This uses the engineering
+-#                                     focused interface version numbers.
+-#
+-#  TBB_MALLOC_FOUND - system has TBB malloc library
+-#  TBB_MALLOC_INCLUDE_DIRS - the TBB malloc include directories
+-#  TBB_MALLOC_LIBRARIES - The TBB malloc libraries to be lined
+-#  TBB::malloc - imported target for the TBB malloc library
+-#
+-#  TBB_MALLOC_PROXY_FOUND - system has TBB malloc proxy library
+-#  TBB_MALLOC_PROXY_INCLUDE_DIRS = the TBB malloc proxy include directories
+-#  TBB_MALLOC_PROXY_LIBRARIES - The TBB malloc proxy libraries to be lined
+-#  TBB::malloc_proxy - imported target for the TBB malloc proxy library
+-#
+-#
+-# This module reads hints about search locations from variables:
+-#  ENV TBB_ARCH_PLATFORM - for eg. set it to "mic" for Xeon Phi builds
+-#  ENV TBB_ROOT or just TBB_ROOT - root directory of tbb installation
+-#  ENV TBB_BUILD_PREFIX - specifies the build prefix for user built tbb
+-#                         libraries. Should be specified with ENV TBB_ROOT
+-#                         and optionally...
+-#  ENV TBB_BUILD_DIR - if build directory is different than ${TBB_ROOT}/build
+-#
+-#
+-# Modified by Robert Maynard from the original OGRE source
+-#
+-#-------------------------------------------------------------------
+-# This file is part of the CMake build system for OGRE
+-#     (Object-oriented Graphics Rendering Engine)
+-# For the latest info, see http://www.ogre3d.org/
+-#
+-# The contents of this file are placed in the public domain. Feel
+-# free to make use of it in any way you like.
+-#-------------------------------------------------------------------
+-#
+-# =========================================================================
+-# Taken from Copyright.txt in the root of the VTK source tree as per
+-# instructions to substitute the full license in place of the summary
+-# reference when distributing outside of VTK
+-# =========================================================================
+-#
+-#  Program:   Visualization Toolkit
+-#  Module:    Copyright.txt
+-#
+-# Copyright (c) 1993-2015 Ken Martin, Will Schroeder, Bill Lorensen
+-# All rights reserved.
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are met:
+-#
+-# * Redistributions of source code must retain the above copyright notice,
+-#   this list of conditions and the following disclaimer.
+-#
+-# * Redistributions in binary form must reproduce the above copyright notice,
+-#   this list of conditions and the following disclaimer in the documentation
+-#   and/or other materials provided with the distribution.
+-#
+-# * Neither name of Ken Martin, Will Schroeder, or Bill Lorensen nor the names
+-#   of any contributors may be used to endorse or promote products derived
+-#   from this software without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS''
+-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+-# ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
+-# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-#
+-# =========================================================================*/
+-
+-#=============================================================================
+-#  FindTBB helper functions and macros
+-#
+-
+-#====================================================
+-# Fix the library path in case it is a linker script
+-#====================================================
+-function(tbb_extract_real_library library real_library)
+-  if(NOT UNIX OR NOT EXISTS ${library})
+-    set(${real_library} "${library}" PARENT_SCOPE)
+-    return()
+-  endif()
+-
+-  #Read in the first 4 bytes and see if they are the ELF magic number
+-  set(_elf_magic "7f454c46")
+-  file(READ ${library} _hex_data OFFSET 0 LIMIT 4 HEX)
+-  if(_hex_data STREQUAL _elf_magic)
+-    #we have opened a elf binary so this is what
+-    #we should link to
+-    set(${real_library} "${library}" PARENT_SCOPE)
+-    return()
+-  endif()
+-
+-  file(READ ${library} _data OFFSET 0 LIMIT 1024)
+-  if("${_data}" MATCHES "INPUT \\(([^(]+)\\)")
+-    #extract out the .so name from REGEX MATCH command
+-    set(_proper_so_name "${CMAKE_MATCH_1}")
+-
+-    #construct path to the real .so which is presumed to be in the same directory
+-    #as the input file
+-    get_filename_component(_so_dir "${library}" DIRECTORY)
+-    set(${real_library} "${_so_dir}/${_proper_so_name}" PARENT_SCOPE)
+-  else()
+-    #unable to determine what this library is so just hope everything works
+-    #and pass it unmodified.
+-    set(${real_library} "${library}" PARENT_SCOPE)
+-  endif()
+-endfunction()
+-
+-#===============================================
+-# Do the final processing for the package find.
+-#===============================================
+-macro(findpkg_finish PREFIX TARGET_NAME)
+-  if (${PREFIX}_INCLUDE_DIR AND ${PREFIX}_LIBRARY)
+-    set(${PREFIX}_FOUND TRUE)
+-    set (${PREFIX}_INCLUDE_DIRS ${${PREFIX}_INCLUDE_DIR})
+-    set (${PREFIX}_LIBRARIES ${${PREFIX}_LIBRARY})
+-  else ()
+-    if (${PREFIX}_FIND_REQUIRED AND NOT ${PREFIX}_FIND_QUIETLY)
+-      message(FATAL_ERROR "Required library ${PREFIX} not found.")
+-    endif ()
+-  endif ()
+-
+-  if (NOT TARGET "TBB::${TARGET_NAME}")
+-    if (${PREFIX}_LIBRARY_RELEASE)
+-      tbb_extract_real_library(${${PREFIX}_LIBRARY_RELEASE} real_release)
+-    endif ()
+-    if (${PREFIX}_LIBRARY_DEBUG)
+-      tbb_extract_real_library(${${PREFIX}_LIBRARY_DEBUG} real_debug)
+-    endif ()
+-    add_library(TBB::${TARGET_NAME} UNKNOWN IMPORTED)
+-    set_target_properties(TBB::${TARGET_NAME} PROPERTIES
+-      INTERFACE_INCLUDE_DIRECTORIES "${${PREFIX}_INCLUDE_DIR}")
+-    if (${PREFIX}_LIBRARY_DEBUG AND ${PREFIX}_LIBRARY_RELEASE)
+-      set_target_properties(TBB::${TARGET_NAME} PROPERTIES
+-        IMPORTED_LOCATION "${real_release}"
+-        IMPORTED_LOCATION_DEBUG "${real_debug}"
+-        IMPORTED_LOCATION_RELEASE "${real_release}")
+-    elseif (${PREFIX}_LIBRARY_RELEASE)
+-      set_target_properties(TBB::${TARGET_NAME} PROPERTIES
+-        IMPORTED_LOCATION "${real_release}")
+-    elseif (${PREFIX}_LIBRARY_DEBUG)
+-      set_target_properties(TBB::${TARGET_NAME} PROPERTIES
+-        IMPORTED_LOCATION "${real_debug}")
+-    endif ()
+-  endif ()
+-
+-  #mark the following variables as internal variables
+-  mark_as_advanced(${PREFIX}_INCLUDE_DIR
+-                   ${PREFIX}_LIBRARY
+-                   ${PREFIX}_LIBRARY_DEBUG
+-                   ${PREFIX}_LIBRARY_RELEASE)
+-endmacro()
+-
+-#===============================================
+-# Generate debug names from given release names
+-#===============================================
+-macro(get_debug_names PREFIX)
+-  foreach(i ${${PREFIX}})
+-    set(${PREFIX}_DEBUG ${${PREFIX}_DEBUG} ${i}d ${i}D ${i}_d ${i}_D ${i}_debug ${i})
+-  endforeach()
+-endmacro()
+-
+-#===============================================
+-# See if we have env vars to help us find tbb
+-#===============================================
+-macro(getenv_path VAR)
+-   set(ENV_${VAR} $ENV{${VAR}})
+-   # replace won't work if var is blank
+-   if (ENV_${VAR})
+-     string( REGEX REPLACE "\\\\" "/" ENV_${VAR} ${ENV_${VAR}} )
+-   endif ()
+-endmacro()
+-
+-#===============================================
+-# Couple a set of release AND debug libraries
+-#===============================================
+-macro(make_library_set PREFIX)
+-  if (${PREFIX}_RELEASE AND ${PREFIX}_DEBUG)
+-    set(${PREFIX} optimized ${${PREFIX}_RELEASE} debug ${${PREFIX}_DEBUG})
+-  elseif (${PREFIX}_RELEASE)
+-    set(${PREFIX} ${${PREFIX}_RELEASE})
+-  elseif (${PREFIX}_DEBUG)
+-    set(${PREFIX} ${${PREFIX}_DEBUG})
+-  endif ()
+-endmacro()
+-
+-#===============================================
+-# Ensure that the release & debug libraries found are from the same installation.
+-#===============================================
+-macro(find_tbb_library_verifying_release_debug_locations PREFIX)
+-  find_library(${PREFIX}_RELEASE
+-    NAMES ${${PREFIX}_NAMES}
+-    HINTS ${TBB_LIB_SEARCH_PATH})
+-  if (${PREFIX}_RELEASE)
+-    # To avoid finding a mismatched set of release & debug libraries from
+-    # different installations if the first found does not have debug libraries
+-    # by forcing the search for debug to only occur within the detected release
+-    # library directory (if found).  Although this would break detection if the
+-    # release & debug libraries were shipped in different directories, this is
+-    # not the case in the official TBB releases for any platform.
+-    get_filename_component(
+-      FOUND_RELEASE_LIB_DIR "${${PREFIX}_RELEASE}" DIRECTORY)
+-    find_library(${PREFIX}_DEBUG
+-      NAMES ${${PREFIX}_NAMES_DEBUG}
+-      HINTS ${FOUND_RELEASE_LIB_DIR}
+-      NO_DEFAULT_PATH)
+-  else()
+-    find_library(${PREFIX}_DEBUG
+-      NAMES ${${PREFIX}_NAMES_DEBUG}
+-      HINTS ${TBB_LIB_SEARCH_PATH})
+-  endif()
+-endmacro()
+-
+-#=============================================================================
+-#  Now to actually find TBB
+-#
+-
+-# Get path, convert backslashes as ${ENV_${var}}
+-getenv_path(TBB_ROOT)
+-
+-# initialize search paths
+-set(TBB_PREFIX_PATH ${TBB_ROOT} ${ENV_TBB_ROOT})
+-set(TBB_INC_SEARCH_PATH "")
+-set(TBB_LIB_SEARCH_PATH "")
+-
+-
+-# If user built from sources
+-set(TBB_BUILD_PREFIX $ENV{TBB_BUILD_PREFIX})
+-if (TBB_BUILD_PREFIX AND ENV_TBB_ROOT)
+-  getenv_path(TBB_BUILD_DIR)
+-  if (NOT ENV_TBB_BUILD_DIR)
+-    set(ENV_TBB_BUILD_DIR ${ENV_TBB_ROOT}/build)
+-  endif ()
+-
+-  # include directory under ${ENV_TBB_ROOT}/include
+-  list(APPEND TBB_LIB_SEARCH_PATH
+-    ${ENV_TBB_BUILD_DIR}/${TBB_BUILD_PREFIX}_release
+-    ${ENV_TBB_BUILD_DIR}/${TBB_BUILD_PREFIX}_debug)
+-endif ()
+-
+-
+-# For Windows, let's assume that the user might be using the precompiled
+-# TBB packages from the main website. These use a rather awkward directory
+-# structure (at least for automatically finding the right files) depending
+-# on platform and compiler, but we'll do our best to accommodate it.
+-# Not adding the same effort for the precompiled linux builds, though. Those
+-# have different versions for CC compiler versions and linux kernels which
+-# will never adequately match the user's setup, so there is no feasible way
+-# to detect the "best" version to use. The user will have to manually
+-# select the right files. (Chances are the distributions are shipping their
+-# custom version of tbb, anyway, so the problem is probably nonexistent.)
+-if (WIN32 AND MSVC)
+-  set(COMPILER_PREFIX "vc7.1")
+-  if (MSVC_VERSION EQUAL 1400)
+-    set(COMPILER_PREFIX "vc8")
+-  elseif(MSVC_VERSION EQUAL 1500)
+-    set(COMPILER_PREFIX "vc9")
+-  elseif(MSVC_VERSION EQUAL 1600)
+-    set(COMPILER_PREFIX "vc10")
+-  elseif(MSVC_VERSION EQUAL 1700)
+-    set(COMPILER_PREFIX "vc11")
+-  elseif(MSVC_VERSION EQUAL 1800)
+-    set(COMPILER_PREFIX "vc12")
+-  elseif(MSVC_VERSION GREATER_EQUAL 1900)
+-    set(COMPILER_PREFIX "vc14")
+-  endif ()
+-
+-  # for each prefix path, add ia32/64\${COMPILER_PREFIX}\lib to the lib search path
+-  foreach (dir IN LISTS TBB_PREFIX_PATH)
+-    if (CMAKE_CL_64)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/ia64/${COMPILER_PREFIX}/lib)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/ia64/${COMPILER_PREFIX})
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/intel64/${COMPILER_PREFIX}/lib)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/intel64/${COMPILER_PREFIX})
+-    else ()
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/ia32/${COMPILER_PREFIX}/lib)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/ia32/${COMPILER_PREFIX})
+-    endif ()
+-  endforeach ()
+-endif ()
+-
+-# For OS X binary distribution, choose libc++ based libraries for Mavericks (10.9)
+-# and above and AppleClang
+-if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
+-    NOT CMAKE_SYSTEM_VERSION VERSION_LESS 13.0)
+-  set (USE_LIBCXX OFF)
+-  cmake_policy(GET CMP0025 POLICY_VAR)
+-
+-  if (POLICY_VAR STREQUAL "NEW")
+-    if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+-      set (USE_LIBCXX ON)
+-    endif ()
+-  else ()
+-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+-      set (USE_LIBCXX ON)
+-    endif ()
+-  endif ()
+-
+-  if (USE_LIBCXX)
+-    foreach (dir IN LISTS TBB_PREFIX_PATH)
+-      list (APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/libc++ ${dir}/libc++/lib)
+-    endforeach ()
+-  endif ()
+-endif ()
+-
+-# check compiler ABI
+-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+-  set(COMPILER_PREFIX)
+-  if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)
+-    list(APPEND COMPILER_PREFIX "gcc4.8")
+-  endif()
+-  if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
+-    list(APPEND COMPILER_PREFIX "gcc4.7")
+-  endif()
+-  if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.4)
+-    list(APPEND COMPILER_PREFIX "gcc4.4")
+-  endif()
+-  list(APPEND COMPILER_PREFIX "gcc4.1")
+-elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+-  set(COMPILER_PREFIX)
+-  if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.0) # Complete guess
+-    list(APPEND COMPILER_PREFIX "gcc4.8")
+-  endif()
+-  if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.6)
+-    list(APPEND COMPILER_PREFIX "gcc4.7")
+-  endif()
+-  list(APPEND COMPILER_PREFIX "gcc4.4")
+-else() # Assume compatibility with 4.4 for other compilers
+-  list(APPEND COMPILER_PREFIX "gcc4.4")
+-endif ()
+-
+-# if platform architecture is explicitly specified
+-set(TBB_ARCH_PLATFORM $ENV{TBB_ARCH_PLATFORM})
+-if (TBB_ARCH_PLATFORM)
+-  foreach (dir IN LISTS TBB_PREFIX_PATH)
+-    list(APPEND TBB_LIB_SEARCH_PATH ${dir}/${TBB_ARCH_PLATFORM}/lib)
+-    list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/${TBB_ARCH_PLATFORM})
+-  endforeach ()
+-endif ()
+-
+-foreach (dir IN LISTS TBB_PREFIX_PATH)
+-  foreach (prefix IN LISTS COMPILER_PREFIX)
+-    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/intel64)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/intel64/${prefix})
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/intel64/lib)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/intel64/${prefix}/lib)
+-    else ()
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/ia32)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib/ia32/${prefix})
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/ia32/lib)
+-      list(APPEND TBB_LIB_SEARCH_PATH ${dir}/ia32/${prefix}/lib)
+-    endif ()
+-  endforeach()
+-endforeach ()
+-
+-# add general search paths
+-foreach (dir IN LISTS TBB_PREFIX_PATH)
+-  list(APPEND TBB_LIB_SEARCH_PATH ${dir}/lib ${dir}/Lib ${dir}/lib/tbb
+-    ${dir}/Libs)
+-  list(APPEND TBB_INC_SEARCH_PATH ${dir}/include ${dir}/Include
+-    ${dir}/include/tbb)
+-endforeach ()
+-
+-set(TBB_LIBRARY_NAMES tbb)
+-get_debug_names(TBB_LIBRARY_NAMES)
+-
+-find_path(TBB_INCLUDE_DIR
+-          NAMES tbb/tbb.h
+-          HINTS ${TBB_INC_SEARCH_PATH})
+-find_tbb_library_verifying_release_debug_locations(TBB_LIBRARY)
+-make_library_set(TBB_LIBRARY)
+-
+-findpkg_finish(TBB tbb)
+-
+-#if we haven't found TBB no point on going any further
+-if (NOT TBB_FOUND)
+-  return()
+-endif ()
+-
+-#=============================================================================
+-# Look for TBB's malloc package
+-set(TBB_MALLOC_LIBRARY_NAMES tbbmalloc)
+-get_debug_names(TBB_MALLOC_LIBRARY_NAMES)
+-
+-find_path(TBB_MALLOC_INCLUDE_DIR
+-          NAMES tbb/tbb.h
+-          HINTS ${TBB_INC_SEARCH_PATH})
+-find_tbb_library_verifying_release_debug_locations(TBB_MALLOC_LIBRARY)
+-make_library_set(TBB_MALLOC_LIBRARY)
+-
+-findpkg_finish(TBB_MALLOC tbbmalloc)
+-
+-#=============================================================================
+-# Look for TBB's malloc proxy package
+-set(TBB_MALLOC_PROXY_LIBRARY_NAMES tbbmalloc_proxy)
+-get_debug_names(TBB_MALLOC_PROXY_LIBRARY_NAMES)
+-
+-find_path(TBB_MALLOC_PROXY_INCLUDE_DIR
+-          NAMES tbb/tbbmalloc_proxy.h
+-          HINTS ${TBB_INC_SEARCH_PATH})
+-find_tbb_library_verifying_release_debug_locations(TBB_MALLOC_PROXY_LIBRARY)
+-make_library_set(TBB_MALLOC_PROXY_LIBRARY)
+-
+-findpkg_finish(TBB_MALLOC_PROXY tbbmalloc_proxy)
+-
+-
+-#=============================================================================
+-#parse all the version numbers from tbb
+-if(NOT TBB_VERSION)
+-  set(TBB_VERSION_FILE_PRIOR_TO_TBB_2021_1
+-    "${TBB_INCLUDE_DIR}/tbb/tbb_stddef.h")
+-  set(TBB_VERSION_FILE_AFTER_TBB_2021_1
+-    "${TBB_INCLUDE_DIR}/oneapi/tbb/version.h")
+-
+-  if (EXISTS "${TBB_VERSION_FILE_PRIOR_TO_TBB_2021_1}")
+-    set(TBB_VERSION_FILE "${TBB_VERSION_FILE_PRIOR_TO_TBB_2021_1}")
+-  elseif (EXISTS "${TBB_VERSION_FILE_AFTER_TBB_2021_1}")
+-    set(TBB_VERSION_FILE "${TBB_VERSION_FILE_AFTER_TBB_2021_1}")
+-  else()
+-    message(FATAL_ERROR "Found TBB installation: ${TBB_INCLUDE_DIR} "
+-      "missing version header.")
+-  endif()
+-
+- #only read the start of the file
+- file(STRINGS
+-      "${TBB_VERSION_FILE}"
+-      TBB_VERSION_CONTENTS
+-      REGEX "VERSION")
+-
+-  string(REGEX REPLACE
+-    ".*#define TBB_VERSION_MAJOR ([0-9]+).*" "\\1"
+-    TBB_VERSION_MAJOR "${TBB_VERSION_CONTENTS}")
+-
+-  string(REGEX REPLACE
+-    ".*#define TBB_VERSION_MINOR ([0-9]+).*" "\\1"
+-    TBB_VERSION_MINOR "${TBB_VERSION_CONTENTS}")
+-
+-  string(REGEX REPLACE
+-        ".*#define TBB_INTERFACE_VERSION ([0-9]+).*" "\\1"
+-        TBB_INTERFACE_VERSION "${TBB_VERSION_CONTENTS}")
+-
+-  string(REGEX REPLACE
+-        ".*#define TBB_COMPATIBLE_INTERFACE_VERSION ([0-9]+).*" "\\1"
+-        TBB_COMPATIBLE_INTERFACE_VERSION "${TBB_VERSION_CONTENTS}")
+-
+-endif()
+diff --git a/cmake_modules/basalt.pc.in b/cmake_modules/basalt.pc.in
+index f0497e5..97e61bb 100644
+--- a/cmake_modules/basalt.pc.in
++++ b/cmake_modules/basalt.pc.in
+@@ -1,6 +1,6 @@
+ prefix=@CMAKE_INSTALL_PREFIX@
+-libdir=${prefix}/lib
+-includedir=${prefix}/include
++libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
++includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+ 
+ Name: Basalt
+ Description: Visual-Inertial Mapping with Non-Linear Factor Recovery
+diff --git a/include/basalt/optical_flow/frame_to_frame_optical_flow.h b/include/basalt/optical_flow/frame_to_frame_optical_flow.h
+index cb82c6a..a78cab7 100644
+--- a/include/basalt/optical_flow/frame_to_frame_optical_flow.h
++++ b/include/basalt/optical_flow/frame_to_frame_optical_flow.h
+@@ -119,6 +119,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
+     for (size_t i = 0; i < getNumCams(); i++) cells.at(i).setZero(h / c + 1, w / c + 1);
+   }
+ 
++  virtual ~FrameToFrameOpticalFlow(){};
++
+   void processingLoop() override {
+     using std::make_shared;
+     OpticalFlowInput::Ptr img;
+diff --git a/include/basalt/optical_flow/multiscale_frame_to_frame_optical_flow.h b/include/basalt/optical_flow/multiscale_frame_to_frame_optical_flow.h
+index b947ffc..84e307f 100644
+--- a/include/basalt/optical_flow/multiscale_frame_to_frame_optical_flow.h
++++ b/include/basalt/optical_flow/multiscale_frame_to_frame_optical_flow.h
+@@ -100,6 +100,8 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Patter
+     predicted_state = std::make_shared<PoseVelBiasState<double>>();
+   }
+ 
++  virtual ~MultiscaleFrameToFrameOpticalFlow(){};
++
+   void processingLoop() override {
+     using std::make_shared;
+     OpticalFlowInput::Ptr img;
+diff --git a/include/basalt/optical_flow/optical_flow.h b/include/basalt/optical_flow/optical_flow.h
+index b1f3ee3..fb42ba1 100644
+--- a/include/basalt/optical_flow/optical_flow.h
++++ b/include/basalt/optical_flow/optical_flow.h
+@@ -86,7 +86,9 @@ struct OpticalFlowInput {
+     masks.resize(NUM_CAMS);
+   }
+ 
+-  int64_t t_ns;
++  virtual ~OpticalFlowInput(){}
++
++  int64_t t_ns = 0;
+   std::vector<ImageData> img_data;
+ 
+   // Recorded internal pipeline values for UI playback
+@@ -164,7 +166,7 @@ class OpticalFlowBase {
+   PoseVelBiasState<double>::Ptr predicted_state = nullptr;
+ 
+   bool first_state_arrived = false;
+-  bool show_gui;  //!< Whether we need to store additional info for the UI
++  bool show_gui = false;  //!< Whether we need to store additional info for the UI
+ 
+   int64_t t_ns = -1;
+   size_t frame_counter = 0;
+diff --git a/include/basalt/optical_flow/patch_optical_flow.h b/include/basalt/optical_flow/patch_optical_flow.h
+index a446677..a93d7a8 100644
+--- a/include/basalt/optical_flow/patch_optical_flow.h
++++ b/include/basalt/optical_flow/patch_optical_flow.h
+@@ -101,6 +101,8 @@ class PatchOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
+     patches.reserve(3000);
+   }
+ 
++  virtual ~PatchOpticalFlow(){}
++
+   void processingLoop() override {
+     using std::make_shared;
+     OpticalFlowInput::Ptr img;
+diff --git a/src/calibration/cam_calib.cpp b/src/calibration/cam_calib.cpp
+index 90e956e..7af93e9 100644
+--- a/src/calibration/cam_calib.cpp
++++ b/src/calibration/cam_calib.cpp
+@@ -44,6 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/serialization/headers_serialization.h>
+ 
+ #include <basalt/utils/filesystem.h>
++#include <pangolin/display/default_font.h>
+ 
+ namespace basalt {
+ 
+@@ -892,10 +893,10 @@ void CamCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+           const Eigen::Vector2f c = cr.corners[i].cast<float>();
+           pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-          if (show_ids) pangolin::GlFont::I().Text("%d", cr.corner_ids[i]).Draw(c[0], c[1]);
++          if (show_ids) pangolin::default_font().Text("%d", cr.corner_ids[i]).Draw(c[0], c[1]);
+         }
+ 
+-        pangolin::GlFont::I()
++        pangolin::default_font()
+             .Text("Detected %d corners (%d rejected)", cr.corners.size(), cr_rej.corners.size())
+             .Draw(5, 50);
+ 
+@@ -909,14 +910,14 @@ void CamCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+             const Eigen::Vector2f c = cr_rej.corners[i].cast<float>();
+             pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-            if (show_ids) pangolin::GlFont::I().Text("%d", cr_rej.corner_ids[i]).Draw(c[0], c[1]);
++            if (show_ids) pangolin::default_font().Text("%d", cr_rej.corner_ids[i]).Draw(c[0], c[1]);
+           }
+         }
+ 
+       } else {
+         glLineWidth(1.0);
+ 
+-        pangolin::GlFont::I().Text("Corners not processed").Draw(5, 50);
++        pangolin::default_font().Text("Corners not processed").Draw(5, 50);
+       }
+     }
+ 
+@@ -933,13 +934,13 @@ void CamCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+           Eigen::Vector2d c = cr.reprojected_corners[i];
+           pangolin::glDrawCirclePerimeter(c[0], c[1], 3.0);
+ 
+-          if (show_ids) pangolin::GlFont::I().Text("%d", i).Draw(c[0], c[1]);
++          if (show_ids) pangolin::default_font().Text("%d", i).Draw(c[0], c[1]);
+         }
+ 
+-        pangolin::GlFont::I().Text("Initial pose with %d inliers", cr.num_inliers).Draw(5, 100);
++        pangolin::default_font().Text("Initial pose with %d inliers", cr.num_inliers).Draw(5, 100);
+ 
+       } else {
+-        pangolin::GlFont::I().Text("Initial pose not processed").Draw(5, 100);
++        pangolin::default_font().Text("Initial pose not processed").Draw(5, 100);
+       }
+     }
+ 
+@@ -959,10 +960,10 @@ void CamCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+             Eigen::Vector2d c = rc.corners_proj[i];
+             pangolin::glDrawCirclePerimeter(c[0], c[1], 3.0);
+ 
+-            if (show_ids) pangolin::GlFont::I().Text("%d", i).Draw(c[0], c[1]);
++            if (show_ids) pangolin::default_font().Text("%d", i).Draw(c[0], c[1]);
+           }
+         } else {
+-          pangolin::GlFont::I().Text("Too few corners detected.").Draw(5, 150);
++          pangolin::default_font().Text("Too few corners detected.").Draw(5, 150);
+         }
+       }
+     }
+@@ -989,14 +990,14 @@ void CamCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+ 
+             if (show_ids) {
+               if (has_errors) {
+-                pangolin::GlFont::I().Text("%d(%f)", i, it->second[i]).Draw(c[0], c[1]);
++                pangolin::default_font().Text("%d(%f)", i, it->second[i]).Draw(c[0], c[1]);
+               } else {
+-                pangolin::GlFont::I().Text("%d", i).Draw(c[0], c[1]);
++                pangolin::default_font().Text("%d", i).Draw(c[0], c[1]);
+               }
+             }
+           }
+         } else {
+-          pangolin::GlFont::I().Text("Too few corners detected.").Draw(5, 200);
++          pangolin::default_font().Text("Too few corners detected.").Draw(5, 200);
+         }
+       }
+     }
+diff --git a/src/calibration/cam_imu_calib.cpp b/src/calibration/cam_imu_calib.cpp
+index df8d29c..543f82e 100644
+--- a/src/calibration/cam_imu_calib.cpp
++++ b/src/calibration/cam_imu_calib.cpp
+@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/serialization/headers_serialization.h>
+ 
+ #include <basalt/optimization/spline_optimize.h>
++#include <pangolin/display/default_font.h>
+ 
+ namespace basalt {
+ 
+@@ -757,10 +758,10 @@ void CamImuCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+           const Eigen::Vector2f c = cr.corners[i].cast<float>();
+           pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-          if (show_ids) pangolin::GlFont::I().Text("%d", cr.corner_ids[i]).Draw(c[0], c[1]);
++          if (show_ids) pangolin::default_font().Text("%d", cr.corner_ids[i]).Draw(c[0], c[1]);
+         }
+ 
+-        pangolin::GlFont::I()
++        pangolin::default_font()
+             .Text("Detected %d corners (%d rejected)", cr.corners.size(), cr_rej.corners.size())
+             .Draw(5, 50);
+ 
+@@ -774,14 +775,14 @@ void CamImuCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+             const Eigen::Vector2f c = cr_rej.corners[i].cast<float>();
+             pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-            if (show_ids) pangolin::GlFont::I().Text("%d", cr_rej.corner_ids[i]).Draw(c[0], c[1]);
++            if (show_ids) pangolin::default_font().Text("%d", cr_rej.corner_ids[i]).Draw(c[0], c[1]);
+           }
+         }
+ 
+       } else {
+         glLineWidth(1.0);
+ 
+-        pangolin::GlFont::I().Text("Corners not processed").Draw(5, 50);
++        pangolin::default_font().Text("Corners not processed").Draw(5, 50);
+       }
+     }
+ 
+@@ -798,13 +799,13 @@ void CamImuCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+           Eigen::Vector2d c = cr.reprojected_corners[i];
+           pangolin::glDrawCirclePerimeter(c[0], c[1], 3.0);
+ 
+-          if (show_ids) pangolin::GlFont::I().Text("%d", i).Draw(c[0], c[1]);
++          if (show_ids) pangolin::default_font().Text("%d", i).Draw(c[0], c[1]);
+         }
+ 
+-        pangolin::GlFont::I().Text("Initial pose with %d inliers", cr.num_inliers).Draw(5, 100);
++        pangolin::default_font().Text("Initial pose with %d inliers", cr.num_inliers).Draw(5, 100);
+ 
+       } else {
+-        pangolin::GlFont::I().Text("Initial pose not processed").Draw(5, 100);
++        pangolin::default_font().Text("Initial pose not processed").Draw(5, 100);
+       }
+     }
+ 
+@@ -824,10 +825,10 @@ void CamImuCalib::drawImageOverlay(pangolin::View &v, size_t cam_id) {
+             Eigen::Vector2d c = rc.corners_proj[i];
+             pangolin::glDrawCirclePerimeter(c[0], c[1], 3.0);
+ 
+-            if (show_ids) pangolin::GlFont::I().Text("%d", i).Draw(c[0], c[1]);
++            if (show_ids) pangolin::default_font().Text("%d", i).Draw(c[0], c[1]);
+           }
+         } else {
+-          pangolin::GlFont::I().Text("Too few corners detected.").Draw(5, 150);
++          pangolin::default_font().Text("Too few corners detected.").Draw(5, 150);
+         }
+       }
+     }
+diff --git a/src/calibration/vignette.cpp b/src/calibration/vignette.cpp
+index 53d3bb9..b6a7ba6 100644
+--- a/src/calibration/vignette.cpp
++++ b/src/calibration/vignette.cpp
+@@ -79,7 +79,9 @@ void VignetteEstimator::compute_error(std::map<TimeCamId, std::vector<double>> *
+   //  double error = 0;
+   //  double mean_residual = 0;
+   double max_residual = 0;
++  /*
+   int num_residuals = 0;
++  */
+ 
+   TimeCamId tcid_max;
+   // int point_id = 0;
+@@ -109,7 +111,9 @@ void VignetteEstimator::compute_error(std::map<TimeCamId, std::vector<double>> *
+           tcid_max = tcid;
+           // point_id = i;
+         }
++        /*
+         num_residuals++;
++        */
+       }
+     }
+ 
+diff --git a/src/io/dataset_io.cpp b/src/io/dataset_io.cpp
+index 0629d12..4622dcc 100644
+--- a/src/io/dataset_io.cpp
++++ b/src/io/dataset_io.cpp
+@@ -36,7 +36,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/io/dataset_io.h>
+ #include <basalt/io/dataset_io_euroc.h>
+ #include <basalt/io/dataset_io_kitti.h>
++#ifdef BUILD_ROS
+ #include <basalt/io/dataset_io_rosbag.h>
++#endif
+ #include <basalt/io/dataset_io_uzh.h>
+ 
+ namespace basalt {
+@@ -44,15 +46,17 @@ namespace basalt {
+ DatasetIoInterfacePtr DatasetIoFactory::getDatasetIo(const std::string &dataset_type, bool load_mocap_as_gt) {
+   if (dataset_type == "euroc") {
+     // return DatasetIoInterfacePtr();
+-    return DatasetIoInterfacePtr(new EurocIO(load_mocap_as_gt));
++    return std::make_shared<EurocIO>(load_mocap_as_gt);
++#ifdef BUILD_ROS
+   } else if (dataset_type == "bag") {
+-    return DatasetIoInterfacePtr(new RosbagIO);
++    return std::make_shared<RosbagIO>();
++#endif
+   } else if (dataset_type == "uzh") {
+-    return DatasetIoInterfacePtr(new UzhIO);
++    return std::make_shared<UzhIO>();
+   } else if (dataset_type == "kitti") {
+-    return DatasetIoInterfacePtr(new KittiIO);
++    return std::make_shared<KittiIO>();
+   } else {
+-    std::cerr << "Dataset type " << dataset_type << " is not supported" << std::endl;
++    std::cerr << "Dataset type " << dataset_type << " is not supported\n";
+     std::abort();
+   }
+ }
+diff --git a/src/mapper.cpp b/src/mapper.cpp
+index 0abfadb..409cb83 100644
+--- a/src/mapper.cpp
++++ b/src/mapper.cpp
+@@ -64,6 +64,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/calibration/calibration.hpp>
+ 
+ #include <basalt/serialization/headers_serialization.h>
++#include <pangolin/display/default_font.h>
+ 
+ using basalt::POSE_SIZE;
+ using basalt::POSE_VEL_BIAS_SIZE;
+@@ -378,12 +379,12 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
+         pangolin::glDrawLine(c, c + r);
+       }
+ 
+-      pangolin::GlFont::I().Text("Detected %d corners", cr.corners.size()).Draw(5, 20);
++      pangolin::default_font().Text("Detected %d corners", cr.corners.size()).Draw(5, 20);
+ 
+     } else {
+       glLineWidth(1.0);
+ 
+-      pangolin::GlFont::I().Text("Corners not processed").Draw(5, text_row);
++      pangolin::default_font().Text("Corners not processed").Draw(5, text_row);
+     }
+     text_row += 20;
+   }
+@@ -430,11 +431,11 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
+           pangolin::glDrawLine(c, c + r);
+ 
+           if (show_ids) {
+-            pangolin::GlFont::I().Text("%d", i).Draw(c[0], c[1]);
++            pangolin::default_font().Text("%d", i).Draw(c[0], c[1]);
+           }
+         }
+ 
+-        pangolin::GlFont::I().Text("Detected %d matches", it->second.matches.size()).Draw(5, text_row);
++        pangolin::default_font().Text("Detected %d matches", it->second.matches.size()).Draw(5, text_row);
+         text_row += 20;
+       }
+     }
+@@ -459,11 +460,11 @@ void draw_image_overlay(pangolin::View& v, size_t view_id) {
+           pangolin::glDrawLine(c, c + r);
+ 
+           if (show_ids) {
+-            pangolin::GlFont::I().Text("%d", i).Draw(c[0], c[1]);
++            pangolin::default_font().Text("%d", i).Draw(c[0], c[1]);
+           }
+         }
+ 
+-        pangolin::GlFont::I().Text("Detected %d inliers", it->second.inliers.size()).Draw(5, text_row);
++        pangolin::default_font().Text("Detected %d inliers", it->second.inliers.size()).Draw(5, text_row);
+         text_row += 20;
+       }
+     }
+diff --git a/src/mapper_sim_naive.cpp b/src/mapper_sim_naive.cpp
+index e29fd7e..8108268 100644
+--- a/src/mapper_sim_naive.cpp
++++ b/src/mapper_sim_naive.cpp
+@@ -62,6 +62,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/serialization/headers_serialization.h>
+ 
+ #include <basalt/utils/vis_utils.h>
++#include <pangolin/display/default_font.h>
+ 
+ // GUI functions
+ void draw_image_overlay(pangolin::View& v, size_t cam_id);
+@@ -383,10 +384,10 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
+         const Eigen::Vector2f c = cr.pos[i].cast<float>();
+         pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-        if (show_ids) pangolin::GlFont::I().Text("%d", cr.id[i]).Draw(c[0], c[1]);
++        if (show_ids) pangolin::default_font().Text("%d", cr.id[i]).Draw(c[0], c[1]);
+       }
+ 
+-      pangolin::GlFont::I().Text("%d gt points", cr.pos.size()).Draw(5, 20);
++      pangolin::default_font().Text("%d gt points", cr.pos.size()).Draw(5, 20);
+     }
+   }
+ 
+@@ -404,10 +405,10 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
+         const Eigen::Vector2f c = cr.pos[i].cast<float>();
+         pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-        if (show_ids) pangolin::GlFont::I().Text("%d", cr.id[i]).Draw(c[0], c[1]);
++        if (show_ids) pangolin::default_font().Text("%d", cr.id[i]).Draw(c[0], c[1]);
+       }
+ 
+-      pangolin::GlFont::I().Text("%d noisy points", cr.pos.size()).Draw(5, 40);
++      pangolin::default_font().Text("%d noisy points", cr.pos.size()).Draw(5, 40);
+     }
+   }
+ 
+@@ -434,12 +435,12 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
+           const Eigen::Vector4d c = points[i];
+           pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-          if (show_ids) pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
++          if (show_ids) pangolin::default_font().Text("%d", int(c[3])).Draw(c[0], c[1]);
+         }
+       }
+ 
+       glColor3f(0.0, 0.0, 1.0);
+-      pangolin::GlFont::I().Text("%d vio points", points.size()).Draw(5, 60);
++      pangolin::default_font().Text("%d vio points", points.size()).Draw(5, 60);
+     }
+   }
+ }
+diff --git a/src/opt_flow.cpp b/src/opt_flow.cpp
+index 7c6bc1a..a514cc4 100644
+--- a/src/opt_flow.cpp
++++ b/src/opt_flow.cpp
+@@ -59,6 +59,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/optical_flow/optical_flow.h>
+ 
+ #include <basalt/serialization/headers_serialization.h>
++#include <pangolin/display/default_font.h>
+ 
+ constexpr int UI_WIDTH = 200;
+ 
+@@ -292,10 +293,10 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
+ 
+         const Eigen::Vector2f c = kv.second.translation();
+ 
+-        if (show_ids) pangolin::GlFont::I().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
++        if (show_ids) pangolin::default_font().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
+       }
+ 
+-      pangolin::GlFont::I().Text("Tracked %d keypoints", kp_map.size()).Draw(5, 20);
++      pangolin::default_font().Text("Tracked %d keypoints", kp_map.size()).Draw(5, 20);
+     }
+   }
+ }
+diff --git a/src/optical_flow/optical_flow.cpp b/src/optical_flow/optical_flow.cpp
+index 4864d0a..09f8595 100644
+--- a/src/optical_flow/optical_flow.cpp
++++ b/src/optical_flow/optical_flow.cpp
+@@ -63,7 +63,7 @@ OpticalFlowBase::Ptr OpticalFlowFactory::getOpticalFlow(const VioConfig& config,
+         break;
+ 
+       default:
+-        std::cerr << "config.optical_flow_pattern " << config.optical_flow_pattern << " is not supported." << std::endl;
++        std::cerr << "config.optical_flow_pattern " << config.optical_flow_pattern << " is not supported.\n";
+         std::abort();
+     }
+   }
+@@ -87,7 +87,7 @@ OpticalFlowBase::Ptr OpticalFlowFactory::getOpticalFlow(const VioConfig& config,
+         break;
+ 
+       default:
+-        std::cerr << "config.optical_flow_pattern " << config.optical_flow_pattern << " is not supported." << std::endl;
++        std::cerr << "config.optical_flow_pattern " << config.optical_flow_pattern << " is not supported.\n";
+         std::abort();
+     }
+   }
+@@ -111,7 +111,7 @@ OpticalFlowBase::Ptr OpticalFlowFactory::getOpticalFlow(const VioConfig& config,
+         break;
+ 
+       default:
+-        std::cerr << "config.optical_flow_pattern " << config.optical_flow_pattern << " is not supported." << std::endl;
++        std::cerr << "config.optical_flow_pattern " << config.optical_flow_pattern << " is not supported.\n";
+         std::abort();
+     }
+   }
+diff --git a/src/rs_t265_record.cpp b/src/rs_t265_record.cpp
+index 84d9cb8..0fdc792 100644
+--- a/src/rs_t265_record.cpp
++++ b/src/rs_t265_record.cpp
+@@ -386,16 +386,16 @@ int main(int argc, char *argv[]) {
+         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+ 
+         if (t265_device->last_img_data.get())
+-          pangolin::GlFont::I()
++          pangolin::default_font()
+               .Text("Exposure: %.3f ms.", t265_device->last_img_data->img_data[idx].exposure * 1000.0)
+               .Draw(30, 30);
+ 
+         if (idx == 0) {
+-          pangolin::GlFont::I().Text("Queue: %d.", image_data_queue2.size()).Draw(30, 60);
++          pangolin::default_font().Text("Queue: %d.", image_data_queue2.size()).Draw(30, 60);
+         }
+ 
+         if (idx == 0 && recording) {
+-          pangolin::GlFont::I().Text("Recording").Draw(30, 90);
++          pangolin::default_font().Text("Recording").Draw(30, 90);
+         }
+       };
+ 
+diff --git a/src/rs_t265_vio.cpp b/src/rs_t265_vio.cpp
+index 44b0970..1b63c74 100644
+--- a/src/rs_t265_vio.cpp
++++ b/src/rs_t265_vio.cpp
+@@ -396,12 +396,12 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
+ 
+           pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-          if (show_ids) pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
++          if (show_ids) pangolin::default_font().Text("%d", int(c[3])).Draw(c[0], c[1]);
+         }
+       }
+ 
+       glColor3f(1.0, 0.0, 0.0);
+-      pangolin::GlFont::I().Text("Tracked %d points", points.size()).Draw(5, 20);
++      pangolin::default_font().Text("Tracked %d points", points.size()).Draw(5, 20);
+     }
+   }
+ }
+diff --git a/src/utils/vis_utils.cpp b/src/utils/vis_utils.cpp
+index f627ae0..11aea46 100644
+--- a/src/utils/vis_utils.cpp
++++ b/src/utils/vis_utils.cpp
+@@ -121,7 +121,7 @@ void VIOUIBase::do_show_flow(size_t cam_id) {
+       try_draw_image_text(view, c[0] + 5, c[1], pangolin::GlFont::I().Text("%.1f", responses.at(lmid)));
+   }
+ 
+-  pangolin::GlFont::I().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);
++  pangolin::default_font().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);
+ }
+ 
+ void VIOUIBase::do_show_highlights(size_t cam_id) {
+@@ -142,7 +142,7 @@ void VIOUIBase::do_show_highlights(size_t cam_id) {
+     float u = kpt.translation().x();
+     float v = kpt.translation().y();
+     pangolin::glDrawCirclePerimeter(u, v, 3);
+-    if (show_ids) try_draw_image_text(view, u, v + 5, pangolin::GlFont::I().Text("%lu", kpid));
++    if (show_ids) try_draw_image_text(view, u, v + 5, pangolin::default_font().Text("%lu", kpid));
+   }
+ }
+ 
+@@ -574,15 +574,15 @@ void VIOUIBase::do_show_obs(size_t cam_id) {
+           pangolin::glDrawCirclePerimeter(u, v, cradius);
+         }
+ 
+-        if (show_ids) try_draw_image_text(view, u, v, pangolin::GlFont::I().Text("%d", id));
+-        if (show_depth) pangolin::GlFont::I().Text("%.3lf m", depth).Draw(u, v + 5);
++        if (show_ids) try_draw_image_text(view, u, v, pangolin::default_font().Text("%d", id));
++        if (show_depth) pangolin::default_font().Text("%.3lf m", depth).Draw(u, v + 5);
+       }
+     }
+ 
+     if (show_guesses) do_show_guesses(cam_id);
+ 
+     glColor3f(0.0, 1.0, 0.0);
+-    pangolin::GlFont::I().Text("Tracked %d points", points.size()).Draw(5, 20);
++    pangolin::default_font().Text("Tracked %d points", points.size()).Draw(5, 20);
+   }
+ }
+ 
+diff --git a/src/vio_sim.cpp b/src/vio_sim.cpp
+index 48e4cec..e3fa206 100644
+--- a/src/vio_sim.cpp
++++ b/src/vio_sim.cpp
+@@ -61,6 +61,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/calibration/calibration.hpp>
+ 
+ #include <basalt/serialization/headers_serialization.h>
++#include <pangolin/display/default_font.h>
+ 
+ #include <basalt/utils/vis_utils.h>
+ 
+@@ -428,10 +429,10 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
+         const Eigen::Vector2f c = cr.pos[i].cast<float>();
+         pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-        if (show_ids) pangolin::GlFont::I().Text("%d", cr.id[i]).Draw(c[0], c[1]);
++        if (show_ids) pangolin::default_font().Text("%d", cr.id[i]).Draw(c[0], c[1]);
+       }
+ 
+-      pangolin::GlFont::I().Text("%d gt points", cr.pos.size()).Draw(5, 20);
++      pangolin::default_font().Text("%d gt points", cr.pos.size()).Draw(5, 20);
+     }
+   }
+ 
+@@ -449,10 +450,10 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
+         const Eigen::Vector2f c = cr.pos[i].cast<float>();
+         pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-        if (show_ids) pangolin::GlFont::I().Text("%d", cr.id[i]).Draw(c[0], c[1]);
++        if (show_ids) pangolin::default_font().Text("%d", cr.id[i]).Draw(c[0], c[1]);
+       }
+ 
+-      pangolin::GlFont::I().Text("%d noisy points", cr.pos.size()).Draw(5, 40);
++      pangolin::default_font().Text("%d noisy points", cr.pos.size()).Draw(5, 40);
+     }
+   }
+ 
+@@ -479,12 +480,12 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
+           const Eigen::Vector4d c = points[i];
+           pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+ 
+-          if (show_ids) pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
++          if (show_ids) pangolin::default_font().Text("%d", int(c[3])).Draw(c[0], c[1]);
+         }
+       }
+ 
+       glColor3f(0.0, 0.0, 1.0);
+-      pangolin::GlFont::I().Text("%d vio points", points.size()).Draw(5, 60);
++      pangolin::default_font().Text("%d vio points", points.size()).Draw(5, 60);
+     }
+   }
+ }
+diff --git a/src/vit/vit_tracker_ui.hpp b/src/vit/vit_tracker_ui.hpp
+index 7da6b83..156f227 100644
+--- a/src/vit/vit_tracker_ui.hpp
++++ b/src/vit/vit_tracker_ui.hpp
+@@ -66,6 +66,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/utils/vis_matrices.h>
+ #include <basalt/utils/vis_utils.h>
+ #include <basalt/vi_estimator/vio_estimator.h>
++#include <pangolin/display/default_font.h>
+ 
+ #define ASSERT(cond, ...)                                      \
+   do {                                                         \
+@@ -387,7 +388,7 @@ class vit_tracker_ui : vis::VIOUIBase {
+         if (filter_highlights && !highlighted) continue;
+ 
+         if (show_highlights && highlighted) glColor3ubv(vis::GREEN);
+-        pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
++        pangolin::default_font().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
+         if (show_highlights && highlighted) glColor3ubv(pose_color);
+       }
+     }
+diff --git a/thirdparty/CMakeLists.txt b/thirdparty/CMakeLists.txt
+index 5beecd9..c994b65 100644
+--- a/thirdparty/CMakeLists.txt
++++ b/thirdparty/CMakeLists.txt
+@@ -1,13 +1,19 @@
+ cmake_minimum_required(VERSION 3.10...3.18)
+ 
+ add_library(nlohmann::json INTERFACE IMPORTED GLOBAL)
+-set_property(TARGET nlohmann::json PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/json/)
++if(BASALT_BUILTIN_JSON)
++  set_property(TARGET nlohmann::json PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/json/)
++else()
++  find_package(nlohmann_json)
++  set_property(TARGET nlohmann::json PROPERTY INTERFACE_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INCLUDE_DIRECTORIES>)
++endif()
+ 
+ add_subdirectory(basalt-headers EXCLUDE_FROM_ALL)
+ add_subdirectory(ros EXCLUDE_FROM_ALL)
+ add_subdirectory(apriltag EXCLUDE_FROM_ALL)
+ 
+ 
++if(BASALT_BUILTIN_PANGOLIN)
+ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Enable BUILD_SHARED_LIBS")
+ set(BUILD_TESTS OFF CACHE BOOL "Enable BUILD_TESTS")
+ set(BUILD_TOOLS OFF CACHE BOOL "Enable BUILD_TOOLS")
+@@ -25,16 +31,22 @@ set(BUILD_PANGOLIN_FFMPEG OFF CACHE BOOL "Build support for ffmpeg video input")
+ 
+ set(EIGEN_INCLUDE_DIR "${EIGEN3_INCLUDE_DIR}")
+ set(EIGEN_INCLUDE_DIRS "${EIGEN3_INCLUDE_DIR}")
+-
+-
+-# Hack to disable march=native in opengv
+-macro(add_definitions)
+-  if(NOT ${ARGV0} STREQUAL "-march=native")
+-    _add_definitions(${ARGN})
+-  endif()
+-endmacro()
+-add_subdirectory(opengv EXCLUDE_FROM_ALL)
+-
++endif(BASALT_BUILTIN_PANGOLIN)
++
++
++# if(BASALT_BUILTIN_OPENGV)
++# # Hack to disable march=native in opengv
++# macro(add_definitions)
++#   if(NOT ${ARGV0} STREQUAL "-march=native")
++#     _add_definitions(${ARGN})
++#   endif()
++# endmacro()
++#   add_subdirectory(opengv EXCLUDE_FROM_ALL)
++# else()
++  find_package(opengv REQUIRED)
++# endif()
++
++if(BASALT_BUILTIN_PANGOLIN)
+ # Hack to disable CPack in Pangolin.
+ macro(include)
+   if(NOT ${ARGV0} STREQUAL "CPack")
+@@ -42,11 +54,13 @@ macro(include)
+   endif()
+ endmacro()
+ add_subdirectory(Pangolin EXCLUDE_FROM_ALL)
++endif(BASALT_BUILTIN_PANGOLIN)
+ 
+ 
+ # fix aprilgrid
+ target_compile_options(apriltag PRIVATE "-Wno-unused-private-field")
+ 
++if(BASALT_BUILTIN_OPENGV)
+ # fix opengv: c++17 and debug postfix
+ set_target_properties(opengv PROPERTIES
+   CXX_STANDARD 17
+@@ -57,7 +71,9 @@ target_compile_options(opengv PRIVATE
+   -Wno-unused-private-field
+   ${BASALT_MARCH_FLAGS}
+   "SHELL:${BASALT_PASSED_CXX_FLAGS}")
++endif(BASALT_BUILTIN_OPENGV)
+ 
++if(BASALT_BUILTIN_PANGOLIN)
+ # TODO: enable once mpark issue is fixed upstream pangolin
+ #set_target_properties(pangolin PROPERTIES
+ #  CXX_STANDARD 17)
+@@ -116,10 +132,19 @@ endif()
+ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10.0)
+   target_compile_options(pangolin PRIVATE "-Wno-parentheses")
+ endif()
++endif(BASALT_BUILTIN_PANGOLIN)
++
++set(eigen_targets "")
++if(BASALT_BUILTIN_OPENGV)
++  list(APPEND eigen_targets "opengv")
++endif(BASALT_BUILTIN_OPENGV)
++if(BASALT_BUILTIN_PANGOLIN)
++  list(APPEND eigen_targets "pangolin")
++endif(BASALT_BUILTIN_PANGOLIN)
+ 
+ # check here the directories for the pangolin and opengv targets, and
+ # confirm that the eigen-related include dirs match.
+-foreach(_target opengv pangolin)
++foreach(_target ${eigen_targets})
+   get_target_property(_include_dirs ${_target} INTERFACE_INCLUDE_DIRECTORIES)
+   foreach(_dir IN LISTS _include_dirs)
+     if("${_dir}" MATCHES ".*/eigen3?(/unsupported)?$")
+@@ -135,7 +160,7 @@ endforeach()
+ # source folder. Thus, we update the property to only include these
+ # eigen paths in the "BUILD_INTERFACE" (not "INSTALL").
+ if (EIGEN3_INCLUDE_DIR MATCHES "^${CMAKE_SOURCE_DIR}.*")
+-  foreach(_target opengv pangolin)
++  foreach(_target ${eigen_targets})
+     get_target_property(_include_dirs ${_target} INTERFACE_INCLUDE_DIRECTORIES)
+     set(_include_dirs_new "")
+     foreach(_dir IN LISTS _include_dirs)
+diff --git a/thirdparty/apriltag/CMakeLists.txt b/thirdparty/apriltag/CMakeLists.txt
+index 9c36fa8..73e1d67 100644
+--- a/thirdparty/apriltag/CMakeLists.txt
++++ b/thirdparty/apriltag/CMakeLists.txt
+@@ -20,6 +20,9 @@ include_directories(../basalt-headers/thirdparty/Sophus)
+ add_library(apriltag STATIC ${APRILTAG_SRCS} include/basalt/utils/apriltag.h src/apriltag.cpp)
+ 
+ target_include_directories(apriltag PUBLIC include)
++if(NOT BASALT_BUILTIN_SOPHUS)
++find_package(Sophus REQUIRED)
+ target_link_libraries(apriltag PUBLIC basalt::opencv Sophus::Sophus)
++endif(NOT BASALT_BUILTIN_SOPHUS)
+ 
+ 
+diff --git a/thirdparty/ros/CMakeLists.txt b/thirdparty/ros/CMakeLists.txt
+index f684b89..8a3abcc 100644
+--- a/thirdparty/ros/CMakeLists.txt
++++ b/thirdparty/ros/CMakeLists.txt
+@@ -1,3 +1,6 @@
++if(NOT BUILD_ROS)
++    return()
++endif()
+ cmake_minimum_required(VERSION 3.2)
+ 
+ 

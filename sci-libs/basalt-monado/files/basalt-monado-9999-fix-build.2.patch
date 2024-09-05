@@ -1,0 +1,563 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index fa566dc..9092484 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -29,6 +29,7 @@ if(LSB_RELEASE_PROGRAM)
+   endif()
+ 
+ endif(LSB_RELEASE_PROGRAM)
++endif()
+ 
+ string(TIMESTAMP PROJECT_VERSION_REVISION "%Y%m%d%H%M")
+ 
+@@ -43,6 +44,7 @@ set(VIT_VERSION_MINOR ${CMAKE_MATCH_1})
+ string(REGEX MATCH "#define VIT_HEADER_VERSION_PATCH ([0-9]+)" _ ${VIT_INTERFACE_CONTENTS})
+ set(VIT_VERSION_PATCH ${CMAKE_MATCH_1})
+ 
++if(UBUNTU)
+ set(CPACK_GENERATOR "DEB")
+ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Mateo de Mayo <mateo.demayo@collabora.com>")
+ set(CPACK_PACKAGE_VERSION_MAJOR ${VIT_VERSION_MAJOR})
+@@ -551,11 +553,14 @@ configure_file(
+ )
+ 
+ # Export only the VIT interface symbols
++message("PROJECT_NAME ${PROJECT_NAME}")
++message("CMAKE_CURRENT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}")
++message("${VIT_VERSION_MAJOR}.${VIT_VERSION_MINOR}.${VIT_VERSION_PATCH}")
+ set_target_properties(${PROJECT_NAME} PROPERTIES
+   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/basalt.map
+   LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/basalt.map"
+   VERSION "${VIT_VERSION_MAJOR}.${VIT_VERSION_MINOR}.${VIT_VERSION_PATCH}"
+-  SOVERSION ${VIT_VERSION_MAJOR}
++  SOVERSION "${VIT_VERSION_MAJOR}"
+ )
+ 
+ if(BASALT_BUILD_SHARED_LIBRARY_ONLY)
+diff --git a/include/basalt/optical_flow/optical_flow.h b/include/basalt/optical_flow/optical_flow.h
+index fb42ba1..b7dfbf3 100644
+--- a/include/basalt/optical_flow/optical_flow.h
++++ b/include/basalt/optical_flow/optical_flow.h
+@@ -70,8 +70,8 @@ using LandmarkId = KeypointId;
+ struct LandmarkBundle {
+   using Ptr = std::shared_ptr<LandmarkBundle>;
+   int64_t ts = -1;
+-  Eigen::aligned_vector<LandmarkId> lmids = {};
+-  Eigen::aligned_vector<Eigen::Vector4f> lms = {};
++  Eigen::aligned_vector<LandmarkId> lmids;
++  Eigen::aligned_vector<Eigen::Vector4f> lms;
+ };
+ 
+ struct OpticalFlowInput {
+@@ -86,7 +86,7 @@ struct OpticalFlowInput {
+     masks.resize(NUM_CAMS);
+   }
+ 
+-  virtual ~OpticalFlowInput(){}
++  virtual ~OpticalFlowInput() = default;
+ 
+   int64_t t_ns = 0;
+   std::vector<ImageData> img_data;
+@@ -94,7 +94,7 @@ struct OpticalFlowInput {
+   // Recorded internal pipeline values for UI playback
+   double depth_guess = -1;        //!< Depth guess to use for all features
+   bool state_reset = false;       //!< Whether to schedule a state reset in the backend
+-  std::vector<Masks> masks{};     //!< Regions of the image to ignore
++  std::vector<Masks> masks;     //!< Regions of the image to ignore
+   UIMAT show_uimat = UIMAT::ALL;  //!< Which matrix to compute for the UI
+ 
+   vit::TimeStats stats;  //!< Keeps track of internal metrics for this t_ns
+@@ -131,7 +131,7 @@ class OpticalFlowBase {
+ 
+   virtual void processingLoop() = 0;
+ 
+-  void start() { processing_thread.reset(new std::thread(&OpticalFlowBase::processingLoop, this)); }
++  void start() { processing_thread = std::make_shared<std::thread>(&OpticalFlowBase::processingLoop, this); }
+ 
+   virtual inline void drain_input_queues() {
+     while (!input_img_queue.empty()) {
+diff --git a/include/basalt/utils/vis_utils.h b/include/basalt/utils/vis_utils.h
+index 6036e25..630bfb9 100644
+--- a/include/basalt/utils/vis_utils.h
++++ b/include/basalt/utils/vis_utils.h
+@@ -47,6 +47,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <basalt/utils/sophus_utils.hpp>
+ #include <tuple>
+ 
++namespace pangolin {
++  extern "C" const unsigned char AnonymousPro_ttf[];
++}
++
+ const uint8_t cam_color[3]{250, 0, 125};
+ const uint8_t state_color[3]{250, 0, 26};
+ const uint8_t pose_color[3]{0, 50, 255};
+@@ -90,7 +94,7 @@ inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth, const u
+   pangolin::glDrawLines(lines);
+   if (show_ids) {
+     glColor3ubv(idx_color);
+-    pangolin::GlFont::I().Text("%d", frame_idx).Draw(0, 0, -0.01F);
++    pangolin::GlFont(pangolin::AnonymousPro_ttf, 11).Text("%d", frame_idx).Draw(0, 0, -0.01F);
+   }
+   glPopMatrix();
+ }
+diff --git a/src/utils/vis_utils.cpp b/src/utils/vis_utils.cpp
+index 11aea46..fe72bd6 100644
+--- a/src/utils/vis_utils.cpp
++++ b/src/utils/vis_utils.cpp
+@@ -38,10 +38,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <pangolin/gl/glfont.h>
+ #include <pangolin/var/var.h>
+ 
+-namespace pangolin {
+-extern "C" const unsigned char AnonymousPro_ttf[];
+-}
+-
+ namespace basalt::vis {
+ 
+ pangolin::GlFont SMALL_FONT(pangolin::AnonymousPro_ttf, 11);
+@@ -116,12 +112,12 @@ void VIOUIBase::do_show_flow(size_t cam_id) {
+ 
+     const Vector2f c = pose.translation();
+ 
+-    if (show_ids) try_draw_image_text(view, c[0] + 5, c[1] + 5, pangolin::GlFont::I().Text("%d", lmid));
++    if (show_ids) try_draw_image_text(view, c[0] + 5, c[1] + 5, SMALL_FONT.Text("%d", lmid));
+     if (show_responses && responses.count(lmid) > 0)
+-      try_draw_image_text(view, c[0] + 5, c[1], pangolin::GlFont::I().Text("%.1f", responses.at(lmid)));
++      try_draw_image_text(view, c[0] + 5, c[1], SMALL_FONT.Text("%.1f", responses.at(lmid)));
+   }
+ 
+-  pangolin::default_font().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);
++  SMALL_FONT.Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);
+ }
+ 
+ void VIOUIBase::do_show_highlights(size_t cam_id) {
+@@ -142,7 +138,7 @@ void VIOUIBase::do_show_highlights(size_t cam_id) {
+     float u = kpt.translation().x();
+     float v = kpt.translation().y();
+     pangolin::glDrawCirclePerimeter(u, v, 3);
+-    if (show_ids) try_draw_image_text(view, u, v + 5, pangolin::default_font().Text("%lu", kpid));
++    if (show_ids) try_draw_image_text(view, u, v + 5, SMALL_FONT.Text("%lu", kpid));
+   }
+ }
+ 
+@@ -228,7 +224,7 @@ void VIOUIBase::do_show_recall_guesses(size_t cam_id) {
+ 
+     auto g = kpt.translation();
+     guess_points.emplace_back(g);
+-    pangolin::GlFont::I().Text("%zu", kpid).Draw(5 + g.x(), 5 + g.y());
++    SMALL_FONT.Text("%zu", kpid).Draw(5 + g.x(), 5 + g.y());
+ 
+     if (new_kpts.count(kpid) > 0) {
+       auto n = new_kpts.at(kpid).translation();
+@@ -574,15 +570,15 @@ void VIOUIBase::do_show_obs(size_t cam_id) {
+           pangolin::glDrawCirclePerimeter(u, v, cradius);
+         }
+ 
+-        if (show_ids) try_draw_image_text(view, u, v, pangolin::default_font().Text("%d", id));
+-        if (show_depth) pangolin::default_font().Text("%.3lf m", depth).Draw(u, v + 5);
++        if (show_ids) try_draw_image_text(view, u, v, SMALL_FONT.Text("%d", id));
++        if (show_depth) SMALL_FONT.Text("%.3lf m", depth).Draw(u, v + 5);
+       }
+     }
+ 
+     if (show_guesses) do_show_guesses(cam_id);
+ 
+     glColor3f(0.0, 1.0, 0.0);
+-    pangolin::default_font().Text("Tracked %d points", points.size()).Draw(5, 20);
++    SMALL_FONT.Text("Tracked %d points", points.size()).Draw(5, 20);
+   }
+ }
+ 
+@@ -640,7 +636,7 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
+                     : marginalized ? curr_vis_data->marginalized_idx[ts]
+                                    : curr_vis_data->frame_idx[ts]);
+       glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
+-      auto text = pangolin::GlFont::I().Text("%lu", fid);
++      auto text = SMALL_FONT.Text("%lu", fid);
+       try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
+       glColor3ubv(BLUE);
+     }
+@@ -657,7 +653,7 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
+     pangolin::glDrawLine(xoffh - 0.5, yoff + i - 0.5, xoffh + W - 0.5, yoff + i - 0.5);
+ 
+     if (show_ids) {
+-      auto text = pangolin::GlFont::I().Text("%lu", b.lmid);
++      auto text = SMALL_FONT.Text("%lu", b.lmid);
+       try_draw_image_text(blocks_view, xoffh + 2, yoff + i + b.storage->rows() / 2.0F, text);
+     }
+ 
+@@ -721,7 +717,7 @@ void VIOUIBase::draw_hessian_overlay(pangolin::ImageView& blocks_view, const UIH
+                     : marginalized ? curr_vis_data->marginalized_idx[ts]
+                                    : curr_vis_data->frame_idx[ts]);
+       glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
+-      auto text = pangolin::GlFont::I().Text("%lu", fid);
++      auto text = SMALL_FONT.Text("%lu", fid);
+       try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
+       try_draw_image_text(blocks_view, 0, yoff + idx + pad / 2, text);
+       glColor3ubv(BLUE);
+diff --git a/src/vio.cpp b/src/vio.cpp
+index 4f37265..78fb83a 100644
+--- a/src/vio.cpp
++++ b/src/vio.cpp
+@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <cmath>
+ #include <condition_variable>
+ #include <iostream>
++#include <memory>
+ #include <thread>
+ 
+ #include <magic_enum.hpp>
+@@ -249,7 +250,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
+     basalt::MargDataSaver::Ptr marg_data_saver;
+ 
+     if (!marg_data_path.empty()) {
+-      marg_data_saver.reset(new basalt::MargDataSaver(marg_data_path));
++      marg_data_saver = std::make_shared<basalt::MargDataSaver>(marg_data_path);
+       vio->out_marg_queue = &marg_data_saver->in_marg_queue;
+ 
+       // Save gt.
+@@ -787,7 +788,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
+         if (filter_highlights && !highlighted) continue;
+ 
+         if (show_highlights && highlighted) glColor3ubv(vis::GREEN);
+-        pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
++        pangolin::GlFont(pangolin::AnonymousPro_ttf, 11).Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
+         if (show_highlights && highlighted) glColor3ubv(pose_color);
+       }
+     }
+Submodule thirdparty/basalt-headers 28b09b3..1c6fdf0:
+diff --git a/thirdparty/basalt-headers/CMakeLists.txt b/thirdparty/basalt-headers/CMakeLists.txt
+index bcb86c5..48cf3bd 100644
+--- a/thirdparty/basalt-headers/CMakeLists.txt
++++ b/thirdparty/basalt-headers/CMakeLists.txt
+@@ -8,36 +8,6 @@ include(GNUInstallDirs)
+ include(CTest) # note: this adds a BUILD_TESTING which defaults to ON
+ 
+ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+-  if (NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+-    find_program(CCACHE_PROGRAM ccache)
+-    if(CCACHE_PROGRAM)
+-      message(STATUS "Found ccache: ${CCACHE_PROGRAM}")
+-      set(CMAKE_C_COMPILER_LAUNCHER   ${CCACHE_PROGRAM})
+-      set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+-    else()
+-      message(STATUS "Dind't find ccache")
+-    endif()
+-  else()
+-    message(STATUS "Compiler launcher already set. Not configuring ccache.")
+-    message(STATUS "CMAKE_C_COMPILER_LAUNCHER: ${CMAKE_C_COMPILER_LAUNCHER}")
+-    message(STATUS "CMAKE_CXX_COMPILER_LAUNCHER: ${CMAKE_CXX_COMPILER_LAUNCHER}")
+-  endif()
+-
+-  IF( NOT CMAKE_BUILD_TYPE )
+-    SET( CMAKE_BUILD_TYPE Release)
+-  ENDIF()
+-
+-  IF(NOT CXX_MARCH)
+-    SET(CXX_MARCH native)
+-  ENDIF()
+-
+-  IF(NOT APPLE OR NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+-    set(BASALT_HEADERS_MARCH_FLAGS "-march=${CXX_MARCH}")
+-  ELSE()
+-    message(STATUS "Running on Apple ${CMAKE_SYSTEM_PROCESSOR}. Disabled -march flag.")
+-  ENDIF()
+-
+-
+   set(CMAKE_CXX_STANDARD 17)
+   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+   set(CMAKE_CXX_EXTENSIONS OFF)
+@@ -45,27 +15,13 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+ 
+   # clang-specific compile flags
+   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+-    set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-exceptions -fcolor-diagnostics -frelaxed-template-template-args -Wno-error=deprecated-declarations")
+-
+-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+-      # These are disabled to avoid lot's of warnings in Eigen code with clang 10
+-      set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-misleading-indentation")
+-    endif()
+-  else()
+-    set(BASALT_HEADERS_CXX_FLAGS "${BASALT_HEADERS_CXX_FLAGS} -Wno-error=maybe-uninitialized")
++    add_compile_options(-frelaxed-template-template-args)
+   endif()
++  add_compile_options(-Wno-missing-template-keyword)
++  add_compile_options(-Wno-error=array-bounds=)
+ 
+-
+-  set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")          # cmake default: "-g"
+-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")  # cmake default: "-O2 -g -DNDEBUG"
+-  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")                                      # cmake default: "-O3 -DNDEBUG"
+-  SET(CMAKE_CXX_FLAGS "-Wall -Werror -Wextra ${BASALT_HEADERS_MARCH_FLAGS} ${CMAKE_CXX_FLAGS} ${BASALT_HEADERS_CXX_FLAGS}")
+-  SET(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fno-inline -fno-inline-small-functions -fno-default-inline")
+-  SET(CMAKE_EXE_LINKER_FLAGS_COVERAGE "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
+-  SET(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} --coverage")
+-  set(CMAKE_CXX_FLAGS_SANITIZERDEBUG "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN -fno-omit-frame-pointer -fsanitize=address,undefined")
+-  set(CMAKE_CXX_FLAGS_SANITIZERRELWITHDEBINFO "-O3 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN -fno-omit-frame-pointer -fsanitize=address,undefined")
+-
++  add_compile_options(-DEIGEN_INITIALIZE_MATRICES_BY_NAN)
++  add_compile_options(-Wall -Werror -Wextra)
+ endif()
+ 
+ function(report_dependency_location DEP_NAME DEP_TARGET)
+diff --git a/thirdparty/basalt-headers/include/basalt/imu/imu_types.h b/thirdparty/basalt-headers/include/basalt/imu/imu_types.h
+index 215dea5..b8308e2 100644
+--- a/thirdparty/basalt-headers/include/basalt/imu/imu_types.h
++++ b/thirdparty/basalt-headers/include/basalt/imu/imu_types.h
+@@ -228,9 +228,9 @@ struct PoseVelBiasState : public PoseVelState<Scalar_> {
+   /// @param other state to compute difference.
+   VecN diff(const PoseVelBiasState<Scalar>& other) const {
+     VecN res;
+-    res.segment<9>(0) = PoseVelState<Scalar>::diff(other);
+-    res.segment<3>(9) = other.bias_gyro - bias_gyro;
+-    res.segment<3>(12) = other.bias_accel - bias_accel;
++    res.template segment<9>(0) = PoseVelState<Scalar>::diff(other);
++    res.template segment<3>(9) = other.bias_gyro - bias_gyro;
++    res.template segment<3>(12) = other.bias_accel - bias_accel;
+     return res;
+   }
+ 
+diff --git a/thirdparty/basalt-headers/include/basalt/spline/ceres_spline_helper.h b/thirdparty/basalt-headers/include/basalt/spline/ceres_spline_helper.h
+index 2e9aa21..bda5faa 100644
+--- a/thirdparty/basalt-headers/include/basalt/spline/ceres_spline_helper.h
++++ b/thirdparty/basalt-headers/include/basalt/spline/ceres_spline_helper.h
+@@ -89,7 +89,7 @@ struct CeresSplineHelper {
+   /// @brief Evaluate Lie group cummulative B-spline and time derivatives.
+   ///
+   /// @param[in] sKnots array of pointers of the spline knots. The size of each
+-  /// knot should be GroupT::num_parameters: 4 for SO(3) and 7 for SE(3).
++  /// knot should be Group::num_parameters: 4 for SO(3) and 7 for SE(3).
+   /// @param[in] u normalized time to compute value of the spline
+   /// @param[in] inv_dt inverse of the time spacing in seconds between spline
+   /// knots
+@@ -98,14 +98,14 @@ struct CeresSplineHelper {
+   /// body frame
+   /// @param[out] accel_out if not nullptr acceleration (second time derivative)
+   /// in the body frame
+-  template <class T, template <class> class GroupT>
+-  static inline void evaluate_lie(T const* const* sKnots, const double u, const double inv_dt,
+-                                  GroupT<T>* transform_out = nullptr, typename GroupT<T>::Tangent* vel_out = nullptr,
+-                                  typename GroupT<T>::Tangent* accel_out = nullptr,
+-                                  typename GroupT<T>::Tangent* jerk_out = nullptr) {
+-    using Group = GroupT<T>;
+-    using Tangent = typename GroupT<T>::Tangent;
+-    using Adjoint = typename GroupT<T>::Adjoint;
++  template <class Group>
++  static inline void evaluate_lie(typename Group::Scalar const* const* sKnots, const double u, const double inv_dt,
++                                  Group* transform_out = nullptr,
++                                  typename Group::Tangent* vel_out = nullptr,
++                                  typename Group::Tangent* accel_out = nullptr,
++                                  typename Group::Tangent* jerk_out = nullptr) {
++    using Tangent = typename Group::Tangent;
++    using Adjoint = typename Group::Adjoint;
+ 
+     VecN p, coeff, dcoeff, ddcoeff, dddcoeff;
+ 
+diff --git a/thirdparty/basalt-headers/test/CMakeLists.txt b/thirdparty/basalt-headers/test/CMakeLists.txt
+index 0485dfd..cdaa312 100644
+--- a/thirdparty/basalt-headers/test/CMakeLists.txt
++++ b/thirdparty/basalt-headers/test/CMakeLists.txt
+@@ -1,8 +1,15 @@
+ cmake_minimum_required(VERSION 3.10...3.18)
+ 
+-if(NOT TARGET gtest_main)
+-    add_subdirectory(googletest EXCLUDE_FROM_ALL)
+-endif(NOT TARGET gtest_main)
++option(BASALT_BUILTIN_BENCHMARK "Use builtin benchmark from submodule" OFF)
++option(BUILD_BENCHMARK "Build camera benchmark" ON)
++option(BASALT_BUILTIN_GTEST "Use builtin GoogleTest from submodule" OFF)
++
++
++if(NOT TARGET gtest_main AND BASALT_BUILTIN_GTEST)
++  message(STATUS "Including internal GoogleTest from submodule")
++  add_subdirectory(googletest EXCLUDE_FROM_ALL)
++  report_dependency_location(GTest GTest::GTest)
++endif()
+ 
+ add_library(basalt-headers-test-utils INTERFACE)
+ add_library (basalt::basalt-headers-test-utils ALIAS basalt-headers-test-utils)
+@@ -41,16 +48,32 @@ target_link_libraries(test_preintegration gtest_main basalt::basalt-headers-test
+ add_executable(test_ceres_spline_helper src/test_ceres_spline_helper.cpp)
+ target_link_libraries(test_ceres_spline_helper gtest_main basalt::basalt-headers-test-utils basalt::basalt-headers)
+ 
+-# benchmarks (currently doesnt work on macOS and with clang)
+-if(NOT APPLE AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+-    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "ENABLE tests")
+-    set(BENCHMARK_ENABLE_EXCEPTIONS OFF CACHE BOOL "ENABLE exceptions")
+-    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "ENABLE gtests")
+-    set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "ENABLE install")
+-    add_subdirectory(benchmark EXCLUDE_FROM_ALL)
+-
+-    add_executable(benchmark_camera src/benchmark_camera.cpp)
+-    target_link_libraries(benchmark_camera benchmark::benchmark basalt::basalt-headers)
++# # benchmarks (currently doesnt work on macOS and with clang)
++# if(NOT APPLE AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
++#     set(BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
++#     message(WARNING "Disabled Benchmark")
++# endif()
++
++if(BUILD_BENCHMARK)
++  if(NOT TARGET benchmark::benchmark)
++    if(BASALT_BUILTIN_BENCHMARK)
++      message(STATUS "Including internal benchmark from submodule")
++      set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "ENABLE tests")
++      set(BENCHMARK_ENABLE_EXCEPTIONS OFF CACHE BOOL "ENABLE exceptions")
++      set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "ENABLE gtests")
++      set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "ENABLE install")
++      add_subdirectory(benchmark EXCLUDE_FROM_ALL)
++    else()
++      message(STATUS "Finding external benchmark")
++      find_package(benchmark REQUIRED)
++    endif()
++  else()
++    message(STATUS "benchmark already available")
++  endif()
++  report_dependency_location(benchmark benchmark::benchmark)
++
++  add_executable(benchmark_camera src/benchmark_camera.cpp)
++  target_link_libraries(benchmark_camera benchmark::benchmark basalt::basalt-headers)
+ endif()
+ 
+ include(GoogleTest)  # for gtest_discover_test
+diff --git a/thirdparty/basalt-headers/test/src/test_ceres_spline_helper.cpp b/thirdparty/basalt-headers/test/src/test_ceres_spline_helper.cpp
+index cc184e3..b0339ef 100644
+--- a/thirdparty/basalt-headers/test/src/test_ceres_spline_helper.cpp
++++ b/thirdparty/basalt-headers/test/src/test_ceres_spline_helper.cpp
+@@ -46,11 +46,11 @@ void test_ceres_spline_helper_so3() {
+         vec.emplace_back(spline.getKnots()[s + i].data());
+       }
+ 
+-      basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(&vec[0], u, pow_inv_dt, &pos2);
+-      basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(&vec[0], u, pow_inv_dt, nullptr, &vel2);
+-      basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(&vec[0], u, pow_inv_dt, nullptr, nullptr,
+-                                                                               &accel2);
+-      basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SO3>(&vec[0], u, pow_inv_dt, nullptr, nullptr,
++      basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SO3d>(&vec[0], u, pow_inv_dt, &pos2);
++      basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SO3d>(&vec[0], u, pow_inv_dt, nullptr, &vel2);
++      basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SO3d>(&vec[0], u, pow_inv_dt, nullptr, nullptr,
++                                                                        &accel2);
++      basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SO3d>(&vec[0], u, pow_inv_dt, nullptr, nullptr,
+                                                                                nullptr, &jerk2);
+     }
+ 
+@@ -70,9 +70,9 @@ void test_ceres_spline_helper_rd() {
+   spline.genRandomTrajectory(3 * N);
+ 
+   for (int64_t t_ns = 0; t_ns < spline.maxTimeNs(); t_ns += 1e8) {
+-    Eigen::Vector3d pos1 = spline.evaluate<0>(t_ns);
+-    Eigen::Vector3d vel1 = spline.evaluate<1>(t_ns);
+-    Eigen::Vector3d accel1 = spline.evaluate<2>(t_ns);
++    Eigen::Vector3d pos1 = spline.template evaluate<0>(t_ns);
++    Eigen::Vector3d vel1 = spline.template evaluate<1>(t_ns);
++    Eigen::Vector3d accel1 = spline.template evaluate<2>(t_ns);
+ 
+     Eigen::Vector3d pos2, vel2, accel2;
+ 
+@@ -129,7 +129,7 @@ void test_ceres_spline_helper_vel_se3() {
+           vec.emplace_back(knots[i + j].data());
+         }
+ 
+-        basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SE3>(&vec[0], u, pow_inv_dt, &pose, &vel);
++        basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SE3d>(&vec[0], u, pow_inv_dt, &pose, &vel);
+ 
+         Eigen::Matrix<double, 1, 1> x0;
+         x0.setZero();
+@@ -141,7 +141,7 @@ void test_ceres_spline_helper_vel_se3() {
+ 
+               double inc = x[0] / (dt_ns * 1e-9);
+ 
+-              basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SE3>(&vec[0], u + inc, pow_inv_dt,
++              basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SE3d>(&vec[0], u + inc, pow_inv_dt,
+                                                                                        &pose_new);
+ 
+               return (pose.inverse() * pose_new).log();
+@@ -173,7 +173,7 @@ void test_ceres_spline_helper_accel_se3() {
+           vec.emplace_back(knots[i + j].data());
+         }
+ 
+-        basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SE3>(&vec[0], u, pow_inv_dt, nullptr,
++        basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SE3d>(&vec[0], u, pow_inv_dt, nullptr,
+                                                                                  nullptr, &accel);
+ 
+         Eigen::Matrix<double, 1, 1> x0;
+@@ -186,7 +186,7 @@ void test_ceres_spline_helper_accel_se3() {
+ 
+               double inc = x[0] / (dt_ns * 1e-9);
+ 
+-              basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SE3>(&vec[0], u + inc, pow_inv_dt,
++              basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SE3d>(&vec[0], u + inc, pow_inv_dt,
+                                                                                        nullptr, &vel);
+ 
+               return vel;
+@@ -218,7 +218,7 @@ void test_ceres_spline_helper_jerk_se3() {
+           vec.emplace_back(knots[i + j].data());
+         }
+ 
+-        basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SE3>(&vec[0], u, pow_inv_dt, nullptr,
++        basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SE3d>(&vec[0], u, pow_inv_dt, nullptr,
+                                                                                  nullptr, nullptr, &jerk);
+ 
+         Eigen::Matrix<double, 1, 1> x0;
+@@ -231,7 +231,7 @@ void test_ceres_spline_helper_jerk_se3() {
+ 
+               double inc = x[0] / (dt_ns * 1e-9);
+ 
+-              basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::SE3>(&vec[0], u + inc, pow_inv_dt,
++              basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::SE3d>(&vec[0], u + inc, pow_inv_dt,
+                                                                                        nullptr, nullptr, &accel);
+ 
+               return accel;
+@@ -264,7 +264,7 @@ void test_ceres_spline_helper_vel_sim3() {
+           vec.emplace_back(knots[i + j].data());
+         }
+ 
+-        basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::Sim3>(&vec[0], u, pow_inv_dt, &pose, &vel);
++        basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::Sim3d>(&vec[0], u, pow_inv_dt, &pose, &vel);
+ 
+         Eigen::Matrix<double, 1, 1> x0;
+         x0.setZero();
+@@ -276,7 +276,7 @@ void test_ceres_spline_helper_vel_sim3() {
+ 
+               double inc = x[0] / (dt_ns * 1e-9);
+ 
+-              basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::Sim3>(&vec[0], u + inc, pow_inv_dt,
++              basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::Sim3d>(&vec[0], u + inc, pow_inv_dt,
+                                                                                         &pose_new);
+ 
+               return (pose.inverse() * pose_new).log();
+@@ -308,7 +308,7 @@ void test_ceres_spline_helper_accel_sim3() {
+           vec.emplace_back(knots[i + j].data());
+         }
+ 
+-        basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::Sim3>(&vec[0], u, pow_inv_dt, nullptr,
++        basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::Sim3d>(&vec[0], u, pow_inv_dt, nullptr,
+                                                                                   nullptr, &accel);
+ 
+         Eigen::Matrix<double, 1, 1> x0;
+@@ -321,7 +321,7 @@ void test_ceres_spline_helper_accel_sim3() {
+ 
+               double inc = x[0] / (dt_ns * 1e-9);
+ 
+-              basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::Sim3>(&vec[0], u + inc, pow_inv_dt,
++              basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::Sim3d>(&vec[0], u + inc, pow_inv_dt,
+                                                                                         nullptr, &vel);
+ 
+               return vel;
+@@ -353,7 +353,7 @@ void test_ceres_spline_helper_jerk_sim3() {
+           vec.emplace_back(knots[i + j].data());
+         }
+ 
+-        basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::Sim3>(&vec[0], u, pow_inv_dt, nullptr,
++        basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::Sim3d>(&vec[0], u, pow_inv_dt, nullptr,
+                                                                                   nullptr, nullptr, &jerk);
+ 
+         Eigen::Matrix<double, 1, 1> x0;
+@@ -366,7 +366,7 @@ void test_ceres_spline_helper_jerk_sim3() {
+ 
+               double inc = x[0] / (dt_ns * 1e-9);
+ 
+-              basalt::CeresSplineHelper<N>::template evaluate_lie<double, Sophus::Sim3>(&vec[0], u + inc, pow_inv_dt,
++              basalt::CeresSplineHelper<N>::template evaluate_lie<Sophus::Sim3d>(&vec[0], u + inc, pow_inv_dt,
+                                                                                         nullptr, nullptr, &accel);
+ 
+               return accel;
