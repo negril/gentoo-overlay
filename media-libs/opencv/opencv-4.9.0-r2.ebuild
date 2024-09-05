@@ -145,7 +145,10 @@ RDEPEND="
 	dev-libs/protobuf:=[${MULTILIB_USEDEP}]
 	sys-libs/zlib[${MULTILIB_USEDEP}]
 	cuda? ( <dev-util/nvidia-cuda-toolkit-12.4:0= )
-	cudnn? ( dev-libs/cudnn:= )
+	cudnn? (
+		dev-cpp/abseil-cpp:=
+		dev-libs/cudnn:=
+	)
 	contribdnn? ( dev-libs/flatbuffers:= )
 	contribhdf? ( sci-libs/hdf5:= )
 	contribfreetype? (
@@ -266,6 +269,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.9.0-drop-python2-detection.patch"
 	"${FILESDIR}/${PN}-4.9.0-ade-0.1.2d.tar.gz.patch"
 	"${FILESDIR}/${PN}-4.9.0-cmake-cleanup.patch"
+	"${FILESDIR}/${PN}-4.9.0-r2-dnn-explicitly-include-abseil-cpp.patch"
 
 	# TODO applied in src_prepare
 	# "${FILESDIR}/${PN}_contrib-${PV}-rgbd.patch"
