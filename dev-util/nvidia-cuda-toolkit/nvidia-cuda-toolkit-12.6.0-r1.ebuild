@@ -6,10 +6,10 @@ EAPI=8
 PYTHON_COMPAT=( python3_{10..12} )
 inherit check-reqs desktop unpacker python-r1
 
-DRIVER_PV="555.42.06"
+DRIVER_PV="560.28.03"
 # grep -P "unsupported (GNU|clang) version" builds/cuda_nvcc/targets/x86_64-linux/include/crt/host_config.h
 GCC_MAX_VER="13"
-CLANG_MAX_VER="17"
+CLANG_MAX_VER="18"
 
 DESCRIPTION="NVIDIA CUDA Toolkit (compiler and friends)"
 HOMEPAGE="https://developer.nvidia.com/cuda-zone"
