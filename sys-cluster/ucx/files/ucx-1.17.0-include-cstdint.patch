@@ -1,0 +1,48 @@
+From 7ee7e82a454af4ef4e26bc5d0165f373e229d5e0 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Tue, 6 Aug 2024 17:52:17 +0200
+Subject: [PATCH] gtest-death-test.cc: Explicitly include <cstdint>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+GCC 15 will no longer include <cstdint> by default, resulting in build
+failures in projects that do not explicitly include it.
+
+gtest-death-test.cc: In function ‘pid_t
+testing::internal::ExecDeathTestSpawnChild(char* const*, int)’:
+gtest-death-test.cc:1385:26: error: ‘uintptr_t’ does not name a type
+1385 |         reinterpret_cast<uintptr_t>(stack_top) %
+kMaxStackAlignment == 0);
+      |                          ^~~~~~~~~
+gtest-death-test.cc:308:38: note: in definition of macro
+‘GTEST_DEATH_TEST_CHECK_’
+  308 |     if (!::testing::internal::IsTrue(expression)) { \
+      |                                      ^~~~~~~~~~
+gtest-death-test.cc:86:1: note: ‘uintptr_t’ is defined in header
+‘<cstdint>’; this is probably fixable by adding ‘#include <cstdint>’
+   85 | #include "gtest-internal-inl.h"
+  +++ |+#include <cstdint>
+   86 |
+
+See-also: https://gcc.gnu.org/pipermail/gcc-cvs/2024-August/407124.html
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+---
+ test/gtest/common/googletest/gtest-death-test.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/test/gtest/common/googletest/gtest-death-test.cc b/test/gtest/common/googletest/gtest-death-test.cc
+index 9b5d1ea..6564ae4 100644
+--- a/test/gtest/common/googletest/gtest-death-test.cc
++++ b/test/gtest/common/googletest/gtest-death-test.cc
+@@ -33,6 +33,7 @@
+ #include "gtest-death-test.h"
+ 
+ #include <utility>
++#include <cstdint>
+ 
+ #include "internal/gtest-port.h"
+ #include "internal/custom/gtest.h"
+-- 
+2.45.2
+
