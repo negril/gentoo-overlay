@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+  <longdescription>Pangolin is a lightweight portable rapid development library for managing OpenGL display / interaction and abstracting video input.</longdescription>
+  <maintainer type="person" proxied="yes">
+    <email>negril.nx+gentoo@gmail.com</email>
+    <name>Paul Zander</name>
+  </maintainer>
+  <maintainer type="project" proxied="proxy">
+    <email>proxy-maint@gentoo.org</email>
+    <name>Proxy Maintainers</name>
+  </maintainer>
+  <use>
+    <flag name="asan">Enable AddressSanitizer for Debug builds</flag>
+    <flag name="dc1394">Build support for libdc1394 video input</flag>
+    <!--<flag name="depthsense">Build support for DepthSense video input</flag>-->
+    <flag name="examples">Build Examples</flag>
+    <flag name="ffmpeg">Build support for ffmpeg video input</flag>
+    <flag name="jpeg">Build support for libjpeg image input</flag>
+    <flag name="lz4">Build support for liblz4 compression</flag>
+    <flag name="openexr">Build support for libopenexr image input</flag>
+    <flag name="openni">Build support for OpenNI video input</flag>
+    <flag name="openni2">Build support for OpenNI2 video input</flag>
+    <!--<flag name="pleora">Build support for Pleora video input</flag>-->
+    <flag name="png">Build support for libpng image input</flag>
+    <flag name="python">Build support for Pangolin Interactive Console</flag>
+    <flag name="raw">Build support for raw images (libraw)</flag>
+    <!--<flag name="realsense">Build support for RealSense video input</flag>-->
+    <!--<flag name="realsense2">Build support for RealSense2 video input</flag>-->
+    <flag name="shared">Build Shared Library</flag>
+    <!--<flag name="telicam">Build support for TeliCam video input</flag>-->
+    <flag name="test">Build Tests</flag>
+    <flag name="tiff">Build support for libtiff image input</flag>
+    <flag name="tools">Build Tools</flag>
+    <flag name="uvc">Build support for libuvc video input</flag>
+    <flag name="v4l">Build support for V4L video input</flag>
+    <flag name="zstd">Build support for libzstd compression</flag>
+  </use>
+  <upstream>
+    <remote-id type="github">stevenlovegrove/Pangolin</remote-id>
+  </upstream>
+</pkgmetadata>
