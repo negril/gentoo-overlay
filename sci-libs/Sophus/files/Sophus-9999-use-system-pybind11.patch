@@ -1,0 +1,22 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index eed09723..e0fdf029 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -156,15 +140,9 @@ endif()
+ # Build python sophus bindings
+ option(BUILD_PYTHON_BINDINGS "Build python sophus bindings." OFF)
+ if(BUILD_PYTHON_BINDINGS)
+-  include(FetchContent)
+-  FetchContent_Declare(
+-      pybind11
+-      GIT_REPOSITORY https://github.com/pybind/pybind11.git
+-      GIT_TAG master
+-  )
+-  FetchContent_MakeAvailable(pybind11)
++  find_package(Python COMPONENTS Interpreter Development)
++  find_package(pybind11 CONFIG)
+
+-  add_subdirectory(${pybind11_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/pybind)
+   pybind11_add_module(sophus_pybind ${CMAKE_CURRENT_SOURCE_DIR}/sophus_pybind/bindings.cpp)
+   target_link_libraries(sophus_pybind PUBLIC sophus)
+ endif(BUILD_PYTHON_BINDINGS)

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+  <maintainer type="person" proxied="yes">
+    <email>negril.nx+gentoo@gmail.com</email>
+    <name>Paul Zander</name>
+  </maintainer>
+  <maintainer type="project" proxied="proxy">
+    <email>proxy-maint@gentoo.org</email>
+    <name>Proxy Maintainers</name>
+  </maintainer>
+  <use>
+    <flag name="examples">Build Examples</flag>
+    <flag name="fmt">Don't usee basic logging (in ensure and test macros)</flag>
+    <flag name="python">Build python sophus bindings</flag>
+    <flag name="test">Build Tests</flag>
+  </use>
+  <upstream>
+    <remote-id type="github">strasdat/Sophus</remote-id>
+  </upstream>
+</pkgmetadata>
