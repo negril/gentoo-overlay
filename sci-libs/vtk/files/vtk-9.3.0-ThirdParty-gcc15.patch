@@ -3,14 +3,6 @@ From: Ted Rodgers <ted.d.rodgers@gmail.com>
 Date: Sat, 10 Aug 2024 16:13:09 -0400
 Subject: [PATCH] include cstdint + correct case/words
 
----
- .../vtkvtkm/vtk-m/vtkm/filter/contour/worklet/mir/MIRTables.h | 2 +-
- .../worklet/contourtree_distributed/HierarchicalContourTree.h | 4 ++--
- .../vtkmdiy/include/vtkmdiy/thirdparty/chobo/small_vector.hpp | 1 +
- 3 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/filter/contour/worklet/mir/MIRTables.h b/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/filter/contour/worklet/mir/MIRTables.h
-index 3dff3329..529ea662 100644
 --- a/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/filter/contour/worklet/mir/MIRTables.h
 +++ b/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/filter/contour/worklet/mir/MIRTables.h
 @@ -11402,7 +11402,7 @@ public:
@@ -22,8 +14,6 @@ index 3dff3329..529ea662 100644
      }
  
    private:
-diff --git a/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/filter/scalar_topology/worklet/contourtree_distributed/HierarchicalContourTree.h b/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/filter/scalar_topology/worklet/contourtree_distributed/HierarchicalContourTree.h
-index acd5eca2..5a23705d 100644
 --- a/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/filter/scalar_topology/worklet/contourtree_distributed/HierarchicalContourTree.h
 +++ b/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/filter/scalar_topology/worklet/contourtree_distributed/HierarchicalContourTree.h
 @@ -663,7 +663,7 @@ std::string HierarchicalContourTree<FieldType>::PrintDotSuperStructure(const cha
@@ -44,8 +34,6 @@ index acd5eca2..5a23705d 100644
        { // root node
          outstream << "\tSN" << std::setw(1) << superarcFrom << " -> SA" << std::setw(1) << superarc
                    << " [label=\"S" << std::setw(1) << superarc << "\",style=dotted]\n";
-diff --git a/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/thirdparty/diy/vtkmdiy/include/vtkmdiy/thirdparty/chobo/small_vector.hpp b/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/thirdparty/diy/vtkmdiy/include/vtkmdiy/thirdparty/chobo/small_vector.hpp
-index 784534bb..e2c36dde 100644
 --- a/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/thirdparty/diy/vtkmdiy/include/vtkmdiy/thirdparty/chobo/small_vector.hpp
 +++ b/ThirdParty/vtkm/vtkvtkm/vtk-m/vtkm/thirdparty/diy/vtkmdiy/include/vtkmdiy/thirdparty/chobo/small_vector.hpp
 @@ -136,6 +136,7 @@
@@ -56,5 +44,4 @@ index 784534bb..e2c36dde 100644
  #include <type_traits>
  #include <cstddef>
  #include <memory>
--- 
-2.45.2
+

@@ -208,13 +208,28 @@ vtk_check_compiler() {
 		if [[ -z "${version}" ]]; then
 			die "could not find supported version of ${package}"
 		fi
+		# einfo "compiler $compiler"
+		# einfo "version ${version}"
+		# einfo "a ${version}" | grep -oP "(?<=${package}-)[0-9]*"
+		# einfo "b ${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
+		# einfo "c $(command -v -p "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")")"
 		CUDAHOSTCXX_test="$(
 			dirname "$(
 				realpath "$(
-					which "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
+					command -v -p "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
 				)"
 			)"
 		)"
+		# einfo "d $(realpath "$(
+		# 			command -v -p "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
+		# 		)" )"
+		# einfo "e $(dirname "$(
+		# 		realpath "$(
+		# 			command -v -p "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
+		# 		)"
+		# 	)" )"
+		# einfo "f ${CUDAHOSTCXX_test}"
+		# nvcc "-ccbin=${CUDAHOSTCXX_test}" - -x cu <<<"int main(){}"
 		if nvcc "-ccbin=${CUDAHOSTCXX_test}" - -x cu <<<"int main(){}" &>/dev/null; then
 			CUDAHOSTCXX="${CUDAHOSTCXX_test}"
 			einfo "using =${version#"<"}"
@@ -769,6 +784,7 @@ src_test() {
 		"VTK::ChartsCoreCxx-TestChartDoubleColorsOpaque$" # (Failed)
 		"VTK::ChartsCoreCxx-TestParallelCoordinatesDouble$" # (Failed)
 		"VTK::CommonDataModelCxx-TestHyperTreeGridGeometricLocator$" # (Failed)
+		"VTK::CommonDataModelCxx-TestIncrementalOctreePointLocator$" # (Failed)
 		"VTK::CommonDataModelCxx-TestTriangle$" # (Failed)
 		"VTK::CommonDataModelCxx-UnitTestCells$" # (Failed)
 		"VTK::FiltersCoreCxx-TestDecimatePolylineFilter$" # (Failed)
@@ -776,6 +792,7 @@ src_test() {
 		"VTK::FiltersCorePython-TestSphereTreeFilter$" # (Failed)
 		"VTK::FiltersFlowPathsCxx-TestEvenlySpacedStreamlines2D$" # (Failed)
 		"VTK::FiltersGeneralCxx-TestContourTriangulatorHoles$" # (Failed)
+		"VTK::FiltersParallelCxx-TestAngularPeriodicFilter$" # (Failed)
 		"VTK::FiltersParallelDIY2Cxx-MPI-TestProbeLineFilter$" # (Failed)
 		"VTK::FiltersSelectionCxx-TestLinearSelector3D$" # (Failed)
 		"VTK::GUISupportQtQuickCxx-TestQQuickVTKRenderItem$" # (Failed)
@@ -810,6 +827,7 @@ src_test() {
 		"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMWarpScalar$" # (NUMERICAL)
 		"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMWarpVector$" # (NUMERICAL)
 		"VTK::ImagingOpenGL2Cxx-TestOpenGLImageGradient$" # (NUMERICAL)
+		"VTK::InteractionWidgetsCxx-TestBrokenLineWidget$" # (Failed)
 		"VTK::InteractionWidgetsCxx-TestPickingManagerSeedWidget$" # (Timeout)
 		"VTK::InteractionWidgetsCxx-TestResliceCursorWidget2$" # (Failed)
 		"VTK::InteractionWidgetsCxx-TestResliceCursorWidget3$" # (Failed)

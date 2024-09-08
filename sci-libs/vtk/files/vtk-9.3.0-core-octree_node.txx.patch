@@ -3,12 +3,8 @@ From: Ted Rodgers <ted.d.rodgers@gmail.com>
 Date: Sat, 10 Aug 2024 16:10:13 -0400
 Subject: [PATCH] octree_node.txx fix chilren typo
 
----
- Utilities/octree/octree/octree_node.txx | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
 
-diff --git a/Utilities/octree/octree/octree_node.txx b/Utilities/octree/octree/octree_node.txx
-index 6971c7c1..5f12bb7d 100644
 --- a/Utilities/octree/octree/octree_node.txx
 +++ b/Utilities/octree/octree/octree_node.txx
 @@ -210,7 +210,7 @@ const octree_node<T_, d_, A_>& octree_node<T_, d_, A_>::operator[](int child) co
@@ -20,5 +16,3 @@ index 6971c7c1..5f12bb7d 100644
  }
  
  /**\brief Return a reference to a child node.
--- 
-2.45.2
