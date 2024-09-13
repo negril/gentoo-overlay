@@ -3,13 +3,13 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+PYTHON_COMPAT=( python3_{10..13} )
 inherit cuda java-pkg-opt-2 cmake-multilib flag-o-matic python-r1 toolchain-funcs virtualx
 
 DESCRIPTION="A collection of algorithms and sample code for various computer vision problems"
 HOMEPAGE="https://opencv.org"
 
-if [[ ${PV} = *9999* ]] ; then
+if [[ "${PV}" = *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/${PN}/${PN}.git"
 else
@@ -109,8 +109,8 @@ unset ARM_CPU_FEATURES PPC_CPU_FEATURES X86_CPU_FEATURES_RAW X86_CPU_FEATURES
 
 REQUIRED_USE="
 	amd64? ( cpu_flags_x86_sse cpu_flags_x86_sse2 )
-	cpu_flags_x86_avx2? ( cpu_flags_x86_f16c )
-	cpu_flags_x86_f16c? ( cpu_flags_x86_avx )
+	amd64? ( cpu_flags_x86_avx2? ( cpu_flags_x86_f16c ) )
+	amd64? ( cpu_flags_x86_f16c? ( cpu_flags_x86_avx ) )
 	cuda? (
 		contrib
 	)
@@ -134,17 +134,16 @@ REQUIRED_USE="
 "
 
 # TODO find a way to compile these with the cuda compiler
-REQUIRED_USE+="
-	cuda? ( !gdal !openexr !tbb )
-"
+# REQUIRED_USE+="
+# 	cuda? ( !gdal !openexr !tbb )
+# "
 
 RESTRICT="!test? ( test )"
 
 RDEPEND="
-	app-arch/bzip2[${MULTILIB_USEDEP}]
 	dev-libs/protobuf:=[${MULTILIB_USEDEP}]
 	sys-libs/zlib[${MULTILIB_USEDEP}]
-	cuda? ( <dev-util/nvidia-cuda-toolkit-12.4:0= )
+	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	cudnn? (
 		dev-cpp/abseil-cpp:=
 		dev-libs/cudnn:=
@@ -271,113 +270,63 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.9.0-cmake-cleanup.patch"
 	"${FILESDIR}/${PN}-4.9.0-r2-dnn-explicitly-include-abseil-cpp.patch"
 
-	# TODO applied in src_prepare
+	"${FILESDIR}/${PN}-4.9.0-25658.patch" # 25658
+
+	# NOTE applied in src_prepare
 	# "${FILESDIR}/${PN}_contrib-${PV}-rgbd.patch"
 	# "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
-	# "${FILESDIR}/${PN}_contrib-4.9.0-cuda-12.4.patch"
+	# "${FILESDIR}/${PN}_contrib-4.9.0-cuda-12.4_1.patch"
 )
 
-debugp() {
-	einfo "$1 ${!1}"
-}
-
-cuda_get_cuda_compiler() {
-	einfo cuda_get_cuda_compiler
-	local compiler
-	debugp compiler
-	tc-is-gcc && compiler="gcc"
-	tc-is-clang && compiler="clang"
-	debugp compiler
-	[[ -z "$compiler" ]] && die "no compiler specified"
-
-	local package="sys-devel/${compiler}"
-	local version="${package}"
-	local CUDAHOSTCXX_test
-
-	debugp package
-	debugp version
-	debugp CUDAHOSTCXX_test
-
-	while
-		local CUDAHOSTCXX="${CUDAHOSTCXX_test}"
-		debugp CUDAHOSTCXX
-		version=$(best_version "${version}")
-		debugp version
-		if [[ -z "${version}" ]]; then
-			if [[ -z "${CUDAHOSTCXX}" ]]; then
-				die "could not find supported version of ${package}"
-			fi
-			break
-		fi
-		CUDAHOSTCXX_test="$(
-			dirname "$(
-				realpath "$(
-					command -v "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
-				)"
-			)"
-		)"
-		debugp CUDAHOSTCXX_test
-		version="<${version}"
-		debugp version
-	do ! nvcc -ccbin "${CUDAHOSTCXX_test}" - -x cu &>/dev/null <<<"int main(){}"; done
-
-	echo "${CUDAHOSTCXX}"
-	debugp CUDAHOSTCXX
-}
-
 cuda_get_host_compiler() {
-	# einfo cuda_get_host_compiler
-	local compiler="$(tc-get-compiler-type)"
-	# debugp compiler
+	if [[ -n "${CUDAHOSTCXX}" ]]; then
+		echo "${CUDAHOSTCXX}"
+		return
+	fi
+
+	einfo "trying to find working CUDA host compiler"
+
+	local compiler compiler_type compiler_version
+	local package package_version
+	local NVCC_CCBIN
+
+	compiler_type="$(tc-get-compiler-type)"
+	compiler_version="$("${compiler_type}-major-version")"
+
+	compiler="$(tc-getCC)"
+	compiler="${compiler/%-${compiler_version}}"
+
+	# store the package so we can re-use it later
+	package="sys-devel/${compiler_type}"
+	package_version="${package}"
+
 	if ! tc-is-gcc && ! tc-is-clang; then
 		die "${compiler} compiler is not supported"
 	fi
-	# local default_compiler="$(tc-getCXX)"
-	local default_compiler="$(tc-getCXX)"
-	local package="sys-devel/${compiler}"
-	local version="${package}"
 
-	# debugp default_compiler
-	# debugp version
+	if [[ "${compiler%%[[:space:]]*}" == "ccache" ]]; then
+		compiler="${compiler/#ccache }"
+		local PATH="/usr/lib/ccache/bin:${PATH}"
+	fi
 
 	# try the default compiler first
-	local NVCC_CCBIN="${default_compiler}-$("${compiler}-major-version")"
-	# debugp NVCC_CCBIN
-	# einfo ""
+	NVCC_CCBIN="$(command -v "${compiler}-${compiler_version}")"
+	ebegin "testing default compiler: ${compiler_type}-${compiler_version}"
+
 	while ! nvcc -ccbin "${NVCC_CCBIN}" - -x cu <<<"int main(){}" &>/dev/null; do
-		# einfo "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
-		version=$(best_version "${version}")
-		# debugp version
-		if [[ -z "${version}" ]]; then
+		eend 1
+		# prepare next version
+		if ! package_version="<$(best_version "${package_version}")"; then
 			die "could not find a supported version of ${compiler}"
 		fi
-		version="<${version}"
-		# debugp version
-		# nvcc accepts just an executable name, too.
-		# search for NVCC_CCBIN here:
-		# https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/
-		# debugp package
-		# NVCC_CCBIN="$(
-		# 	dirname "$(
-		# 		realpath "$(
-		# 			command -v "${default_compiler}-$(ver_cut 1 "${version//<${package}-/}")"
-		# 		)"
-		# 	)"
-		# )"
-		NVCC_CCBIN="${default_compiler}-$(ver_cut 1 "${version//<${package}-/}")"
-		# NVCC_CCBIN="$(echo "${version}" | sed 's:.*/\([a-z]*-[0-9]*\).*:\1:')"
-		# debugp NVCC_CCBIN
-		# einfo
-	done
 
-	# if [[ ${NVCC_CCBIN} != ${default_compiler} ]]; then
-	# 	ewarn "The default compiler, ${default_compiler} is not supported by nvcc!"
-	# 	ewarn "Compiler version mismatch causes undefined reference errors on linking, so"
-	# 	ewarn "${NVCC_CCBIN}, which is supported by nvcc, will be used to compile OpenCV."
-	# fi
+		compiler_version="$(ver_cut 1 "${package_version/#<${package}-/}")"
+		NVCC_CCBIN="$(command -v "${compiler}-${compiler_version}")"
+		ebegin "testing ${compiler_type}-${compiler_version}"
+	done
+	eend $?
 
 	echo "${NVCC_CCBIN}"
-	# debugp NVCC_CCBIN
 }
 
 cuda_get_host_native_arch() {
@@ -406,6 +355,9 @@ pkg_pretend() {
 pkg_setup() {
 	[[ ${MERGE_TYPE} != binary ]] && use openmp && tc-check-openmp
 	use java && java-pkg-opt-2_pkg_setup
+	if use cuda; then
+		nvidia-modprobe -u -m | true
+	fi
 }
 
 src_prepare() {
@@ -421,9 +373,13 @@ src_prepare() {
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
 		if ver_test "$(nvcc --version | tail -n 1 | cut -d '_' -f 2- | cut -d '.' -f 1-2)" -ge 12.4; then
-			# TODO https://github.com/NVIDIA/cccl/pull/1522
-			eapply "${FILESDIR}/${PN}_contrib-4.9.0-cuda-12.4.patch"
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-3607.patch" # 3607
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-cuda-12.4.patch" # 3726
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-3742.patch" # 3742
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-3744.patch" # 3744
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-CUDA-12.6-tuple_size.patch" # 3785
 		fi
+
 		cd "${S}" || die
 
 		! use contribcvv && { rm -R "${WORKDIR}/${PN}_contrib-${PV}/modules/cvv" || die; }
@@ -772,24 +728,23 @@ multilib_src_configure() {
 	if multilib_is_native_abi && use cuda; then
 		cuda_add_sandbox -w
 		addwrite "/proc/self/task"
-		# CUDAHOSTCXX="$(cuda_get_cuda_compiler)"
+
+		__nvcc_device_query
+
 		CUDAHOSTCXX="$(cuda_get_host_compiler)"
 		CUDAARCHS="$(cuda_get_host_native_arch)"
+		CUDAHOSTLD="$(command -v "$(tc-getCXX)")"
+
 		export CUDAHOSTCXX
 		export CUDAARCHS
-		export CUDAHOSTLD="$(command -v $(tc-getCXX))"
-
-		mycmakeargs+=(
-			-DCMAKE_CUDA_HOST_LINK_LAUNCHER="$(command -v $(tc-getCXX))"
-		)
+		export CUDAHOSTLD
 
 		if tc-is-gcc; then
 			CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES_EXCLUDE=$("${CUDAHOSTLD}" -E -v - <<<"int main(){}" |& grep LIBRARY_PATH | cut -d '=' -f 2 | cut -d ':' -f 1)
 		fi
 
-		# export CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES_EXCLUDE="${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES_EXCLUDE%/}"
-		# einfo "CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES_EXCLUDE=${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES_EXCLUDE}"
 		mycmakeargs+=(
+			# -DCMAKE_CUDA_HOST_LINK_LAUNCHER="$(command -v "$(tc-getCXX)")"
 			-DENABLE_CUDA_FIRST_CLASS_LANGUAGE="yes"
 		)
 	fi
@@ -878,26 +833,10 @@ multilib_src_configure() {
 }
 
 multilib_src_compile() {
-	opencv_compile() {
-		if use cuda; then
-			cmake_ver="$(cmake --version | head -n1  | sed -e 's/cmake version //')"
-			local compiler=$(tc-get-compiler-type)
-			local compiler_version="$("${compiler}-major-version")"
-
-			sed \
-				-e "s#CMAKE_CUDA_HOST_LINK_LAUNCHER .*#CMAKE_CUDA_HOST_LINK_LAUNCHER \"/usr/x86_64-pc-linux-gnu/gcc-bin/${compiler_version}/g++\")#" \
-				-e "s#CMAKE_CUDA_COMPILER_LINKER .*#CMAKE_CUDA_COMPILER_LINKER \"/usr/x86_64-pc-linux-gnu/bin/ld\")#" \
-				-i "${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake" || die
-
-			ewarn "$(grep CMAKE_CUDA_HOST_LINK_LAUNCHER ${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake)"
-		fi
-
-		cmake_src_compile
-	}
 	if multilib_is_native_abi && use python; then
-		python_foreach_impl opencv_compile
+		python_foreach_impl cmake_src_compile
 	else
-		opencv_compile
+		cmake_src_compile
 	fi
 }
 

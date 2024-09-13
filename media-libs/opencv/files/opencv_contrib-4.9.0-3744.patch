@@ -1,0 +1,1335 @@
+https://github.com/opencv/opencv_contrib/pull/3744
+From 7e8ae30952a4a5a60f67668db9d1625fb6193e8b Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Fri, 24 May 2024 13:44:49 +0300
+Subject: [PATCH 1/8] Added branch compatible with variadic tuple version in
+ Trust (since CUDA 12.4).
+
+---
+ .../opencv2/cudev/block/detail/reduce.hpp     | 55 ++++++++++++++++---
+ .../include/opencv2/cudev/block/reduce.hpp    | 35 ++++++++++++
+ 2 files changed, 81 insertions(+), 9 deletions(-)
+
+diff --git a/modules/cudev/include/opencv2/cudev/block/detail/reduce.hpp b/modules/cudev/include/opencv2/cudev/block/detail/reduce.hpp
+index 151e949a617..79ab35ce6ca 100644
+--- a/modules/cudev/include/opencv2/cudev/block/detail/reduce.hpp
++++ b/modules/cudev/include/opencv2/cudev/block/detail/reduce.hpp
+@@ -154,6 +154,17 @@ namespace block_reduce_detail
+         val = smem[tid];
+     }
+ 
++
++    // merge
++
++    template <typename T, class Op>
++    __device__ __forceinline__ void merge(volatile T* smem, T& val, uint tid, uint delta, const Op& op)
++    {
++        T reg = smem[tid + delta];
++        smem[tid] = val = op(val, reg);
++    }
++
++#if (CUDART_VERSION < 12040)
+     template <typename P0, typename P1, typename P2, typename P3, typename P4, typename P5, typename P6, typename P7, typename P8, typename P9,
+               typename R0, typename R1, typename R2, typename R3, typename R4, typename R5, typename R6, typename R7, typename R8, typename R9>
+     __device__ __forceinline__ void loadToSmem(const tuple<P0, P1, P2, P3, P4, P5, P6, P7, P8, P9>& smem,
+@@ -172,15 +183,6 @@ namespace block_reduce_detail
+         For<0, tuple_size<tuple<P0, P1, P2, P3, P4, P5, P6, P7, P8, P9> >::value>::loadFromSmem(smem, val, tid);
+     }
+ 
+-    // merge
+-
+-    template <typename T, class Op>
+-    __device__ __forceinline__ void merge(volatile T* smem, T& val, uint tid, uint delta, const Op& op)
+-    {
+-        T reg = smem[tid + delta];
+-        smem[tid] = val = op(val, reg);
+-    }
+-
+     template <typename P0, typename P1, typename P2, typename P3, typename P4, typename P5, typename P6, typename P7, typename P8, typename P9,
+               typename R0, typename R1, typename R2, typename R3, typename R4, typename R5, typename R6, typename R7, typename R8, typename R9,
+               class Op0, class Op1, class Op2, class Op3, class Op4, class Op5, class Op6, class Op7, class Op8, class Op9>
+@@ -214,6 +216,41 @@ namespace block_reduce_detail
+     }
+ #endif
+ 
++#else
++    template <typename... P, typename... R>
++    __device__ __forceinline__ void loadToSmem(const tuple<P...>& smem, const tuple<R...>& val, uint tid)
++    {
++        For<0, tuple_size<tuple<P...> >::value>::loadToSmem(smem, val, tid);
++    }
++
++    template <typename... P, typename... R>
++    __device__ __forceinline__ void loadFromSmem(const tuple<P...>& smem, const tuple<R...>& val, uint tid)
++    {
++        For<0, tuple_size<tuple<P...> >::value>::loadFromSmem(smem, val, tid);
++    }
++
++    template <typename P..., typename... R, class... Op>
++    __device__ __forceinline__ void merge(const tuple<P...>& smem, const tuple<R...>& val, uint tid, uint delta, const tuple<Op...>& op)
++    {
++        For<0, tuple_size<tuple<P...> >::value>::merge(smem, val, tid, delta, op);
++    }
++
++    // mergeShfl
++
++    template <typename T, class Op>
++    __device__ __forceinline__ void mergeShfl(T& val, uint delta, uint width, const Op& op)
++    {
++        T reg = shfl_down(val, delta, width);
++        val = op(val, reg);
++    }
++
++    template <typename... R, class... Op>
++    __device__ __forceinline__ void mergeShfl(const tuple<R...>& val, uint delta, uint width, const tuple<Op...>& op)
++    {
++        For<0, tuple_size<tuple<R...> >::value>::mergeShfl(val, delta, width, op);
++    }
++#endif
++
+     // Generic
+ 
+     template <int N> struct Generic
+diff --git a/modules/cudev/include/opencv2/cudev/block/reduce.hpp b/modules/cudev/include/opencv2/cudev/block/reduce.hpp
+index 06f59a16ae9..77b18e21a9c 100644
+--- a/modules/cudev/include/opencv2/cudev/block/reduce.hpp
++++ b/modules/cudev/include/opencv2/cudev/block/reduce.hpp
+@@ -51,6 +51,7 @@
+ #include "../warp/reduce.hpp"
+ #include "detail/reduce.hpp"
+ #include "detail/reduce_key_val.hpp"
++#include <cuda_runtime_api.h>
+ 
+ namespace cv { namespace cudev {
+ 
+@@ -65,6 +66,7 @@ __device__ __forceinline__ void blockReduce(volatile T* smem, T& val, uint tid,
+     block_reduce_detail::Dispatcher<N>::reductor::template reduce<volatile T*, T&, const Op&>(smem, val, tid, op);
+ }
+ 
++#if (CUDART_VERSION < 12040)
+ template <int N,
+           typename P0, typename P1, typename P2, typename P3, typename P4, typename P5, typename P6, typename P7, typename P8, typename P9,
+           typename R0, typename R1, typename R2, typename R3, typename R4, typename R5, typename R6, typename R7, typename R8, typename R9,
+@@ -126,6 +128,39 @@ __device__ __forceinline__ void blockReduceKeyVal(const tuple<KP0, KP1, KP2, KP3
+             >(skeys, key, svals, val, tid, cmp);
+ }
+ 
++#else
++
++template <int N, typename... P, typename... R, typename... Op>
++__device__ __forceinline__ void blockReduce(const tuple<P...>& smem,
++                                            const tuple<R...>& val,
++                                            uint tid,
++                                            const tuple<Op..>& op)
++{
++    block_reduce_detail::Dispatcher<N>::reductor::template reduce<const tuple<P...>&, const tuple<R...>&, const tuple<Op...>&>(smem, val, tid, op);
++}
++
++// blockReduceKeyVal
++
++template <int N, typename K, typename V, class Cmp>
++__device__ __forceinline__ void blockReduceKeyVal(volatile K* skeys, K& key, volatile V* svals, V& val, uint tid, const Cmp& cmp)
++{
++    block_reduce_key_val_detail::Dispatcher<N>::reductor::template reduce<volatile K*, K&, volatile V*, V&, const Cmp&>(skeys, key, svals, val, tid, cmp);
++}
++
++template <int N, typename K, typename... VP, typename... VR, class Cmp>
++__device__ __forceinline__ void blockReduceKeyVal(volatile K* skeys, K& key, const tuple<VP...>& svals, const tuple<VR...>& val, uint tid, const Cmp& cmp)
++{
++    block_reduce_key_val_detail::Dispatcher<N>::reductor::template reduce<volatile K*, K&, const tuple<VP...>&, const tuple<VR...>&, const Cmp&>(skeys, key, svals, val, tid, cmp);
++}
++
++template <int N, typename... KP, typename... KR, typename... VP, typename... VR, class... Cmp>
++__device__ __forceinline__ void blockReduceKeyVal(const tuple<KP...>& skeys, const tuple<KR...>& key, const tuple<VP...>& svals, const tuple<VR...>& val, uint tid, const tuple<Cmp...>& cmp)
++{
++    block_reduce_key_val_detail::Dispatcher<N>::reductor::template reduce< const tuple<KP...>&, const tuple<KR...>&, const tuple<VP...>&, const tuple<VR...>&, const tuple<Cmp...>&>(skeys, key, svals, val, tid, cmp);
++}
++
++#endif
++
+ //! @}
+ 
+ }}
+
+From 153e8e120f537635bbd2c406c103a8db931c6b8b Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Fri, 24 May 2024 14:14:58 +0300
+Subject: [PATCH 2/8] More tuple fixes.
+
+---
+ .../opencv2/cudev/block/detail/reduce.hpp     |  2 +-
+ .../cudev/block/detail/reduce_key_val.hpp     | 62 +++++++++++++++++++
+ .../include/opencv2/cudev/block/reduce.hpp    |  2 +-
+ 3 files changed, 64 insertions(+), 2 deletions(-)
+
+diff --git a/modules/cudev/include/opencv2/cudev/block/detail/reduce.hpp b/modules/cudev/include/opencv2/cudev/block/detail/reduce.hpp
+index 79ab35ce6ca..5bd1737aa3c 100644
+--- a/modules/cudev/include/opencv2/cudev/block/detail/reduce.hpp
++++ b/modules/cudev/include/opencv2/cudev/block/detail/reduce.hpp
+@@ -229,7 +229,7 @@ namespace block_reduce_detail
+         For<0, tuple_size<tuple<P...> >::value>::loadFromSmem(smem, val, tid);
+     }
+ 
+-    template <typename P..., typename... R, class... Op>
++    template <typename... P, typename... R, class... Op>
+     __device__ __forceinline__ void merge(const tuple<P...>& smem, const tuple<R...>& val, uint tid, uint delta, const tuple<Op...>& op)
+     {
+         For<0, tuple_size<tuple<P...> >::value>::merge(smem, val, tid, delta, op);
+diff --git a/modules/cudev/include/opencv2/cudev/block/detail/reduce_key_val.hpp b/modules/cudev/include/opencv2/cudev/block/detail/reduce_key_val.hpp
+index 4af834a446e..43876decc92 100644
+--- a/modules/cudev/include/opencv2/cudev/block/detail/reduce_key_val.hpp
++++ b/modules/cudev/include/opencv2/cudev/block/detail/reduce_key_val.hpp
+@@ -160,6 +160,7 @@ namespace block_reduce_key_val_detail
+         data = smem[tid];
+     }
+ 
++#if (CUDART_VERSION < 12040)
+     template <typename VP0, typename VP1, typename VP2, typename VP3, typename VP4, typename VP5, typename VP6, typename VP7, typename VP8, typename VP9,
+               typename VR0, typename VR1, typename VR2, typename VR3, typename VR4, typename VR5, typename VR6, typename VR7, typename VR8, typename VR9>
+     __device__ __forceinline__ void loadToSmem(const tuple<VP0, VP1, VP2, VP3, VP4, VP5, VP6, VP7, VP8, VP9>& smem,
+@@ -241,6 +242,67 @@ namespace block_reduce_key_val_detail
+     {
+         For<0, tuple_size<tuple<VP0, VP1, VP2, VP3, VP4, VP5, VP6, VP7, VP8, VP9> >::value>::merge(skeys, key, svals, val, cmp, tid, delta);
+     }
++#else
++    template <typename... VP, typename... VR>
++    __device__ __forceinline__ void loadToSmem(const tuple<VP...>& smem, const tuple<VR...>& data, uint tid)
++    {
++        For<0, tuple_size<tuple<VP...> >::value>::loadToSmem(smem, data, tid);
++    }
++
++    template <typename... VP, typename... VR>
++    __device__ __forceinline__ void loadFromSmem(const tuple<VP...>& smem, const tuple<VR...>& data, uint tid)
++    {
++        For<0, tuple_size<tuple<VP...> >::value>::loadFromSmem(smem, data, tid);
++    }
++
++    // copyVals
++
++    template <typename V>
++    __device__ __forceinline__ void copyVals(volatile V* svals, V& val, uint tid, uint delta)
++    {
++        svals[tid] = val = svals[tid + delta];
++    }
++
++    template <typename... VP, typename... VR>
++    __device__ __forceinline__ void copyVals(const tuple<VP...>& svals, const tuple<VR...>& val, uint tid, uint delta)
++    {
++        For<0, tuple_size<tuple<VP...> >::value>::copy(svals, val, tid, delta);
++    }
++
++    // merge
++
++    template <typename K, typename V, class Cmp>
++    __device__ void merge(volatile K* skeys, K& key, volatile V* svals, V& val, const Cmp& cmp, uint tid, uint delta)
++    {
++        K reg = skeys[tid + delta];
++
++        if (cmp(reg, key))
++        {
++            skeys[tid] = key = reg;
++            copyVals(svals, val, tid, delta);
++        }
++    }
++
++    template <typename K, typename... VP, typename... VR, class Cmp>
++    __device__ void merge(volatile K* skeys, K& key, const tuple<VP...>& svals, const tuple<VR...>& val, const Cmp& cmp, uint tid, uint delta)
++    {
++        K reg = skeys[tid + delta];
++
++        if (cmp(reg, key))
++        {
++            skeys[tid] = key = reg;
++            copyVals(svals, val, tid, delta);
++        }
++    }
++
++    template <typename... KP, typename... KR, typename... VP, typename... VR, class... Cmp>
++    __device__ __forceinline__ void merge(const tuple<KP...>& skeys, const tuple<KR...>& key,
++                                          const tuple<VP...>& svals, const tuple<VR...>& val,
++                                          const tuple<Cmp...>& cmp, uint tid, uint delta)
++    {
++        For<0, tuple_size<tuple<VP...> >::value>::merge(skeys, key, svals, val, cmp, tid, delta);
++    }
++#endif
+ 
+     // Generic
+ 
+diff --git a/modules/cudev/include/opencv2/cudev/block/reduce.hpp b/modules/cudev/include/opencv2/cudev/block/reduce.hpp
+index 77b18e21a9c..9dde278da84 100644
+--- a/modules/cudev/include/opencv2/cudev/block/reduce.hpp
++++ b/modules/cudev/include/opencv2/cudev/block/reduce.hpp
+@@ -134,7 +134,7 @@ template <int N, typename... P, typename... R, typename... Op>
+ __device__ __forceinline__ void blockReduce(const tuple<P...>& smem,
+                                             const tuple<R...>& val,
+                                             uint tid,
+-                                            const tuple<Op..>& op)
++                                            const tuple<Op...>& op)
+ {
+     block_reduce_detail::Dispatcher<N>::reductor::template reduce<const tuple<P...>&, const tuple<R...>&, const tuple<Op...>&>(smem, val, tid, op);
+ }
+
+From 46dc67391f3d808d91be4570802ab89545f738c1 Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Fri, 24 May 2024 15:15:06 +0300
+Subject: [PATCH 3/8] Temporary hack.
+
+---
+ modules/cudev/include/opencv2/cudev/grid/split_merge.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp b/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
+index 5c92a813ed8..a7fd3af7a69 100644
+--- a/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
++++ b/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
+@@ -117,7 +117,7 @@ __host__ void gridMerge_(const SrcPtrTuple& src, GpuMat_<DstType>& dst, Stream&
+ template <class Policy, class SrcPtrTuple, typename DstType>
+ __host__ void gridMerge_(const SrcPtrTuple& src, const GlobPtrSz<DstType>& dst, Stream& stream = Stream::Null())
+ {
+-    CV_StaticAssert( VecTraits<DstType>::cn == tuple_size<SrcPtrTuple>::value, "" );
++    //CV_StaticAssert( VecTraits<DstType>::cn == tuple_size<SrcPtrTuple>::value, "" );
+ 
+     const int rows = getRows(src);
+     const int cols = getCols(src);
+
+From 350c5e5c4a6e2533353755f74b7d2a876898368c Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Mon, 27 May 2024 15:47:39 +0300
+Subject: [PATCH 4/8] Fixed compilation issue with tuple_size()
+
+---
+ .../cudev/include/opencv2/cudev/ptr2d/zip.hpp | 22 +++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/modules/cudev/include/opencv2/cudev/ptr2d/zip.hpp b/modules/cudev/include/opencv2/cudev/ptr2d/zip.hpp
+index e68f4cf61f5..f5a3f8c85d4 100644
+--- a/modules/cudev/include/opencv2/cudev/ptr2d/zip.hpp
++++ b/modules/cudev/include/opencv2/cudev/ptr2d/zip.hpp
+@@ -49,6 +49,7 @@
+ #include "../common.hpp"
+ #include "../util/tuple.hpp"
+ #include "traits.hpp"
++#include <cuda/std/tuple>
+ 
+ namespace cv { namespace cudev {
+ 
+@@ -175,4 +176,25 @@ template <class PtrTuple> struct PtrTraits< ZipPtrSz<PtrTuple> > : PtrTraitsBase
+ 
+ }}
+ 
++_LIBCUDACXX_BEGIN_NAMESPACE_STD
++
++template< class... Types >
++struct tuple_size< cv::cudev::ZipPtr<tuple<Types...> > >
++: tuple_size<tuple<Types...> > { };
++
++template< class... Types >
++struct tuple_size< cv::cudev::ZipPtrSz<tuple<Types...> > >
++: tuple_size<tuple<Types...> > { };
++
++
++template<size_t N, class... Types >
++struct tuple_element<N, cv::cudev::ZipPtr<tuple<Types...> > >
++: tuple_element<N, tuple<Types...> > { };
++
++template<size_t N, class... Types >
++struct tuple_element<N, cv::cudev::ZipPtrSz<tuple<Types...> > >
++: tuple_element<N, tuple<Types...> > { };
++
++_LIBCUDACXX_END_NAMESPACE_STD
++
+ #endif
+
+From 4fcbc9cace65b997adf047517193a7470de914e0 Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Wed, 29 May 2024 13:58:16 +0300
+Subject: [PATCH 5/8] Added cuda merge branch with vector instead of tuple.
+
+---
+ modules/cudaarithm/src/cuda/polar_cart.cu     |  36 ++---
+ modules/cudaarithm/src/cuda/split_merge.cu    |   9 +-
+ .../opencv2/cudev/grid/detail/split_merge.hpp |  25 +++-
+ .../opencv2/cudev/grid/split_merge.hpp        | 132 +++++++++++++++---
+ .../include/opencv2/cudev/ptr2d/glob.hpp      |  12 ++
+ modules/cudev/test/test_split_merge.cu        |   7 +-
+ 6 files changed, 178 insertions(+), 43 deletions(-)
+
+diff --git a/modules/cudaarithm/src/cuda/polar_cart.cu b/modules/cudaarithm/src/cuda/polar_cart.cu
+index 2fb1315e619..396822676ce 100644
+--- a/modules/cudaarithm/src/cuda/polar_cart.cu
++++ b/modules/cudaarithm/src/cuda/polar_cart.cu
+@@ -132,24 +132,24 @@ void cv::cuda::cartToPolar(InputArray _x, InputArray _y, OutputArray _mag, Outpu
+     GpuMat_<float> magc(mag.reshape(1));
+     GpuMat_<float> anglec(angle.reshape(1));
+ 
+-    if (angleInDegrees)
+-    {
+-        gridTransformTuple(zipPtr(xc, yc),
+-                           tie(magc, anglec),
+-                           make_tuple(
+-                               binaryTupleAdapter<0, 1>(magnitude_func<float>()),
+-                               binaryTupleAdapter<0, 1>(direction_func<float, true>())),
+-                           stream);
+-    }
+-    else
+-    {
+-        gridTransformTuple(zipPtr(xc, yc),
+-                           tie(magc, anglec),
+-                           make_tuple(
+-                               binaryTupleAdapter<0, 1>(magnitude_func<float>()),
+-                               binaryTupleAdapter<0, 1>(direction_func<float, false>())),
+-                           stream);
+-    }
++//     if (angleInDegrees)
++//     {
++//         gridTransformTuple(zipPtr(xc, yc),
++//                            tie(magc, anglec),
++//                            make_tuple(
++//                                binaryTupleAdapter<0, 1>(magnitude_func<float>()),
++//                                binaryTupleAdapter<0, 1>(direction_func<float, true>())),
++//                            stream);
++//     }
++//     else
++//     {
++//         gridTransformTuple(zipPtr(xc, yc),
++//                            tie(magc, anglec),
++//                            make_tuple(
++//                                binaryTupleAdapter<0, 1>(magnitude_func<float>()),
++//                                binaryTupleAdapter<0, 1>(direction_func<float, false>())),
++//                            stream);
++//     }
+ 
+     syncOutput(mag, _mag, stream);
+     syncOutput(angle, _angle, stream);
+diff --git a/modules/cudaarithm/src/cuda/split_merge.cu b/modules/cudaarithm/src/cuda/split_merge.cu
+index 5b3af10775d..37be0657120 100644
+--- a/modules/cudaarithm/src/cuda/split_merge.cu
++++ b/modules/cudaarithm/src/cuda/split_merge.cu
+@@ -67,7 +67,8 @@ namespace
+     {
+         static void call(const GpuMat* src, GpuMat& dst, Stream& stream)
+         {
+-            gridMerge(zipPtr(globPtr<T>(src[0]), globPtr<T>(src[1])),
++            const std::vector<GlobPtrSz<T>> d_src = {globPtr<T>(src[0]), globPtr<T>(src[1])};
++            gridMerge(d_src,
+                     globPtr<typename MakeVec<T, 2>::type>(dst),
+                     stream);
+         }
+@@ -77,7 +78,8 @@ namespace
+     {
+         static void call(const GpuMat* src, GpuMat& dst, Stream& stream)
+         {
+-            gridMerge(zipPtr(globPtr<T>(src[0]), globPtr<T>(src[1]), globPtr<T>(src[2])),
++            const std::vector<GlobPtrSz<T>> d_src = {globPtr<T>(src[0]), globPtr<T>(src[1]), globPtr<T>(src[2])};
++            gridMerge(d_src,
+                     globPtr<typename MakeVec<T, 3>::type>(dst),
+                     stream);
+         }
+@@ -87,7 +89,8 @@ namespace
+     {
+         static void call(const GpuMat* src, GpuMat& dst, Stream& stream)
+         {
+-            gridMerge(zipPtr(globPtr<T>(src[0]), globPtr<T>(src[1]), globPtr<T>(src[2]), globPtr<T>(src[3])),
++            const std::vector<GlobPtrSz<T> > d_src = {globPtr<T>(src[0]), globPtr<T>(src[1]), globPtr<T>(src[2]), globPtr<T>(src[3])};
++            gridMerge(d_src,
+                     globPtr<typename MakeVec<T, 4>::type>(dst),
+                     stream);
+         }
+diff --git a/modules/cudev/include/opencv2/cudev/grid/detail/split_merge.hpp b/modules/cudev/include/opencv2/cudev/grid/detail/split_merge.hpp
+index 3f512060165..6e8a4698ad2 100644
+--- a/modules/cudev/include/opencv2/cudev/grid/detail/split_merge.hpp
++++ b/modules/cudev/include/opencv2/cudev/grid/detail/split_merge.hpp
+@@ -157,28 +157,47 @@ namespace grid_split_merge_detail
+     template <class Policy> struct MergeImpl<2, Policy>
+     {
+         template <class SrcPtrTuple, typename DstType, class MaskPtr>
+-        __host__ static void merge(const SrcPtrTuple& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        __host__ static void mergeTuple(const SrcPtrTuple& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
+         {
+             mergeC2<Policy>(get<0>(src), get<1>(src), dst, mask, rows, cols, stream);
+         }
++
++        template <typename VecType, typename DstType, class MaskPtr>
++        __host__ static void mergeVector(const std::vector<VecType>& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        {
++            mergeC2<Policy>(src[0], src[1], dst, mask, rows, cols, stream);
++        }
++
+     };
+ 
+     template <class Policy> struct MergeImpl<3, Policy>
+     {
+         template <class SrcPtrTuple, typename DstType, class MaskPtr>
+-        __host__ static void merge(const SrcPtrTuple& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        __host__ static void mergeTuple(const SrcPtrTuple& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
+         {
+             mergeC3<Policy>(get<0>(src), get<1>(src), get<2>(src), dst, mask, rows, cols, stream);
+         }
++
++        template <typename VecType, typename DstType, class MaskPtr>
++        __host__ static void mergeVector(const std::vector<VecType>& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        {
++            mergeC3<Policy>(src[0], src[1], src[2], dst, mask, rows, cols, stream);
++        }
+     };
+ 
+     template <class Policy> struct MergeImpl<4, Policy>
+     {
+         template <class SrcPtrTuple, typename DstType, class MaskPtr>
+-        __host__ static void merge(const SrcPtrTuple& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        __host__ static void mergeTuple(const SrcPtrTuple& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
+         {
+             mergeC4<Policy>(get<0>(src), get<1>(src), get<2>(src), get<3>(src), dst, mask, rows, cols, stream);
+         }
++
++        template <typename VecType, typename DstType, class MaskPtr>
++        __host__ static void mergeVector(const std::vector<VecType>& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        {
++            mergeC4<Policy>(src[0], src[1], src[2], src[3], dst, mask, rows, cols, stream);
++        }
+     };
+ 
+     // split
+diff --git a/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp b/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
+index a7fd3af7a69..e3a27dc0b6b 100644
+--- a/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
++++ b/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
+@@ -72,11 +72,11 @@ __host__ void gridMerge_(const SrcPtrTuple& src, GpuMat_<DstType>& dst, const Ma
+ 
+     dst.create(rows, cols);
+ 
+-    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::merge(shrinkPtr(src),
+-                                                                              shrinkPtr(dst),
+-                                                                              shrinkPtr(mask),
+-                                                                              rows, cols,
+-                                                                              StreamAccessor::getStream(stream));
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeTuple(shrinkPtr(src),
++                                                                                   shrinkPtr(dst),
++                                                                                   shrinkPtr(mask),
++                                                                                   rows, cols,
++                                                                                   StreamAccessor::getStream(stream));
+ }
+ 
+ template <class Policy, class SrcPtrTuple, typename DstType, class MaskPtr>
+@@ -90,7 +90,7 @@ __host__ void gridMerge_(const SrcPtrTuple& src, const GlobPtrSz<DstType>& dst,
+     CV_Assert( getRows(dst) == rows && getCols(dst) == cols );
+     CV_Assert( getRows(mask) == rows && getCols(mask) == cols );
+ 
+-    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::merge(shrinkPtr(src),
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeTuple(shrinkPtr(src),
+                                                                               shrinkPtr(dst),
+                                                                               shrinkPtr(mask),
+                                                                               rows, cols,
+@@ -107,30 +107,104 @@ __host__ void gridMerge_(const SrcPtrTuple& src, GpuMat_<DstType>& dst, Stream&
+ 
+     dst.create(rows, cols);
+ 
+-    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::merge(shrinkPtr(src),
+-                                                                              shrinkPtr(dst),
+-                                                                              WithOutMask(),
+-                                                                              rows, cols,
+-                                                                              StreamAccessor::getStream(stream));
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeTuple(shrinkPtr(src),
++                                                                                   shrinkPtr(dst),
++                                                                                   WithOutMask(),
++                                                                                   rows, cols,
++                                                                                   StreamAccessor::getStream(stream));
+ }
+ 
+ template <class Policy, class SrcPtrTuple, typename DstType>
+ __host__ void gridMerge_(const SrcPtrTuple& src, const GlobPtrSz<DstType>& dst, Stream& stream = Stream::Null())
+ {
+-    //CV_StaticAssert( VecTraits<DstType>::cn == tuple_size<SrcPtrTuple>::value, "" );
++    CV_StaticAssert( VecTraits<DstType>::cn == tuple_size<SrcPtrTuple>::value, "" );
+ 
+     const int rows = getRows(src);
+     const int cols = getCols(src);
+ 
+     CV_Assert( getRows(dst) == rows && getCols(dst) == cols );
+ 
+-    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::merge(shrinkPtr(src),
+-                                                                              shrinkPtr(dst),
+-                                                                              WithOutMask(),
+-                                                                              rows, cols,
+-                                                                              StreamAccessor::getStream(stream));
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeTuple(shrinkPtr(src),
++                                                                                   shrinkPtr(dst),
++                                                                                   WithOutMask(),
++                                                                                   rows, cols,
++                                                                                   StreamAccessor::getStream(stream));
++}
++
++template <class Policy, typename VecType, typename DstType, class MaskPtr>
++__host__ void gridMergeVector_(const std::vector<VecType>& src, GpuMat_<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
++{
++    CV_Assert( VecTraits<DstType>::cn == src.size() );
++
++    const int rows = getRows(src);
++    const int cols = getCols(src);
++
++    CV_Assert( getRows(mask) == rows && getCols(mask) == cols );
++
++    dst.create(rows, cols);
++
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeVector(src,
++                                                                                   shrinkPtr(dst),
++                                                                                   shrinkPtr(mask),
++                                                                                   rows, cols,
++                                                                                   StreamAccessor::getStream(stream));
++}
++
++template <class Policy, typename VecType, typename DstType, class MaskPtr>
++__host__ void gridMergeVector_(const std::vector<VecType>& src, const GlobPtrSz<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
++{
++    CV_Assert( VecTraits<DstType>::cn == src.size() );
++
++    const int rows = src[0].rows;
++    const int cols = src[0].cols;
++
++    CV_Assert( getRows(dst) == rows && getCols(dst) == cols );
++    CV_Assert( getRows(mask) == rows && getCols(mask) == cols );
++
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeVector(src,
++                                                                                   shrinkPtr(dst),
++                                                                                   shrinkPtr(mask),
++                                                                                   rows, cols,
++                                                                                   StreamAccessor::getStream(stream));
++}
++
++template <class Policy, typename VecType, typename DstType>
++__host__ void gridMergeVector_(const std::vector<VecType>& src, GpuMat_<DstType>& dst, Stream& stream = Stream::Null())
++{
++    CV_Assert( VecTraits<DstType>::cn == src.size() );
++
++    const int rows = src[0].rows;
++    const int cols = src[0].cols;
++
++    dst.create(rows, cols);
++
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeVector(src,
++                                                                                   shrinkPtr(dst),
++                                                                                   WithOutMask(),
++                                                                                   rows, cols,
++                                                                                   StreamAccessor::getStream(stream));
++}
++
++template <class Policy, typename VecType, typename DstType>
++__host__ void gridMergeVector_(const std::vector<VecType>& src, const GlobPtrSz<DstType>& dst, Stream& stream = Stream::Null())
++{
++    CV_Assert( VecTraits<DstType>::cn == src.size() );
++
++    const int rows = src[0].rows;
++    const int cols = src[0].cols;
++
++    CV_Assert( getRows(dst) == rows && getCols(dst) == cols );
++
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeVector(src,
++                                                                                   shrinkPtr(dst),
++                                                                                   WithOutMask(),
++                                                                                   rows, cols,
++                                                                                   StreamAccessor::getStream(stream));
+ }
+ 
++
++///////////////////////////////////////////////////////////////
++
+ template <class Policy, class SrcPtr, typename DstType, class MaskPtr>
+ __host__ void gridSplit_(const SrcPtr& src, const tuple< GpuMat_<DstType>&, GpuMat_<DstType>& >& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+@@ -522,6 +596,30 @@ __host__ void gridMerge(const SrcPtrTuple& src, const GlobPtrSz<DstType>& dst, S
+     gridMerge_<DefaultSplitMergePolicy>(src, dst, stream);
+ }
+ 
++template <typename VecType, typename DstType, class MaskPtr>
++__host__ void gridMergeVector(const std::vector<VecType>& src, GpuMat_<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
++{
++    gridMergeVector_<DefaultSplitMergePolicy>(src, dst, mask, stream);
++}
++
++template <typename VecType, typename DstType, class MaskPtr>
++__host__ void gridMerge(const std::vector<VecType>& src, const GlobPtrSz<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
++{
++    gridMergeVector_<DefaultSplitMergePolicy>(src, dst, mask, stream);
++}
++
++template <typename VecType, typename DstType>
++__host__ void gridMerge(const std::vector<VecType>& src, GpuMat_<DstType>& dst, Stream& stream = Stream::Null())
++{
++    gridMergeVector_<DefaultSplitMergePolicy>(src, dst, stream);
++}
++
++template <typename VecType, typename DstType>
++__host__ void gridMerge(const std::vector<VecType>& src, const GlobPtrSz<DstType>& dst, Stream& stream = Stream::Null())
++{
++    gridMergeVector_<DefaultSplitMergePolicy>(src, dst, stream);
++}
++
+ template <class SrcPtr, typename DstType, class MaskPtr>
+ __host__ void gridSplit(const SrcPtr& src, const tuple< GpuMat_<DstType>&, GpuMat_<DstType>& >& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+diff --git a/modules/cudev/include/opencv2/cudev/ptr2d/glob.hpp b/modules/cudev/include/opencv2/cudev/ptr2d/glob.hpp
+index 2024a7e01a2..98c115fa1bf 100644
+--- a/modules/cudev/include/opencv2/cudev/ptr2d/glob.hpp
++++ b/modules/cudev/include/opencv2/cudev/ptr2d/glob.hpp
+@@ -118,6 +118,18 @@ __host__ GlobPtrSz<T> globPtr(const GpuMat& mat)
+     return p;
+ }
+ 
++template <typename T>
++__host__ GlobPtrSz<T> globPtr(const GpuMat_<T>& mat)
++{
++    GlobPtrSz<T> p;
++    p.data = (T*) mat.data;
++    p.step = mat.step;
++    p.rows = mat.rows;
++    p.cols = mat.cols;
++    return p;
++}
++
++
+ template <typename T> struct PtrTraits< GlobPtrSz<T> > : PtrTraitsBase<GlobPtrSz<T>, GlobPtr<T> >
+ {
+ };
+diff --git a/modules/cudev/test/test_split_merge.cu b/modules/cudev/test/test_split_merge.cu
+index b25c8b96d6f..c39ac79e530 100644
+--- a/modules/cudev/test/test_split_merge.cu
++++ b/modules/cudev/test/test_split_merge.cu
+@@ -70,7 +70,8 @@ public:
+         GpuMat_<T> d_src2(src2);
+ 
+         GpuMat_<typename MakeVec<T, 2>::type> dst;
+-        gridMerge(zipPtr(d_src1, d_src2), dst);
++        std::vector<GlobPtrSz<T> > d_src = {globPtr(d_src1), globPtr(d_src2)};
++        gridMerge(d_src, dst);
+ 
+         Mat dst_gold;
+         Mat srcs[] = {src1, src2};
+@@ -93,8 +94,10 @@ public:
+         GpuMat_<T> d_src2(src2);
+         GpuMat_<T> d_src3(src3);
+ 
++        std::vector<GlobPtrSz<T> > d_src = {globPtr(d_src1), globPtr(d_src2), globPtr(d_src3)};
++
+         GpuMat_<typename MakeVec<T, 3>::type> dst;
+-        gridMerge(zipPtr(d_src1, d_src2, d_src3), dst);
++        gridMerge(d_src, dst);
+ 
+         Mat dst_gold;
+         Mat srcs[] = {src1, src2, src3};
+
+From 7a41af563972de948f904621c7dde401db5593be Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Wed, 29 May 2024 18:44:31 +0300
+Subject: [PATCH 6/8] Got rid of tuple in polar-cart operations.
+
+---
+ modules/cudaarithm/src/cuda/polar_cart.cu     |  22 +---
+ .../opencv2/cudev/grid/detail/transform.hpp   | 118 ++++++++++++++++++
+ .../include/opencv2/cudev/grid/transform.hpp  |  91 ++++++++++++++
+ 3 files changed, 213 insertions(+), 18 deletions(-)
+
+diff --git a/modules/cudaarithm/src/cuda/polar_cart.cu b/modules/cudaarithm/src/cuda/polar_cart.cu
+index 396822676ce..12980e424ff 100644
+--- a/modules/cudaarithm/src/cuda/polar_cart.cu
++++ b/modules/cudaarithm/src/cuda/polar_cart.cu
+@@ -132,24 +132,10 @@ void cv::cuda::cartToPolar(InputArray _x, InputArray _y, OutputArray _mag, Outpu
+     GpuMat_<float> magc(mag.reshape(1));
+     GpuMat_<float> anglec(angle.reshape(1));
+ 
+-//     if (angleInDegrees)
+-//     {
+-//         gridTransformTuple(zipPtr(xc, yc),
+-//                            tie(magc, anglec),
+-//                            make_tuple(
+-//                                binaryTupleAdapter<0, 1>(magnitude_func<float>()),
+-//                                binaryTupleAdapter<0, 1>(direction_func<float, true>())),
+-//                            stream);
+-//     }
+-//     else
+-//     {
+-//         gridTransformTuple(zipPtr(xc, yc),
+-//                            tie(magc, anglec),
+-//                            make_tuple(
+-//                                binaryTupleAdapter<0, 1>(magnitude_func<float>()),
+-//                                binaryTupleAdapter<0, 1>(direction_func<float, false>())),
+-//                            stream);
+-//     }
++    if (angleInDegrees)
++        gridTransformBinary(xc, yc, magc, anglec, magnitude_func<float>(), direction_func<float, true>(), stream);
++    else
++        gridTransformBinary(xc, yc, magc, anglec, magnitude_func<float>(), direction_func<float, false>(), stream);
+ 
+     syncOutput(mag, _mag, stream);
+     syncOutput(angle, _angle, stream);
+diff --git a/modules/cudev/include/opencv2/cudev/grid/detail/transform.hpp b/modules/cudev/include/opencv2/cudev/grid/detail/transform.hpp
+index 557797d7c85..d4c55f73536 100644
+--- a/modules/cudev/include/opencv2/cudev/grid/detail/transform.hpp
++++ b/modules/cudev/include/opencv2/cudev/grid/detail/transform.hpp
+@@ -179,6 +179,22 @@ namespace grid_transform_detail
+         dst(y, x) = saturate_cast<DstType>(op(src1(y, x), src2(y, x)));
+     }
+ 
++    // transformSimple, 2 outputs
++
++    template <class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
++    __global__ void transformSimple(const SrcPtr1 src1, const SrcPtr2 src2, GlobPtr<DstType1> dst1, GlobPtr<DstType2> dst2,
++                                    const BinOp1 op1, const BinOp2 op2, const MaskPtr mask, const int rows, const int cols)
++    {
++        const int x = blockIdx.x * blockDim.x + threadIdx.x;
++        const int y = blockIdx.y * blockDim.y + threadIdx.y;
++
++        if (x >= cols || y >= rows || !mask(y, x))
++            return;
++
++        dst1(y, x) = saturate_cast<DstType1>(op1(src1(y, x), src2(y, x)));
++        dst2(y, x) = saturate_cast<DstType2>(op2(src1(y, x), src2(y, x)));
++    }
++
+     // transformSmart
+ 
+     template <int SHIFT, typename SrcType, typename DstType, class UnOp, class MaskPtr>
+@@ -248,6 +264,51 @@ namespace grid_transform_detail
+         }
+     }
+ 
++    // transformSmart, 2 outputs
++
++    template <int SHIFT, typename SrcType1, typename SrcType2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
++    __global__ void transformSmart(const GlobPtr<SrcType1> src1_, const GlobPtr<SrcType2> src2_,
++                                   GlobPtr<DstType1> dst1_, GlobPtr<DstType2> dst2_,
++                                   const BinOp1 op1, const BinOp2 op2, const MaskPtr mask, const int rows, const int cols)
++    {
++        typedef typename MakeVec<SrcType1, SHIFT>::type read_type1;
++        typedef typename MakeVec<SrcType2, SHIFT>::type read_type2;
++        typedef typename MakeVec<DstType1, SHIFT>::type write_type1;
++        typedef typename MakeVec<DstType2, SHIFT>::type write_type2;
++
++        const int x = blockIdx.x * blockDim.x + threadIdx.x;
++        const int y = blockIdx.y * blockDim.y + threadIdx.y;
++        const int x_shifted = x * SHIFT;
++
++        if (y < rows)
++        {
++            const SrcType1* src1 = src1_.row(y);
++            const SrcType2* src2 = src2_.row(y);
++            DstType1* dst1 = dst1_.row(y);
++            DstType2* dst2 = dst2_.row(y);
++
++            if (x_shifted + SHIFT - 1 < cols)
++            {
++                const read_type1 src1_n_el = ((const read_type1*)src1)[x];
++                const read_type2 src2_n_el = ((const read_type2*)src2)[x];
++
++                OpUnroller<SHIFT>::unroll(src1_n_el, src2_n_el, ((write_type1*)dst1)[x], op1, mask, x_shifted, y);
++                OpUnroller<SHIFT>::unroll(src1_n_el, src2_n_el, ((write_type2*)dst2)[x], op2, mask, x_shifted, y);
++            }
++            else
++            {
++                for (int real_x = x_shifted; real_x < cols; ++real_x)
++                {
++                    if (mask(y, real_x))
++                    {
++                        dst1[real_x] = op1(src1[real_x], src2[real_x]);
++                        dst2[real_x] = op2(src1[real_x], src2[real_x]);
++                    }
++                }
++            }
++        }
++    }
++
+     // TransformDispatcher
+ 
+     template <bool UseSmart, class Policy> struct TransformDispatcher;
+@@ -279,6 +340,20 @@ namespace grid_transform_detail
+             if (stream == 0)
+                 CV_CUDEV_SAFE_CALL( cudaDeviceSynchronize() );
+         }
++
++        template <class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
++        __host__ static void call(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtr<DstType1>& dst1, const GlobPtr<DstType2>& dst2,
++                                  const BinOp1& op1, const BinOp2& op2, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        {
++            const dim3 block(Policy::block_size_x, Policy::block_size_y);
++            const dim3 grid(divUp(cols, block.x), divUp(rows, block.y));
++
++            transformSimple<<<grid, block, 0, stream>>>(src1, src2, dst1, dst2, op1, op2, mask, rows, cols);
++            CV_CUDEV_SAFE_CALL( cudaGetLastError() );
++
++            if (stream == 0)
++                CV_CUDEV_SAFE_CALL( cudaDeviceSynchronize() );
++        }
+     };
+ 
+     template <class Policy> struct TransformDispatcher<true, Policy>
+@@ -336,6 +411,33 @@ namespace grid_transform_detail
+             if (stream == 0)
+                 CV_CUDEV_SAFE_CALL( cudaDeviceSynchronize() );
+         }
++
++        template <typename SrcType1, typename SrcType2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
++        __host__ static void call(const GlobPtr<SrcType1>& src1, const GlobPtr<SrcType2>& src2,
++                                  const GlobPtr<DstType1>& dst1, const GlobPtr<DstType2>& dst2,
++                                  const BinOp1& op1, const BinOp2& op2, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        {
++            if (Policy::shift == 1 ||
++                !isAligned(src1.data, Policy::shift * sizeof(SrcType1))  || !isAligned(src1.step, Policy::shift * sizeof(SrcType1)) ||
++                !isAligned(src2.data, Policy::shift * sizeof(SrcType2))  || !isAligned(src2.step, Policy::shift * sizeof(SrcType2)) ||
++                !isAligned(dst1.data,  Policy::shift * sizeof(DstType1)) || !isAligned(dst1.step,  Policy::shift * sizeof(DstType1))||
++                !isAligned(dst2.data,  Policy::shift * sizeof(DstType2)) || !isAligned(dst2.step,  Policy::shift * sizeof(DstType2))
++            )
++            {
++                TransformDispatcher<false, Policy>::call(src1, src2, dst1, dst2, op1, op2, mask, rows, cols, stream);
++                return;
++            }
++
++            const dim3 block(Policy::block_size_x, Policy::block_size_y);
++            const dim3 grid(divUp(cols, block.x * Policy::shift), divUp(rows, block.y));
++
++            transformSmart<Policy::shift><<<grid, block, 0, stream>>>(src1, src2, dst1, dst2, op1, op2, mask, rows, cols);
++            CV_CUDEV_SAFE_CALL( cudaGetLastError() );
++
++            if (stream == 0)
++                CV_CUDEV_SAFE_CALL( cudaDeviceSynchronize() );
++        }
++
+     };
+ 
+     template <class Policy, class SrcPtr, typename DstType, class UnOp, class MaskPtr>
+@@ -350,6 +452,13 @@ namespace grid_transform_detail
+         TransformDispatcher<false, Policy>::call(src1, src2, dst, op, mask, rows, cols, stream);
+     }
+ 
++    template <class Policy, class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
++    __host__ void transform_binary(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtr<DstType1>& dst1, const GlobPtr<DstType2>& dst2,
++                                   const BinOp1& op1, const BinOp2& op2, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++    {
++        TransformDispatcher<false, Policy>::call(src1, src2, dst1, dst2, op1, op2, mask, rows, cols, stream);
++    }
++
+     template <class Policy, typename SrcType, typename DstType, class UnOp, class MaskPtr>
+     __host__ void transform_unary(const GlobPtr<SrcType>& src, const GlobPtr<DstType>& dst, const UnOp& op, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
+     {
+@@ -362,6 +471,15 @@ namespace grid_transform_detail
+         TransformDispatcher<VecTraits<SrcType1>::cn == 1 && VecTraits<SrcType2>::cn == 1 && VecTraits<DstType>::cn == 1 && Policy::shift != 1, Policy>::call(src1, src2, dst, op, mask, rows, cols, stream);
+     }
+ 
++    template <class Policy, typename SrcType1, typename SrcType2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
++    __host__ void transform_binary(const GlobPtr<SrcType1>& src1, const GlobPtr<SrcType2>& src2, const GlobPtr<DstType1>& dst1, const GlobPtr<DstType2>& dst2,
++                                   const BinOp1& op1, const BinOp2& op2, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++    {
++        TransformDispatcher<VecTraits<SrcType1>::cn == 1 && VecTraits<SrcType2>::cn == 1 &&
++                            VecTraits<DstType1>::cn == 1 && VecTraits<DstType2>::cn == 1 &&
++                            Policy::shift != 1, Policy>::call(src1, src2, dst1, dst2, op1, op2, mask, rows, cols, stream);
++    }
++
+     // transform_tuple
+ 
+     template <int count> struct Unroll
+diff --git a/modules/cudev/include/opencv2/cudev/grid/transform.hpp b/modules/cudev/include/opencv2/cudev/grid/transform.hpp
+index 4f7d191e64b..f89cdf5d484 100644
+--- a/modules/cudev/include/opencv2/cudev/grid/transform.hpp
++++ b/modules/cudev/include/opencv2/cudev/grid/transform.hpp
+@@ -121,6 +121,22 @@ __host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, Gpu
+     grid_transform_detail::transform_binary<Policy>(shrinkPtr(src1), shrinkPtr(src2), shrinkPtr(dst), op, shrinkPtr(mask), rows, cols, StreamAccessor::getStream(stream));
+ }
+ 
++template <class Policy, class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
++__host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, GpuMat_<DstType1>& dst1, GpuMat_<DstType2>& dst2,
++                                   const BinOp1& op1, const BinOp2& op2, const MaskPtr& mask, Stream& stream = Stream::Null())
++{
++    const int rows = getRows(src1);
++    const int cols = getCols(src1);
++
++    CV_Assert( getRows(src2) == rows && getCols(src2) == cols );
++    CV_Assert( getRows(mask) == rows && getCols(mask) == cols );
++
++    dst1.create(rows, cols);
++    dst2.create(rows, cols);
++
++    grid_transform_detail::transform_binary<Policy>(shrinkPtr(src1), shrinkPtr(src2), shrinkPtr(dst1), shrinkPtr(dst2), op1, op2, shrinkPtr(mask), rows, cols, StreamAccessor::getStream(stream));
++}
++
+ template <class Policy, class SrcPtr1, class SrcPtr2, typename DstType, class BinOp, class MaskPtr>
+ __host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtrSz<DstType>& dst, const BinOp& op, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+@@ -134,6 +150,22 @@ __host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, con
+     grid_transform_detail::transform_binary<Policy>(shrinkPtr(src1), shrinkPtr(src2), shrinkPtr(dst), op, shrinkPtr(mask), rows, cols, StreamAccessor::getStream(stream));
+ }
+ 
++template <class Policy, class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
++__host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtrSz<DstType1>& dst1, const GlobPtrSz<DstType2>& dst2,
++                                   const BinOp1& op1, const BinOp2& op2, const MaskPtr& mask, Stream& stream = Stream::Null())
++{
++    const int rows = getRows(src1);
++    const int cols = getCols(src1);
++
++    CV_Assert( getRows(dst1) == rows && getCols(dst1) == cols );
++    CV_Assert( getRows(dst2) == rows && getCols(dst2) == cols );
++    CV_Assert( getRows(src2) == rows && getCols(src2) == cols );
++    CV_Assert( getRows(mask) == rows && getCols(mask) == cols );
++
++    grid_transform_detail::transform_binary<Policy>(shrinkPtr(src1), shrinkPtr(src2), shrinkPtr(dst1), shrinkPtr(dst2), op1, op2, shrinkPtr(mask), rows, cols, StreamAccessor::getStream(stream));
++}
++
++
+ template <class Policy, class SrcPtr1, class SrcPtr2, typename DstType, class BinOp>
+ __host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, GpuMat_<DstType>& dst, const BinOp& op, Stream& stream = Stream::Null())
+ {
+@@ -147,6 +179,21 @@ __host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, Gpu
+     grid_transform_detail::transform_binary<Policy>(shrinkPtr(src1), shrinkPtr(src2), shrinkPtr(dst), op, WithOutMask(), rows, cols, StreamAccessor::getStream(stream));
+ }
+ 
++template <class Policy, class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class BinOp1, class BinOp2>
++__host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, GpuMat_<DstType1>& dst1, GpuMat_<DstType2>& dst2,
++                                   const BinOp1& op1, const BinOp2& op2, Stream& stream = Stream::Null())
++{
++    const int rows = getRows(src1);
++    const int cols = getCols(src1);
++
++    CV_Assert( getRows(src2) == rows && getCols(src2) == cols );
++
++    dst1.create(rows, cols);
++    dst2.create(rows, cols);
++
++    grid_transform_detail::transform_binary<Policy>(shrinkPtr(src1), shrinkPtr(src2), shrinkPtr(dst1), shrinkPtr(dst2), op1, op2, WithOutMask(), rows, cols, StreamAccessor::getStream(stream));
++}
++
+ template <class Policy, class SrcPtr1, class SrcPtr2, typename DstType, class BinOp>
+ __host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtrSz<DstType>& dst, const BinOp& op, Stream& stream = Stream::Null())
+ {
+@@ -159,6 +206,20 @@ __host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, con
+     grid_transform_detail::transform_binary<Policy>(shrinkPtr(src1), shrinkPtr(src2), shrinkPtr(dst), op, WithOutMask(), rows, cols, StreamAccessor::getStream(stream));
+ }
+ 
++template <class Policy, class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class BinOp1, class BinOp2>
++__host__ void gridTransformBinary_(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtrSz<DstType1>& dst1, const GlobPtrSz<DstType2>& dst2,
++                                   const BinOp1& op1, const BinOp2& op2, Stream& stream = Stream::Null())
++{
++    const int rows = getRows(src1);
++    const int cols = getCols(src1);
++
++    CV_Assert( getRows(dst1) == rows && getCols(dst1) == cols );
++    CV_Assert( getRows(dst2) == rows && getCols(dst2) == cols );
++    CV_Assert( getRows(src2) == rows && getCols(src2) == cols );
++
++    grid_transform_detail::transform_binary<Policy>(shrinkPtr(src1), shrinkPtr(src2), shrinkPtr(dst1), shrinkPtr(dst2), op1, op2, WithOutMask(), rows, cols, StreamAccessor::getStream(stream));
++}
++
+ template <class Policy, class SrcPtr, typename D0, typename D1, class OpTuple, class MaskPtr>
+ __host__ void gridTransformTuple_(const SrcPtr& src, const tuple< GpuMat_<D0>&, GpuMat_<D1>& >& dst, const OpTuple& op, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+@@ -449,24 +510,54 @@ __host__ void gridTransformBinary(const SrcPtr1& src1, const SrcPtr2& src2, GpuM
+     gridTransformBinary_<DefaultTransformPolicy>(src1, src2, dst, op, mask, stream);
+ }
+ 
++template <class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class Op1, class Op2, class MaskPtr>
++__host__ void gridTransformBinary(const SrcPtr1& src1, const SrcPtr2& src2, GpuMat_<DstType1>& dst1, GpuMat_<DstType2>& dst2,
++                                  const Op1& op1, const Op2& op2, const MaskPtr& mask, Stream& stream = Stream::Null())
++{
++    gridTransformBinary_<DefaultTransformPolicy>(src1, src2, dst1, dst2, op1, op2, mask, stream);
++}
++
+ template <class SrcPtr1, class SrcPtr2, typename DstType, class Op, class MaskPtr>
+ __host__ void gridTransformBinary(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtrSz<DstType>& dst, const Op& op, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+     gridTransformBinary_<DefaultTransformPolicy>(src1, src2, dst, op, mask, stream);
+ }
+ 
++template <class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class Op1, class Op2, class MaskPtr>
++__host__ void gridTransformBinary(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtrSz<DstType2>& dst1, const GlobPtrSz<DstType2>& dst2,
++                                  const Op1& op1, const Op2& op2, const MaskPtr& mask, Stream& stream = Stream::Null())
++{
++    gridTransformBinary_<DefaultTransformPolicy>(src1, src2, dst1, dst2, op1, op2, mask, stream);
++}
++
+ template <class SrcPtr1, class SrcPtr2, typename DstType, class Op>
+ __host__ void gridTransformBinary(const SrcPtr1& src1, const SrcPtr2& src2, GpuMat_<DstType>& dst, const Op& op, Stream& stream = Stream::Null())
+ {
+     gridTransformBinary_<DefaultTransformPolicy>(src1, src2, dst, op, stream);
+ }
+ 
++template <class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class Op1, class Op2>
++__host__ void gridTransformBinary(const SrcPtr1& src1, const SrcPtr2& src2,
++                                  GpuMat_<DstType1>& dst1, GpuMat_<DstType2>& dst2,
++                                  const Op1& op1, const Op2& op2, Stream& stream = Stream::Null())
++{
++    gridTransformBinary_<DefaultTransformPolicy>(src1, src2, dst1, dst2, op1, op2, stream);
++}
++
+ template <class SrcPtr1, class SrcPtr2, typename DstType, class Op>
+ __host__ void gridTransformBinary(const SrcPtr1& src1, const SrcPtr2& src2, const GlobPtrSz<DstType>& dst, const Op& op, Stream& stream = Stream::Null())
+ {
+     gridTransformBinary_<DefaultTransformPolicy>(src1, src2, dst, op, stream);
+ }
+ 
++template <class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class Op1, class Op2>
++__host__ void gridTransformBinary(const SrcPtr1& src1, const SrcPtr2& src2,
++                                  const GlobPtrSz<DstType1>& dst1, const GlobPtrSz<DstType2>& dst2,
++                                  const Op1& op1, const Op2& op2, Stream& stream = Stream::Null())
++{
++    gridTransformBinary_<DefaultTransformPolicy>(src1, src2, dst1, dst2, op1, op2, stream);
++}
++
+ template <class SrcPtr, typename D0, typename D1, class OpTuple, class MaskPtr>
+ __host__ void gridTransformTuple(const SrcPtr& src, const tuple< GpuMat_<D0>&, GpuMat_<D1>& >& dst, const OpTuple& op, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+
+From 56a6cdf45663b32d2d905bfbbcae53c1ec89f957 Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Wed, 29 May 2024 20:29:34 +0300
+Subject: [PATCH 7/8] Use std::array instead of std::vector to reduce memory
+ allocations.
+
+---
+ modules/cudaarithm/src/cuda/split_merge.cu    |  6 +--
+ .../opencv2/cudev/grid/detail/split_merge.hpp | 12 ++---
+ .../opencv2/cudev/grid/split_merge.hpp        | 48 +++++++++----------
+ modules/cudev/test/test_split_merge.cu        |  4 +-
+ 4 files changed, 35 insertions(+), 35 deletions(-)
+
+diff --git a/modules/cudaarithm/src/cuda/split_merge.cu b/modules/cudaarithm/src/cuda/split_merge.cu
+index 37be0657120..f0acb840a9e 100644
+--- a/modules/cudaarithm/src/cuda/split_merge.cu
++++ b/modules/cudaarithm/src/cuda/split_merge.cu
+@@ -67,7 +67,7 @@ namespace
+     {
+         static void call(const GpuMat* src, GpuMat& dst, Stream& stream)
+         {
+-            const std::vector<GlobPtrSz<T>> d_src = {globPtr<T>(src[0]), globPtr<T>(src[1])};
++            const std::array<GlobPtrSz<T>, 2> d_src = {globPtr<T>(src[0]), globPtr<T>(src[1])};
+             gridMerge(d_src,
+                     globPtr<typename MakeVec<T, 2>::type>(dst),
+                     stream);
+@@ -78,7 +78,7 @@ namespace
+     {
+         static void call(const GpuMat* src, GpuMat& dst, Stream& stream)
+         {
+-            const std::vector<GlobPtrSz<T>> d_src = {globPtr<T>(src[0]), globPtr<T>(src[1]), globPtr<T>(src[2])};
++            const std::array<GlobPtrSz<T>, 3> d_src = {globPtr<T>(src[0]), globPtr<T>(src[1]), globPtr<T>(src[2])};
+             gridMerge(d_src,
+                     globPtr<typename MakeVec<T, 3>::type>(dst),
+                     stream);
+@@ -89,7 +89,7 @@ namespace
+     {
+         static void call(const GpuMat* src, GpuMat& dst, Stream& stream)
+         {
+-            const std::vector<GlobPtrSz<T> > d_src = {globPtr<T>(src[0]), globPtr<T>(src[1]), globPtr<T>(src[2]), globPtr<T>(src[3])};
++            const std::array<GlobPtrSz<T>, 4 > d_src = {globPtr<T>(src[0]), globPtr<T>(src[1]), globPtr<T>(src[2]), globPtr<T>(src[3])};
+             gridMerge(d_src,
+                     globPtr<typename MakeVec<T, 4>::type>(dst),
+                     stream);
+diff --git a/modules/cudev/include/opencv2/cudev/grid/detail/split_merge.hpp b/modules/cudev/include/opencv2/cudev/grid/detail/split_merge.hpp
+index 6e8a4698ad2..df8bed3a948 100644
+--- a/modules/cudev/include/opencv2/cudev/grid/detail/split_merge.hpp
++++ b/modules/cudev/include/opencv2/cudev/grid/detail/split_merge.hpp
+@@ -162,8 +162,8 @@ namespace grid_split_merge_detail
+             mergeC2<Policy>(get<0>(src), get<1>(src), dst, mask, rows, cols, stream);
+         }
+ 
+-        template <typename VecType, typename DstType, class MaskPtr>
+-        __host__ static void mergeVector(const std::vector<VecType>& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        template <class SrcPtrArray, typename DstType, class MaskPtr>
++        __host__ static void mergeArray(const SrcPtrArray& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
+         {
+             mergeC2<Policy>(src[0], src[1], dst, mask, rows, cols, stream);
+         }
+@@ -178,8 +178,8 @@ namespace grid_split_merge_detail
+             mergeC3<Policy>(get<0>(src), get<1>(src), get<2>(src), dst, mask, rows, cols, stream);
+         }
+ 
+-        template <typename VecType, typename DstType, class MaskPtr>
+-        __host__ static void mergeVector(const std::vector<VecType>& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        template <class SrcPtrArray, typename DstType, class MaskPtr>
++        __host__ static void mergeArray(const SrcPtrArray& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
+         {
+             mergeC3<Policy>(src[0], src[1], src[2], dst, mask, rows, cols, stream);
+         }
+@@ -193,8 +193,8 @@ namespace grid_split_merge_detail
+             mergeC4<Policy>(get<0>(src), get<1>(src), get<2>(src), get<3>(src), dst, mask, rows, cols, stream);
+         }
+ 
+-        template <typename VecType, typename DstType, class MaskPtr>
+-        __host__ static void mergeVector(const std::vector<VecType>& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
++        template <class SrcPtrArray, typename DstType, class MaskPtr>
++        __host__ static void mergeArray(const SrcPtrArray& src, const GlobPtr<DstType>& dst, const MaskPtr& mask, int rows, int cols, cudaStream_t stream)
+         {
+             mergeC4<Policy>(src[0], src[1], src[2], src[3], dst, mask, rows, cols, stream);
+         }
+diff --git a/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp b/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
+index e3a27dc0b6b..115d8c55e46 100644
+--- a/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
++++ b/modules/cudev/include/opencv2/cudev/grid/split_merge.hpp
+@@ -131,8 +131,8 @@ __host__ void gridMerge_(const SrcPtrTuple& src, const GlobPtrSz<DstType>& dst,
+                                                                                    StreamAccessor::getStream(stream));
+ }
+ 
+-template <class Policy, typename VecType, typename DstType, class MaskPtr>
+-__host__ void gridMergeVector_(const std::vector<VecType>& src, GpuMat_<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
++template <class Policy, class ArrayType, size_t ArraySize, typename DstType, class MaskPtr>
++__host__ void gridMergeArray_(const std::array<ArrayType, ArraySize>& src, GpuMat_<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+     CV_Assert( VecTraits<DstType>::cn == src.size() );
+ 
+@@ -143,15 +143,15 @@ __host__ void gridMergeVector_(const std::vector<VecType>& src, GpuMat_<DstType>
+ 
+     dst.create(rows, cols);
+ 
+-    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeVector(src,
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeArray(src,
+                                                                                    shrinkPtr(dst),
+                                                                                    shrinkPtr(mask),
+                                                                                    rows, cols,
+                                                                                    StreamAccessor::getStream(stream));
+ }
+ 
+-template <class Policy, typename VecType, typename DstType, class MaskPtr>
+-__host__ void gridMergeVector_(const std::vector<VecType>& src, const GlobPtrSz<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
++template <class Policy, class ArrayType, size_t ArraySize, typename DstType, class MaskPtr>
++__host__ void gridMergeArray_(const std::array<ArrayType, ArraySize>& src, const GlobPtrSz<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+     CV_Assert( VecTraits<DstType>::cn == src.size() );
+ 
+@@ -161,15 +161,15 @@ __host__ void gridMergeVector_(const std::vector<VecType>& src, const GlobPtrSz<
+     CV_Assert( getRows(dst) == rows && getCols(dst) == cols );
+     CV_Assert( getRows(mask) == rows && getCols(mask) == cols );
+ 
+-    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeVector(src,
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeArray(src,
+                                                                                    shrinkPtr(dst),
+                                                                                    shrinkPtr(mask),
+                                                                                    rows, cols,
+                                                                                    StreamAccessor::getStream(stream));
+ }
+ 
+-template <class Policy, typename VecType, typename DstType>
+-__host__ void gridMergeVector_(const std::vector<VecType>& src, GpuMat_<DstType>& dst, Stream& stream = Stream::Null())
++template <class Policy, class ArrayType, size_t ArraySize, typename DstType>
++__host__ void gridMergeArray_(const std::array<ArrayType, ArraySize>& src, GpuMat_<DstType>& dst, Stream& stream = Stream::Null())
+ {
+     CV_Assert( VecTraits<DstType>::cn == src.size() );
+ 
+@@ -178,15 +178,15 @@ __host__ void gridMergeVector_(const std::vector<VecType>& src, GpuMat_<DstType>
+ 
+     dst.create(rows, cols);
+ 
+-    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeVector(src,
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeArray(src,
+                                                                                    shrinkPtr(dst),
+                                                                                    WithOutMask(),
+                                                                                    rows, cols,
+                                                                                    StreamAccessor::getStream(stream));
+ }
+ 
+-template <class Policy, typename VecType, typename DstType>
+-__host__ void gridMergeVector_(const std::vector<VecType>& src, const GlobPtrSz<DstType>& dst, Stream& stream = Stream::Null())
++template <class Policy, class ArrayType, size_t ArraySize, typename DstType>
++__host__ void gridMergeArray_(const std::array<ArrayType, ArraySize>& src, const GlobPtrSz<DstType>& dst, Stream& stream = Stream::Null())
+ {
+     CV_Assert( VecTraits<DstType>::cn == src.size() );
+ 
+@@ -195,7 +195,7 @@ __host__ void gridMergeVector_(const std::vector<VecType>& src, const GlobPtrSz<
+ 
+     CV_Assert( getRows(dst) == rows && getCols(dst) == cols );
+ 
+-    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeVector(src,
++    grid_split_merge_detail::MergeImpl<VecTraits<DstType>::cn, Policy>::mergeArray(src,
+                                                                                    shrinkPtr(dst),
+                                                                                    WithOutMask(),
+                                                                                    rows, cols,
+@@ -596,28 +596,28 @@ __host__ void gridMerge(const SrcPtrTuple& src, const GlobPtrSz<DstType>& dst, S
+     gridMerge_<DefaultSplitMergePolicy>(src, dst, stream);
+ }
+ 
+-template <typename VecType, typename DstType, class MaskPtr>
+-__host__ void gridMergeVector(const std::vector<VecType>& src, GpuMat_<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
++template <class ArrayType, size_t ArraySize, typename DstType, class MaskPtr>
++__host__ void gridMergeArray(const std::array<ArrayType, ArraySize>& src, GpuMat_<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+-    gridMergeVector_<DefaultSplitMergePolicy>(src, dst, mask, stream);
++    gridMergeArray_<DefaultSplitMergePolicy>(src, dst, mask, stream);
+ }
+ 
+-template <typename VecType, typename DstType, class MaskPtr>
+-__host__ void gridMerge(const std::vector<VecType>& src, const GlobPtrSz<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
++template <class ArrayType, size_t ArraySize, typename DstType, class MaskPtr>
++__host__ void gridMerge(const std::array<ArrayType, ArraySize>& src, const GlobPtrSz<DstType>& dst, const MaskPtr& mask, Stream& stream = Stream::Null())
+ {
+-    gridMergeVector_<DefaultSplitMergePolicy>(src, dst, mask, stream);
++    gridMergeArray_<DefaultSplitMergePolicy>(src, dst, mask, stream);
+ }
+ 
+-template <typename VecType, typename DstType>
+-__host__ void gridMerge(const std::vector<VecType>& src, GpuMat_<DstType>& dst, Stream& stream = Stream::Null())
++template <class ArrayType, size_t ArraySize, typename DstType>
++__host__ void gridMerge(const std::array<ArrayType, ArraySize>& src, GpuMat_<DstType>& dst, Stream& stream = Stream::Null())
+ {
+-    gridMergeVector_<DefaultSplitMergePolicy>(src, dst, stream);
++    gridMergeArray_<DefaultSplitMergePolicy>(src, dst, stream);
+ }
+ 
+-template <typename VecType, typename DstType>
+-__host__ void gridMerge(const std::vector<VecType>& src, const GlobPtrSz<DstType>& dst, Stream& stream = Stream::Null())
++template <class ArrayType, size_t ArraySize, typename DstType>
++__host__ void gridMerge(const std::array<ArrayType, ArraySize>& src, const GlobPtrSz<DstType>& dst, Stream& stream = Stream::Null())
+ {
+-    gridMergeVector_<DefaultSplitMergePolicy>(src, dst, stream);
++    gridMergeArray_<DefaultSplitMergePolicy>(src, dst, stream);
+ }
+ 
+ template <class SrcPtr, typename DstType, class MaskPtr>
+diff --git a/modules/cudev/test/test_split_merge.cu b/modules/cudev/test/test_split_merge.cu
+index c39ac79e530..598b6b80ac2 100644
+--- a/modules/cudev/test/test_split_merge.cu
++++ b/modules/cudev/test/test_split_merge.cu
+@@ -70,7 +70,7 @@ public:
+         GpuMat_<T> d_src2(src2);
+ 
+         GpuMat_<typename MakeVec<T, 2>::type> dst;
+-        std::vector<GlobPtrSz<T> > d_src = {globPtr(d_src1), globPtr(d_src2)};
++        std::array<GlobPtrSz<T>, 2 > d_src = {globPtr(d_src1), globPtr(d_src2)};
+         gridMerge(d_src, dst);
+ 
+         Mat dst_gold;
+@@ -94,7 +94,7 @@ public:
+         GpuMat_<T> d_src2(src2);
+         GpuMat_<T> d_src3(src3);
+ 
+-        std::vector<GlobPtrSz<T> > d_src = {globPtr(d_src1), globPtr(d_src2), globPtr(d_src3)};
++        std::array<GlobPtrSz<T>, 3 > d_src = {globPtr(d_src1), globPtr(d_src2), globPtr(d_src3)};
+ 
+         GpuMat_<typename MakeVec<T, 3>::type> dst;
+         gridMerge(d_src, dst);
+
+From 4b25fc47547dea361bed317b31283bf685b3f2ee Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Thu, 30 May 2024 15:00:02 +0300
+Subject: [PATCH 8/8] Added comments about cuda namespace clash.
+
+---
+ .../cudev/include/opencv2/cudev/grid/detail/transform.hpp   | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/modules/cudev/include/opencv2/cudev/grid/detail/transform.hpp b/modules/cudev/include/opencv2/cudev/grid/detail/transform.hpp
+index d4c55f73536..4e901ac751d 100644
+--- a/modules/cudev/include/opencv2/cudev/grid/detail/transform.hpp
++++ b/modules/cudev/include/opencv2/cudev/grid/detail/transform.hpp
+@@ -180,7 +180,8 @@ namespace grid_transform_detail
+     }
+ 
+     // transformSimple, 2 outputs
+-
++    // The overloads are added for polar_cart.cu to compute magnitude and phase with single call
++    // the previous implementation with touple causes cuda namespace clash. See https://github.com/opencv/opencv_contrib/issues/3690
+     template <class SrcPtr1, class SrcPtr2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
+     __global__ void transformSimple(const SrcPtr1 src1, const SrcPtr2 src2, GlobPtr<DstType1> dst1, GlobPtr<DstType2> dst2,
+                                     const BinOp1 op1, const BinOp2 op2, const MaskPtr mask, const int rows, const int cols)
+@@ -265,7 +266,8 @@ namespace grid_transform_detail
+     }
+ 
+     // transformSmart, 2 outputs
+-
++    // The overloads are added for polar_cart.cu to compute magnitude and phase with single call
++    // the previous implementation with touple causes cuda namespace clash. See https://github.com/opencv/opencv_contrib/issues/3690
+     template <int SHIFT, typename SrcType1, typename SrcType2, typename DstType1, typename DstType2, class BinOp1, class BinOp2, class MaskPtr>
+     __global__ void transformSmart(const GlobPtr<SrcType1> src1_, const GlobPtr<SrcType2> src2_,
+                                    GlobPtr<DstType1> dst1_, GlobPtr<DstType2> dst2_,
