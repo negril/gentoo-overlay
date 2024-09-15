@@ -1,0 +1,30 @@
+From 51d5a4b89512b33f5cfe402313483d4a0bc44179 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sun, 15 Sep 2024 21:33:55 +0200
+Subject: [PATCH] put struct Line into anonymous namespace to fix LTO
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/libsrc/meshing/basegeom.cpp b/libsrc/meshing/basegeom.cpp
+index 379185f..1113d9b 100644
+--- a/libsrc/meshing/basegeom.cpp
++++ b/libsrc/meshing/basegeom.cpp
+@@ -213,6 +213,7 @@ namespace netgen
+       }
+   }
+ 
++  namespace {
+   struct Line
+   {
+     Point<3> p0, p1;
+@@ -229,6 +230,7 @@ namespace netgen
+       return 1e99;
+     }
+   };
++  };
+ 
+   void NetgenGeometry :: Clear()
+   {
+-- 
+2.46.0
+
