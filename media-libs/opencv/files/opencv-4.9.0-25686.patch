@@ -1,0 +1,118 @@
+From 91210aa8d9926ddc40d9eed04958ba60d83239e2 Mon Sep 17 00:00:00 2001
+From: Kumataro <Kumataro@users.noreply.github.com>
+Date: Sat, 1 Jun 2024 09:11:47 +0900
+Subject: [PATCH 1/2] Suppress build warnings for GCC14
+
+---
+ modules/core/test/test_mat.cpp                           | 2 +-
+ modules/dnn/src/tensorflow/tf_importer.cpp               | 2 +-
+ modules/dnn/src/torch/torch_importer.cpp                 | 2 +-
+ modules/gapi/src/compiler/passes/exec.cpp                | 2 +-
+ modules/gapi/src/streaming/onevpl/file_data_provider.hpp | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/modules/core/test/test_mat.cpp b/modules/core/test/test_mat.cpp
+index 23a00a7effb6..d13fd96f5776 100644
+--- a/modules/core/test/test_mat.cpp
++++ b/modules/core/test/test_mat.cpp
+@@ -601,7 +601,7 @@ static void setValue(SparseMat& M, const int* idx, double value, RNG& rng)
+         CV_Error(cv::Error::StsUnsupportedFormat, "");
+ }
+ 
+-#if defined(__GNUC__) && (__GNUC__ == 11 || __GNUC__ == 12 || __GNUC__ == 13)
++#if defined(__GNUC__) && (__GNUC__ >= 11)
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Warray-bounds"
+ #endif
+diff --git a/modules/dnn/src/tensorflow/tf_importer.cpp b/modules/dnn/src/tensorflow/tf_importer.cpp
+index bd7ed3e02c99..3e73037a6017 100644
+--- a/modules/dnn/src/tensorflow/tf_importer.cpp
++++ b/modules/dnn/src/tensorflow/tf_importer.cpp
+@@ -260,7 +260,7 @@ const tensorflow::AttrValue& getLayerAttr(const tensorflow::NodeDef &layer, cons
+     return layer.attr().at(name);
+ }
+ 
+-#if defined(__GNUC__) && (__GNUC__ == 13)
++#if defined(__GNUC__) && (__GNUC__ >= 13)
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wdangling-reference"
+ #endif
+diff --git a/modules/dnn/src/torch/torch_importer.cpp b/modules/dnn/src/torch/torch_importer.cpp
+index be4f3fe851ba..08822102c7f3 100644
+--- a/modules/dnn/src/torch/torch_importer.cpp
++++ b/modules/dnn/src/torch/torch_importer.cpp
+@@ -902,7 +902,7 @@ struct TorchImporter
+             {
+                 readTorchTable(scalarParams, tensorParams);
+ 
+-                float power;
++                float power = 1.0f;
+                 if (nnName == "Square") power = 2.0f;
+                 else if (nnName == "Sqrt") power = 0.5f;
+                 else if (nnName == "Power") power = scalarParams.get<float>("pow", 1.0f);
+diff --git a/modules/gapi/src/compiler/passes/exec.cpp b/modules/gapi/src/compiler/passes/exec.cpp
+index a978e47b42c6..f5cb48162de1 100644
+--- a/modules/gapi/src/compiler/passes/exec.cpp
++++ b/modules/gapi/src/compiler/passes/exec.cpp
+@@ -158,7 +158,7 @@ namespace
+         std::unordered_set<CycleCausers, CycleHasher> cycle_causers;
+     };
+ 
+-#if defined(__GNUC__) && (__GNUC__ == 13)
++#if defined(__GNUC__) && (__GNUC__ >= 13)
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wdangling-reference"
+ #endif
+diff --git a/modules/gapi/src/streaming/onevpl/file_data_provider.hpp b/modules/gapi/src/streaming/onevpl/file_data_provider.hpp
+index 7e5e49b0e888..129c6a9d6845 100644
+--- a/modules/gapi/src/streaming/onevpl/file_data_provider.hpp
++++ b/modules/gapi/src/streaming/onevpl/file_data_provider.hpp
+@@ -21,7 +21,7 @@ namespace onevpl {
+ 
+ // With gcc13, std::unique_ptr(FILE, decltype(&fclose)> causes ignored-attributes warning.
+ // See https://stackoverflow.com/questions/76849365/can-we-add-attributes-to-standard-function-declarations-without-breaking-standar
+-#if defined(__GNUC__) && (__GNUC__ == 13)
++#if defined(__GNUC__) && (__GNUC__ >= 13)
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wignored-attributes"
+ #endif
+
+From b8b3b791a53f0595e766b797fbe8b58fd3e4d487 Mon Sep 17 00:00:00 2001
+From: Kumataro <Kumataro@users.noreply.github.com>
+Date: Sat, 1 Jun 2024 09:12:19 +0900
+Subject: [PATCH 2/2] core: hal: Disable optimization for workaround to
+ mis-branch for GCC14
+
+---
+ modules/ts/include/opencv2/ts/ts_gtest.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/modules/ts/include/opencv2/ts/ts_gtest.h b/modules/ts/include/opencv2/ts/ts_gtest.h
+index b6a953592f14..49eb3a5ec79b 100644
+--- a/modules/ts/include/opencv2/ts/ts_gtest.h
++++ b/modules/ts/include/opencv2/ts/ts_gtest.h
+@@ -21317,6 +21317,13 @@ AssertionResult CmpHelperEQFailure(const char* lhs_expression,
+                    false);
+ }
+ 
++// See https://github.com/opencv/opencv/issues/25674
++// Disable optimization for workaround to mis-branch for GCC14.
++#if defined(__GNUC__) && (__GNUC__ == 14)
++#pragma GCC push_options
++#pragma GCC optimize ("O0")
++#endif
++
+ // The helper function for {ASSERT|EXPECT}_EQ.
+ template <typename T1, typename T2>
+ AssertionResult CmpHelperEQ(const char* lhs_expression,
+@@ -21330,6 +21337,10 @@ AssertionResult CmpHelperEQ(const char* lhs_expression,
+   return CmpHelperEQFailure(lhs_expression, rhs_expression, lhs, rhs);
+ }
+ 
++#if defined(__GNUC__) && (__GNUC__ == 14)
++#pragma GCC pop_options
++#endif
++
+ // With this overloaded version, we allow anonymous enums to be used
+ // in {ASSERT|EXPECT}_EQ when compiled with gcc 4, as anonymous enums
+ // can be implicitly cast to BiggestInt.

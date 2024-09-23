@@ -84,9 +84,20 @@ IUSE+=" atlas lapack mkl"
 CPU_FEATURES_MAP=(
 	cpu_flags_arm_neon:NEON
 	cpu_flags_arm_vfpv3:VFPV3
+	cpu_flags_arm_fp16:FP16
+	cpu_flags_arm_neon_dotprod:NEON_DOTPROD
+	cpu_flags_arm_neon_fp16:NEON_FP16
+	cpu_flags_arm_neon_bf16:NEON_BF16
+
+	cpu_flags_loongarch64_lsx:LSX
+	cpu_flags_loongarch64_lasx:LASX
+
+	cpu_flags_mips_msa:MSA
 
 	cpu_flags_ppc_vsx:VSX   # (always available on Power8)
 	cpu_flags_ppc_vsx3:VSX3 # (always available on Power9)
+
+	cpu_flags_riscv_rvv:RVV
 
 	cpu_flags_x86_sse:SSE   # (always available on 64-bit CPUs)
 	cpu_flags_x86_sse2:SSE2 # (always available on 64-bit CPUs)
@@ -102,15 +113,40 @@ CPU_FEATURES_MAP=(
 	cpu_flags_x86_fma3:FMA3
 	cpu_flags_x86_avx:AVX
 	cpu_flags_x86_avx2:AVX2
+	cpu_flags_x86_avx512_bitalg:AVX_512BITALG
+	cpu_flags_x86_avx512_vbmi2:AVX_512VBMI2
+	cpu_flags_x86_avx512_vnni:AVX_512VNNI
+	cpu_flags_x86_avx512_vpopcntdq:AVX_512VPOPCNTDQ
+	cpu_flags_x86_avx512bw:AVX_512BW
+	cpu_flags_x86_avx512cd:AVX_512CD
+	cpu_flags_x86_avx512dq:AVX_512DQ
 	cpu_flags_x86_avx512f:AVX_512F
+	cpu_flags_x86_avx512ifma:AVX_512IFMA
+	cpu_flags_x86_avx512vbmi:AVX_512VBMI
+	cpu_flags_x86_avx512vl:AVX_512VL
+
+	# AVX512_KNL_EXTRA
+	cpu_flags_x86_avx512er:AVX_512ER
+	cpu_flags_x86_avx512pf:AVX_512PF
+	# AVX512_KNM_EXTRA
+	cpu_flags_x86_avx512_4fmaps:AVX_5124FMAPS
+	cpu_flags_x86_avx512_4vnniw:AVX_5124VNNIW
+
 )
 IUSE+=" ${CPU_FEATURES_MAP[*]%:*}"
 unset ARM_CPU_FEATURES PPC_CPU_FEATURES X86_CPU_FEATURES_RAW X86_CPU_FEATURES
 
 REQUIRED_USE="
-	amd64? ( cpu_flags_x86_sse cpu_flags_x86_sse2 )
-	amd64? ( cpu_flags_x86_avx2? ( cpu_flags_x86_f16c ) )
-	amd64? ( cpu_flags_x86_f16c? ( cpu_flags_x86_avx ) )
+	amd64? (
+		cpu_flags_x86_sse
+		cpu_flags_x86_sse2
+		cpu_flags_x86_avx2? ( cpu_flags_x86_f16c )
+		cpu_flags_x86_f16c? ( cpu_flags_x86_avx )
+		cpu_flags_x86_avx512er? ( cpu_flags_x86_avx512pf )
+		cpu_flags_x86_avx512pf? ( cpu_flags_x86_avx512er )
+		cpu_flags_x86_avx512_4fmaps? ( cpu_flags_x86_avx512_4fmaps )
+		cpu_flags_x86_avx512_4vnniw? ( cpu_flags_x86_avx512_4vnniw )
+	)
 	cuda? (
 		contrib
 	)
@@ -135,6 +171,8 @@ REQUIRED_USE="
 
 # TODO find a way to compile these with the cuda compiler
 # REQUIRED_USE+="
+# 	cuda? ( !tbb )
+# "
 # 	cuda? ( !gdal !openexr !tbb )
 # "
 
@@ -218,7 +256,7 @@ RDEPEND="
 		)
 	)
 	quirc? ( media-libs/quirc )
-	tesseract? ( app-text/tesseract[opencl=,${MULTILIB_USEDEP}] )
+	tesseract? ( app-text/tesseract[${MULTILIB_USEDEP}] )
 	tbb? ( dev-cpp/tbb:=[${MULTILIB_USEDEP}] )
 	tiff? ( media-libs/tiff:=[${MULTILIB_USEDEP}] )
 	v4l? ( >=media-libs/libv4l-0.8.3[${MULTILIB_USEDEP}] )
@@ -246,7 +284,7 @@ RDEPEND+="
 "
 BDEPEND="
 	virtual/pkgconfig
-	cuda? ( dev-util/nvidia-cuda-toolkit:0= )
+	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	doc? (
 		app-text/doxygen[dot]
 		python? (
@@ -271,6 +309,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.9.0-r2-dnn-explicitly-include-abseil-cpp.patch"
 
 	"${FILESDIR}/${PN}-4.9.0-25658.patch" # 25658
+	"${FILESDIR}/${PN}-4.9.0-25686.patch" # 25686
 
 	# NOTE applied in src_prepare
 	# "${FILESDIR}/${PN}_contrib-${PV}-rgbd.patch"
@@ -282,6 +321,10 @@ cuda_get_host_compiler() {
 	if [[ -n "${CUDAHOSTCXX}" ]]; then
 		echo "${CUDAHOSTCXX}"
 		return
+	fi
+
+	if ! tc-is-gcc && ! tc-is-clang; then
+		die "$(tc-get-compiler-type) compiler is not supported"
 	fi
 
 	einfo "trying to find working CUDA host compiler"
@@ -300,10 +343,7 @@ cuda_get_host_compiler() {
 	package="sys-devel/${compiler_type}"
 	package_version="${package}"
 
-	if ! tc-is-gcc && ! tc-is-clang; then
-		die "${compiler} compiler is not supported"
-	fi
-
+	# handle compiler launcher
 	if [[ "${compiler%%[[:space:]]*}" == "ccache" ]]; then
 		compiler="${compiler/#ccache }"
 		local PATH="/usr/lib/ccache/bin:${PATH}"
@@ -313,7 +353,7 @@ cuda_get_host_compiler() {
 	NVCC_CCBIN="$(command -v "${compiler}-${compiler_version}")"
 	ebegin "testing default compiler: ${compiler_type}-${compiler_version}"
 
-	while ! nvcc -ccbin "${NVCC_CCBIN}" - -x cu <<<"int main(){}" &>/dev/null; do
+	while ! /opt/cuda-12.6.2/bin/nvcc -ccbin "${NVCC_CCBIN}" - -x cu <<<"int main(){}" &>/dev/null; do
 		eend 1
 		# prepare next version
 		if ! package_version="<$(best_version "${package_version}")"; then
@@ -330,8 +370,7 @@ cuda_get_host_compiler() {
 }
 
 cuda_get_host_native_arch() {
-	: "${CUDAARCHS:=$(__nvcc_device_query)}"
-	echo "${CUDAARCHS}"
+	echo "${CUDAARCHS:=$(__nvcc_device_query)}"
 }
 
 pkg_pretend() {
@@ -354,7 +393,9 @@ pkg_pretend() {
 
 pkg_setup() {
 	[[ ${MERGE_TYPE} != binary ]] && use openmp && tc-check-openmp
+
 	use java && java-pkg-opt-2_pkg_setup
+
 	if use cuda; then
 		nvidia-modprobe -u -m | true
 	fi
@@ -366,13 +407,13 @@ src_prepare() {
 	# remove bundled stuff
 	rm -r 3rdparty || die "Removing 3rd party components failed"
 	sed -e '/add_subdirectory(.*3rdparty.*)/ d' \
-		-i CMakeLists.txt cmake/*cmake || die
+	    -i CMakeLists.txt cmake/*cmake || die
 
 	if use contrib; then
 		cd "${WORKDIR}/${PN}_contrib-${PV}" || die
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
-		if ver_test "$(nvcc --version | tail -n 1 | cut -d '_' -f 2- | cut -d '.' -f 1-2)" -ge 12.4; then
+		if ver_test "$(/opt/cuda-12.6.2/bin/nvcc --version | tail -n 1 | cut -d '_' -f 2- | cut -d '.' -f 1-2)" -ge 12.4; then
 			eapply "${FILESDIR}/${PN}_contrib-4.9.0-3607.patch" # 3607
 			eapply "${FILESDIR}/${PN}_contrib-4.9.0-cuda-12.4.patch" # 3726
 			eapply "${FILESDIR}/${PN}_contrib-4.9.0-3742.patch" # 3742
@@ -686,7 +727,24 @@ multilib_src_configure() {
 	local CPU_BASELINE=""
 	for i in "${CPU_FEATURES_MAP[@]}" ; do
 		if [[ ${ABI} != x86 || ${i%:*} != "cpu_flags_x86_avx2" ]]; then # workaround for Bug 747163
-			use "${i%:*}" && CPU_BASELINE="${CPU_BASELINE}${i#*:};"
+			local value
+			if [[ ${ABI} == amd64 ]]; then
+				case "${i%:*}" in
+					cpu_flags_x86_avx512er|cpu_flags_x86_avx512pf)
+						value="AVX512_KNL_EXTRA"
+						;;
+					cpu_flags_x86_avx512_4fmaps|cpu_flags_x86_avx512_4vnniw)
+						value="AVX512_KNM_EXTRA"
+						;;
+					*)
+						value="${i#*:}"
+						;;
+				esac
+			else
+				value=${i#*:}
+			fi
+
+			use "${i%:*}" && CPU_BASELINE="${CPU_BASELINE}${value};"
 		fi
 	done
 	unset CPU_FEATURES_MAP
@@ -694,12 +752,11 @@ multilib_src_configure() {
 	mycmakeargs+=(
 		-DCPU_BASELINE="${CPU_BASELINE}"
 	)
-	if [[ ${MERGE_TYPE} != "buildonly" ]]; then
-		mycmakeargs+=(
-			-DOPENCV_CPU_OPT_IMPLIES_IGNORE="yes"
-			-DCPU_DISPATCH=
-		)
-	fi
+	# if [[ ${MERGE_TYPE} != "buildonly" ]]; then
+	# 	mycmakeargs+=(
+	# 		-DCPU_DISPATCH=
+	# 	)
+	# fi
 
 	# ===================================================
 	# OpenCV Contrib Modules
@@ -729,22 +786,21 @@ multilib_src_configure() {
 		cuda_add_sandbox -w
 		addwrite "/proc/self/task"
 
-		__nvcc_device_query
-
+		local -x CUDAHOSTCXX CUDAARCHS CUDAHOSTLD
 		CUDAHOSTCXX="$(cuda_get_host_compiler)"
 		CUDAARCHS="$(cuda_get_host_native_arch)"
 		CUDAHOSTLD="$(command -v "$(tc-getCXX)")"
 
-		export CUDAHOSTCXX
-		export CUDAARCHS
-		export CUDAHOSTLD
-
 		if tc-is-gcc; then
-			CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES_EXCLUDE=$("${CUDAHOSTLD}" -E -v - <<<"int main(){}" |& grep LIBRARY_PATH | cut -d '=' -f 2 | cut -d ':' -f 1)
+			# Filter out IMPLICIT_LINK_DIRECTORIES picked up by CMAKE_DETERMINE_COMPILER_ABI(CUDA)
+			# See /usr/share/cmake/Help/variable/CMAKE_LANG_IMPLICIT_LINK_DIRECTORIES.rst
+			CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES_EXCLUDE=$(
+				"${CUDAHOSTLD}" -E -v - <<<"int main(){}" |& \
+				grep LIBRARY_PATH | cut -d '=' -f 2 | cut -d ':' -f 1
+			)
 		fi
 
 		mycmakeargs+=(
-			# -DCMAKE_CUDA_HOST_LINK_LAUNCHER="$(command -v "$(tc-getCXX)")"
 			-DENABLE_CUDA_FIRST_CLASS_LANGUAGE="yes"
 		)
 	fi
@@ -848,6 +904,10 @@ multilib_src_test() {
 		'Test_TensorFlow_layers.concat_3d/1'
 
 		'AsyncAPICancelation/cancel*basic'
+		'hal_intrin128.*32x4_CPP_EMULATOR'
+		'hal_intrin128.*64x2_CPP_EMULATOR'
+		'CV_Face_FacemarkKazemi.can_detect_landmarks'
+		'vittrack.accuracy_vittrack'
 	)
 
 	if ! use gtk3 && ! use qt5 && ! use qt6; then
