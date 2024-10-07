@@ -14,12 +14,13 @@ DESCRIPTION="The Programmers Solid 3D CAD Modeller"
 HOMEPAGE="https://openscad.org/"
 SRC_URI=""
 EGIT_REPO_URI="https://github.com/openscad/openscad.git"
+EGIT_SUBMODULES=( '*' '-submodules/mimalloc' )
 
 # Code is GPL-3+, MCAD library is LGPL-2.1
 LICENSE="GPL-3+ LGPL-2.1"
 SLOT="0"
 KEYWORDS=""
-IUSE="cairo dbus egl experimental gamepad gui hidapi mimalloc spacenav"
+IUSE="cairo dbus egl experimental gamepad gui +qt5 hidapi mimalloc spacenav"
 RESTRICT="test" # 32 out 1300+ tests fail
 
 REQUIRED_USE="
@@ -45,23 +46,34 @@ RDEPEND="
 	virtual/opengl
 	cairo? ( x11-libs/cairo )
 	gui? (
-		dev-qt/qtconcurrent:5
-		dev-qt/qtcore:5
-		dev-qt/qtgui:5[-gles2-only]
-		dev-qt/qtmultimedia:5
-		dev-qt/qtnetwork:5
-		dev-qt/qtopengl:5
-		dev-qt/qtsvg:5
-		dev-qt/qtwidgets:5
-		x11-libs/libX11
-		x11-libs/qscintilla:=[qt5(+)]
-		dbus? ( dev-qt/qtdbus:5 )
-		gamepad? ( dev-qt/qtgamepad:5 )
+		!qt5? (
+			dev-qt/qtbase:6[concurrent,network,opengl,widgets]
+			dev-qt/qtbase:6[gui,-gles2-only]
+			dev-qt/qtmultimedia:6
+			x11-libs/libX11
+			x11-libs/qscintilla:=[qt6(+)]
+			dbus? ( dev-qt/qtbase:6[dbus] )
+		)
+		qt5? (
+			dev-qt/qtconcurrent:5
+			dev-qt/qtcore:5
+			dev-qt/qtgui:5[-gles2-only]
+			dev-qt/qtmultimedia:5
+			dev-qt/qtnetwork:5
+			dev-qt/qtopengl:5
+			dev-qt/qtsvg:5
+			dev-qt/qtwidgets:5
+			x11-libs/libX11
+			x11-libs/qscintilla:=[qt5(+)]
+			dbus? ( dev-qt/qtdbus:5 )
+			gamepad? ( dev-qt/qtgamepad:5 )
+		)
 	)
 	hidapi? ( dev-libs/hidapi )
 	mimalloc? ( dev-libs/mimalloc:= )
 	spacenav? ( dev-libs/libspnav )
 "
+# 	media-libs/libclipper2
 DEPEND="${RDEPEND}"
 BDEPEND="
 	dev-util/itstool
@@ -70,10 +82,6 @@ BDEPEND="
 	sys-devel/gettext
 	virtual/pkgconfig
 "
-
-PATCHES=(
-	"${FILESDIR}/${PN}-cpp-include-cstdint.patch"
-)
 
 DOCS=(
 	README.md
@@ -95,8 +103,8 @@ src_configure() {
 		-DENABLE_CAIRO=$(usex cairo)
 		-DENABLE_EGL=$(usex egl)
 		-DENABLE_HIDAPI=$(usex hidapi)
-		# needs python deps, unbundle first before enabling
-		-DENABLE_MANIFOLD=OFF
+		# # needs python deps, unbundle first before enabling
+		# -DENABLE_MANIFOLD=OFF
 		-DENABLE_SPNAV=$(usex spacenav)
 		-DENABLE_TESTS=OFF
 		-DEXPERIMENTAL=$(usex experimental)
@@ -122,6 +130,8 @@ src_install() {
 
 	mv -i "${ED}"/usr/share/openscad/locale "${ED}"/usr/share || die "failed to move locales"
 	dosym -r /usr/share/locale /usr/share/openscad/locale
+	dolib.so submodules/manifold/src/manifold/libmanifold.so*
+	dolib.so submodules/manifold/src/polygon/libpolygon.so*
 }
 
 pkg_postinst() {
