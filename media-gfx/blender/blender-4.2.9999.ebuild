@@ -416,8 +416,15 @@ src_configure() {
 	fi
 
 	if use cuda; then
+		if [[ -z "${CUDAARCHS}" ]]; then
+			CUDAARCHS="all-major"
+		else
+			CUDAARCHS="sm_${CUDAARCHS}"
+		fi
+
 		mycmakeargs+=(
 			-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
+			-DCYCLES_CUDA_BINARIES_ARCH="${CUDAARCHS}"
 		)
 	fi
 
