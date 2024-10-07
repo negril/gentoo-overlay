@@ -79,7 +79,7 @@ RDEPEND="
 		dev-lang/tk:=
 		sci-libs/vtk:=[rendering]
 		tbb? (
-			sci-libs/vtk:=[tbb,-cuda]
+			sci-libs/vtk:=[tbb]
 		)
 	)
 "
@@ -109,6 +109,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-7.8.0-tests.patch"
 	"${FILESDIR}/${PN}-7.8.0-jemalloc-noexcept.patch"
 	"${FILESDIR}/${PN}-7.8.1-vtk_components.patch"
+	"${FILESDIR}/${PN}-7.8.1-fontconfig-unsigned-char.patch"
 )
 
 src_unpack() {
