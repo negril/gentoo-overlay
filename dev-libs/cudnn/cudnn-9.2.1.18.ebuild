@@ -43,7 +43,7 @@ RESTRICT="mirror"
 # "
 
 REQUIRED_USE="
-	|| (
+	^^ (
 		cuda_targets_11
 		cuda_targets_12
 	)
@@ -61,13 +61,13 @@ src_install() {
 
 	if use cuda_targets_11; then
 		cd "${WORKDIR}/cudnn-linux-${narch}-${PV}_cuda11-archive" || die
-		insinto /opt/cuda-11/targets/${narch}-linux
+		insinto /opt/cuda/targets/${narch}-linux
 		doins -r include lib
 	fi
 
 	if use cuda_targets_12; then
 		cd "${WORKDIR}/cudnn-linux-${narch}-${PV}_cuda12-archive" || die
-		insinto /opt/cuda-12/targets/${narch}-linux
+		insinto /opt/cuda/targets/${narch}-linux
 		doins -r include lib
 	fi
 }
