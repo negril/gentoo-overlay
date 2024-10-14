@@ -50,7 +50,7 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	nsight? (
 		dev-libs/libpfm
-		dev-qt/qtwayland:6=
+		dev-qt/qtwayland:6
 		sys-cluster/ucx
 
 		!system-qt? (
