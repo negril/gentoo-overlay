@@ -177,7 +177,10 @@ COMMON_DEPEND="
 	dev-libs/protobuf:=[${MULTILIB_USEDEP}]
 	sys-libs/zlib[${MULTILIB_USEDEP}]
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
-	cudnn? ( dev-libs/cudnn:= )
+	cudnn? (
+		dev-cpp/abseil-cpp:=
+		dev-libs/cudnn:=
+	)
 	contribdnn? ( dev-libs/flatbuffers:= )
 	contribhdf? ( sci-libs/hdf5:= )
 	contribfreetype? (
@@ -304,6 +307,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.9.0-ade-0.1.2d.tar.gz.patch"
 	"${FILESDIR}/${PN}-4.9.0-cmake-cleanup.patch"
 	"${FILESDIR}/${PN}-4.9.0-tbb-detection.patch"
+	"${FILESDIR}/${PN}-4.9.0-r3-dnn-explicitly-include-abseil-cpp.patch"
 
 	"${FILESDIR}/${PN}-4.9.0-25412.patch" # 25412
 	"${FILESDIR}/${PN}-4.9.0-25658.patch" # 25658
