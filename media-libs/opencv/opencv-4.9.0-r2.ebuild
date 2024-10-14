@@ -3,8 +3,8 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
-inherit cuda java-pkg-opt-2 java-ant-2 cmake-multilib flag-o-matic python-r1 toolchain-funcs virtualx
+PYTHON_COMPAT=( python3_{10..13} )
+inherit cuda java-pkg-opt-2 cmake-multilib flag-o-matic python-r1 toolchain-funcs virtualx
 
 DESCRIPTION="A collection of algorithms and sample code for various computer vision problems"
 HOMEPAGE="https://opencv.org"
@@ -56,7 +56,7 @@ else
 			https://github.com/${PN}/${PN}_extra/archive/refs/tags/${PV}.tar.gz -> ${PN}_extra-${PV}.tar.gz
 		)
 	"
-	KEYWORDS="amd64 ~arm ~arm64 ~loong ~ppc ~ppc64 ~riscv x86"
+	KEYWORDS="amd64 ~arm arm64 ~loong ~ppc ~ppc64 ~riscv x86"
 fi
 
 LICENSE="Apache-2.0"
@@ -113,6 +113,7 @@ REQUIRED_USE="
 	cpu_flags_x86_f16c? ( cpu_flags_x86_avx )
 	cuda? (
 		contrib
+		tesseract? ( opencl )
 	)
 	cudnn? ( cuda )
 	dnnsamples? ( examples )
@@ -140,7 +141,7 @@ REQUIRED_USE+="
 
 RESTRICT="!test? ( test )"
 
-RDEPEND="
+COMMON_DEPEND="
 	app-arch/bzip2[${MULTILIB_USEDEP}]
 	dev-libs/protobuf:=[${MULTILIB_USEDEP}]
 	sys-libs/zlib[${MULTILIB_USEDEP}]
@@ -227,7 +228,7 @@ RDEPEND="
 	xine? ( media-libs/xine-lib )
 "
 DEPEND="
-	${RDEPEND}
+	${COMMON_DEPEND}
 	eigen? ( >=dev-cpp/eigen-3.3.8-r1:3 )
 	java? ( >=virtual/jdk-1.8:* )
 "
@@ -240,6 +241,10 @@ DEPEND+="
 		)
 	)
 "
+RDEPEND="
+	${COMMON_DEPEND}
+	java? ( >=virtual/jre-1.8:* )
+"
 BDEPEND="
 	virtual/pkgconfig
 	cuda? ( dev-util/nvidia-cuda-toolkit:0= )
@@ -249,6 +254,7 @@ BDEPEND="
 			dev-python/beautifulsoup4[${PYTHON_USEDEP}]
 		)
 	)
+	java? ( >=dev-java/ant-1.10.14-r3 )
 "
 
 PATCHES=(
@@ -287,7 +293,6 @@ cuda_get_cuda_compiler() {
 			fi
 			break
 		fi
-		echo "version $version" >&2
 		CUDAHOSTCXX_test="$(
 			dirname "$(
 				realpath "$(
@@ -295,43 +300,10 @@ cuda_get_cuda_compiler() {
 				)"
 			)"
 		)"
-		echo "int main(){}" | nvcc -ccbin "${CUDAHOSTCXX_test}" - -x cu >&2
 		version="<${version}"
-	do ! nvcc -ccbin "${CUDAHOSTCXX_test}" - -x cu &>/dev/null <<<"int main(){}"; done
+	do ! echo "int main(){}" | nvcc "-ccbin ${CUDAHOSTCXX_test}" - -x cu &>/dev/null; done
 
 	echo "${CUDAHOSTCXX}"
-}
-
-cuda_get_host_compiler() {
-	local compiler=$(tc-get-compiler-type)
-	if ! (tc-is-gcc || tc-is-clang); then
-		die "${compiler} compiler is not supported"
-	fi
-	local default_compiler="${compiler}-$(${compiler}-major-version)"
-	local version="sys-devel/${compiler}"
-
-	# try the default compiler first
-	local NVCC_CCBIN=${default_compiler}
-	while ! echo "int main(){}" | nvcc -ccbin "${NVCC_CCBIN}" - -x cu &>/dev/null; do
-		version=$(best_version "${version}")
-		if [[ -z "${version}" ]]; then
-			die "could not find a supported version of ${compiler}"
-		fi
-		version="<${version}"
-
-		# nvcc accepts just an executable name, too.
-		# search for NVCC_CCBIN here:
-		# https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/
-		NVCC_CCBIN="$(echo "${version}" | sed 's:.*/\([a-z]*-[0-9]*\).*:\1:')"
-	done
-
-	if [ ${NVCC_CCBIN} != ${default_compiler} ]; then
-		ewarn "The default compiler, ${default_compiler} is not supported by nvcc!"
-		ewarn "Compiler version mismatch causes undefined reference errors on linking, so"
-		ewarn "${NVCC_CCBIN}, which is supported by nvcc, will be used to compile OpenCV."
-	fi
-
-	echo "${NVCC_CCBIN}"
 }
 
 cuda_get_host_native_arch() {
@@ -462,9 +434,10 @@ src_prepare() {
 	if use java; then
 		java-pkg-opt-2_src_prepare
 
-		JAVA_ANT_ENCODING="iso-8859-1"
 		# set encoding so even this cmake build will pick it up.
 		export ANT_OPTS+=" -Dfile.encoding=iso-8859-1"
+		export ANT_OPTS+=" -Dant.build.javac.source=$(java-pkg_get-source)"
+		export ANT_OPTS+=" -Dant.build.javac.target=$(java-pkg_get-target)"
 	fi
 }
 
@@ -718,8 +691,7 @@ multilib_src_configure() {
 	if multilib_is_native_abi && use cuda; then
 		cuda_add_sandbox -w
 		addwrite "/proc/self/task"
-		# CUDAHOSTCXX="$(cuda_get_cuda_compiler)"
-		CUDAHOSTCXX="$(cuda_get_host_compiler)"
+		CUDAHOSTCXX="$(cuda_get_cuda_compiler)"
 		CUDAARCHS="$(cuda_get_host_native_arch)"
 		export CUDAHOSTCXX
 		export CUDAARCHS
@@ -731,6 +703,14 @@ multilib_src_configure() {
 	if use ffmpeg; then
 		mycmakeargs+=(
 			-DOPENCV_GAPI_GSTREAMER="no"
+		)
+	fi
+
+	# according to modules/java/jar/CMakeLists.txt:23-26
+	if use java; then
+		mycmakeargs+=(
+			-DOPENCV_JAVA_SOURCE_VERSION="$(java-pkg_get-source)"
+			-DOPENCV_JAVA_TARGET_VERSION="$(java-pkg_get-target)"
 		)
 	fi
 
@@ -801,7 +781,6 @@ multilib_src_configure() {
 		)
 		cmake_src_configure
 	fi
-	use java && java-ant-2_src_configure
 }
 
 multilib_src_compile() {
