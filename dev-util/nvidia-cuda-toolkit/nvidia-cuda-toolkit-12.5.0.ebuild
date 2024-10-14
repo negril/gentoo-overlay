@@ -64,7 +64,7 @@ RDEPEND="${PYTHON_DEPS}
 # 		dev-qt/qtwayland:6
 BDEPEND="nsight? ( dev-util/patchelf )"
 
-QA_PREBUILT="opt/cuda/*"
+QA_PREBUILT="opt/cuda-${PV}/*"
 CHECKREQS_DISK_BUILD="15M"
 
 pkg_setup() {
