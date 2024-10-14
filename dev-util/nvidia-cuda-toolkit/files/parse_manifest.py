@@ -39,7 +39,7 @@ def main():
             name2 = name2.replace(" ", "_")
             print(f"{ind * indent}{name2}")
         print(")")
-        print("")
+        print()
 
     # p_components(et)
 
@@ -48,10 +48,11 @@ def main():
             name = el.get("name")
 
             skip = {
-                # "Kernel Objects"
-                "Driver"
-                # "Documentation"
-                # "Demo Suite"
+                "Kernel Objects",
+                "Driver",
+                "Documentation",
+                # "Demo Suite",
+                "nsight",
             }
 
             if name.startswith("CUDA"):
@@ -101,6 +102,7 @@ def main():
             for node in el.findall("./buildPath"):
                 path = node.text.removeprefix('./')
                 print(f"{ind * (level + 1) * indent}cd \"${{S}}/{path}\" || die \"cd ${{S}}/{path} failed\"")
+                print()
 
             # for node in el.findall("./dir"):
             #     pass
@@ -114,8 +116,8 @@ def main():
 
                 filepath = basedir / path / file
 
-                if not filepath.is_symlink():
-                  print(f"{ind * (level + 1) * indent}dofile \"{file}\"{dir}")
+                if not filepath.is_symlink() and not file.endswith("-uninstaller"):
+                    print(f"{ind * (level + 1) * indent}dofile \"{file}\"{dir}")
 
             for node in el.findall("./pcfile"):
                 offset = node.text.rfind('-')
@@ -133,7 +135,7 @@ def main():
 
                 subdir = ""
                 if "subdir" in node.attrib:
-                    subdir = f" {node.attrib["subdir"]}"
+                    subdir = f" \"{node.attrib["subdir"]}\""
 
                 print(f"{ind * (level + 1) * indent}dopcfile "
                       f"\"{lib_name}\" "
