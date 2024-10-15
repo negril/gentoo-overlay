@@ -242,17 +242,17 @@ COMMON_DEPEND="
 		${PYTHON_DEPS}
 		dev-python/numpy:=[${PYTHON_USEDEP}]
 	)
-	qt5? (
-		dev-qt/qtgui:5
-		dev-qt/qtwidgets:5
-		dev-qt/qttest:5
-		dev-qt/qtconcurrent:5
-		opengl? ( dev-qt/qtopengl:5 )
-	)
-	!qt5? (
-		qt6? (
-			dev-qt/qtbase:6[gui,widgets,concurrent,opengl?]
+	!qt6? (
+		qt5? (
+			dev-qt/qtgui:5
+			dev-qt/qtwidgets:5
+			dev-qt/qttest:5
+			dev-qt/qtconcurrent:5
+			opengl? ( dev-qt/qtopengl:5 )
 		)
+	)
+	qt6? (
+		dev-qt/qtbase:6[gui,widgets,concurrent,opengl?]
 	)
 	quirc? ( media-libs/quirc )
 	tesseract? ( app-text/tesseract[${MULTILIB_USEDEP}] )
@@ -660,15 +660,15 @@ multilib_src_configure() {
 
 	)
 
-	if use qt5; then
-		mycmakeargs+=(
-			-DWITH_QT="$(multilib_native_usex qt5)"
-			-DCMAKE_DISABLE_FIND_PACKAGE_Qt6="yes"
-		)
-	elif use qt6; then
+	if use qt6; then
 		mycmakeargs+=(
 			-DWITH_QT="$(multilib_native_usex qt6)"
 			-DCMAKE_DISABLE_FIND_PACKAGE_Qt5="yes"
+		)
+	elif use qt5; then
+		mycmakeargs+=(
+			-DWITH_QT="$(multilib_native_usex qt5)"
+			-DCMAKE_DISABLE_FIND_PACKAGE_Qt6="yes"
 		)
 	else
 		mycmakeargs+=(
