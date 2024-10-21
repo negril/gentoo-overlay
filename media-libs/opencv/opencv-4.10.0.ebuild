@@ -258,13 +258,17 @@ DEPEND="
 	${COMMON_DEPEND}
 	eigen? ( >=dev-cpp/eigen-3.3.8-r1:3 )
 	java? ( >=virtual/jdk-1.8:* )
-"
-# TODO gstreamer dependencies
-DEPEND+="
 	test? (
 		gstreamer? (
+			media-plugins/gst-plugins-aom[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-jpeg[${MULTILIB_USEDEP}]
+			media-plugins/gst-plugins-libav[${MULTILIB_USEDEP}]
+			media-plugins/gst-plugins-mpeg2dec[${MULTILIB_USEDEP}]
+			media-plugins/gst-plugins-mpeg2enc[${MULTILIB_USEDEP}]
+			media-plugins/gst-plugins-mpg123[${MULTILIB_USEDEP}]
+			media-plugins/gst-plugins-openh264[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-x264[${MULTILIB_USEDEP}]
+			media-plugins/gst-plugins-vpx[${MULTILIB_USEDEP}]
 		)
 	)
 "
