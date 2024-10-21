@@ -168,7 +168,7 @@ REQUIRED_USE="
 	python? ( ${PYTHON_REQUIRED_USE} )
 	tesseract? ( contrib )
 	?? ( gtk3 || ( qt5 qt6 ) )
-	test? ( || ( ffmpeg gstreamer ) jpeg png tiff features2d  )
+	test? ( || ( ffmpeg gstreamer ) jpeg png tiff features2d )
 "
 
 RESTRICT="!test? ( test )"
@@ -387,6 +387,8 @@ cuda_get_host_native_arch() {
 }
 
 pkg_pretend() {
+	[[ ${MERGE_TYPE} != binary ]] && use openmp && tc-check-openmp
+
 	if use cuda && [[ -z "${CUDA_GENERATION}" ]] && [[ -z "${CUDA_ARCH_BIN}" ]]; then # TODO CUDAARCHS
 		einfo "The target CUDA architecture can be set via one of:"
 		einfo "  - CUDA_GENERATION set to one of Maxwell, Pascal, Volta, Turing, Ampere, Lovelace, Hopper, Auto"
@@ -401,8 +403,6 @@ pkg_pretend() {
 		local info_message="When building a binary package it's recommended to unset CUDA_GENERATION and CUDA_ARCH_BIN"
 		einfo "$info_message so all available architectures are build."
 	fi
-
-	[[ ${MERGE_TYPE} != binary ]] && use openmp && tc-check-openmp
 }
 
 pkg_setup() {
@@ -914,13 +914,10 @@ multilib_src_configure() {
 }
 
 multilib_src_compile() {
-	opencv_compile() {
-		cmake_src_compile
-	}
 	if multilib_is_native_abi && use python; then
-		python_foreach_impl opencv_compile
+		python_foreach_impl cmake_src_compile
 	else
-		opencv_compile
+		cmake_src_compile
 	fi
 }
 
