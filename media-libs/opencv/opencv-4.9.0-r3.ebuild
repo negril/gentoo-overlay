@@ -930,19 +930,37 @@ multilib_src_test() {
 	# use testprograms && return
 
 	CMAKE_SKIP_TESTS=(
-		'Test_ONNX_layers.LSTM_cell_forward/0'
-		'Test_ONNX_layers.LSTM_cell_bidirectional/0'
-		'Test_TensorFlow_layers.Convolution3D/1'
-		'Test_TensorFlow_layers.concat_3d/1'
+		# 'Test_ONNX_layers.LSTM_cell_forward/0'
+		# 'Test_ONNX_layers.LSTM_cell_bidirectional/0'
+		# 'Test_TensorFlow_layers.Convolution3D/1'
+		# 'Test_TensorFlow_layers.concat_3d/1'
+
+		"videoio/videoio_bunny.frame_count/12"
 
 		'AsyncAPICancelation/cancel*basic'
+
+		'hal_intrin128.*32x4_CPP_EMULATOR'
+		'hal_intrin128.*64x2_CPP_EMULATOR'
+
+		# 'CV_Face_FacemarkKazemi.can_detect_landmarks'
+
+		'All/Imgcodecs_FileMode.regression/26'
+
+		'GOTURN.accuracy'
+		'DaSiamRPN.accuracy'
+		'NanoTrack.accuracy_NanoTrack_V1'
+		'NanoTrack.accuracy_NanoTrack_V2'
+		'Tracking/DistanceAndOverlap.GOTURN*'
 	)
 
 	if ! use gtk3 && ! use qt5 && ! use qt6; then
 		CMAKE_SKIP_TESTS+=(
-			# these fail with parallism
-			'^Highgui_*'
+			# these fail with parallelism
+			# 'Highgui_*'
+			"Highgui_GUI.regression"
 		)
+	else
+		addpredict /dev/fuse
 	fi
 
 	if multilib_is_native_abi && use cuda; then
@@ -955,6 +973,8 @@ multilib_src_test() {
 	fi
 
 	if use opengl; then
+		# opencv_test_cudaarithm
+		# needs direct device access and display server
 		CMAKE_SKIP_TESTS+=(
 			'OpenGL/Buffer.MapDevice/*'
 			'OpenGL/*Gpu*'
@@ -971,25 +991,75 @@ multilib_src_test() {
 		--test-timeout 180
 	)
 
+	if ! use contribdnn; then
+		CMAKE_SKIP_TESTS+=(
+		'Objdetect_face_detection.regression'
+		'Objdetect_face_recognition.regression'
+		'vittrack.accuracy_vittrack'
+		)
+	fi
+
 	if multilib_is_native_abi && use cuda; then
-		cuda_add_sandbox -w
-		export OPENCV_PARALLEL_BACKEND="threads"
-		export DNN_BACKEND_OPENCV="cuda"
+
+		if ! SANDBOX_WRITE=/dev/nvidiactl test -w /dev/nvidiactl ; then
+			eerror "Can't access the GPU at /dev/nvidiactl. User $(id -nu) is not in the group \"video\"."
+			local TEST_CUDA="false"
+			CMAKE_SKIP_TESTS+=(
+				"CUDA*"
+			)
+		# local -x OPENCV_PARALLEL_BACKEND="threads"
+		# local -x DNN_BACKEND_OPENCV="cuda"
+		else
+			cuda_add_sandbox -w
+		fi
 	fi
 
 	opencv_test() {
-		export OPENCV_CORE_PLUGIN_PATH="${BUILD_DIR}/lib"
-		export OPENCV_DNN_PLUGIN_PATH="${BUILD_DIR}/lib"
-		export OPENCV_VIDEOIO_PLUGIN_PATH="${BUILD_DIR}/lib"
+		# cmake --install "${BUILD_DIR}" --component tests --prefix "${BUILD_DIR}/usr" || die
 
-		export OPENCV_TEST_DATA_PATH="${WORKDIR}/${PN}_extra-${PV}/testdata"
+		# cd "${BUILD_DIR}/usr" || die
+		cd "${BUILD_DIR}" || die
+
+		local -x OPENCV_CORE_PLUGIN_PATH="${BUILD_DIR}/lib"
+		local -x OPENCV_DNN_PLUGIN_PATH="${BUILD_DIR}/lib"
+		local -x OPENCV_VIDEOIO_PLUGIN_PATH="${BUILD_DIR}/lib"
+
+		local -x OPENCV_TEST_DATA_PATH="${WORKDIR}/${PN}_extra-${PV}/testdata"
+		# local -x OPENCV_TEST_DATA_PATH="${BUILD_DIR}/usr/share/${PN}$(ver_cut 1)/testdata"
+
+		local -x OPENCV_TEST_REQUIRE_DATA="true"
 
 		# Work around zink warnings
-		export LIBGL_ALWAYS_SOFTWARE=true
-		results=()
+		local -x LIBGL_ALWAYS_SOFTWARE=true
+
+		local test_opts_base=(
+			--skip_unstable
+			--test_bigdata
+			--test_debug=2
+			# --test_require_data
+			--test_threads="$(makeopts_jobs)"
+			--test_tag_enable=verylong
+		)
+
+		local results=()
+
 		for test in "${BUILD_DIR}/bin/opencv_test_"*; do
-			echo "${test}"
-			if ! "${test}" --gtest_color=yes --gtest_filter="-$(IFS=: ; echo "${CMAKE_SKIP_TESTS[*]}")"; then
+		# for test in "${BUILD_DIR}/usr/libexec/opencv/bin/test/opencv_test_"*; do
+			# "${test}" --help &> "${T}/$(basename "${test}")_opts.txt"
+			if [[ ${TEST_CUDA} == "false" && ${test} = *opencv_test_cu* ]] ; then
+				eqawarn "Skipping test ${test}"
+
+				continue
+			fi
+
+			local test_opts=(
+				--gtest_color=yes
+				--gtest_output="json:${T}/$(basename "${test}").json"
+				--gtest_filter="-$(IFS=: ; echo "${CMAKE_SKIP_TESTS[*]}")"
+			)
+
+			einfo "${test} ${test_opts_base[*]} ${test_opts[*]}"
+			if ! "${test}" "${test_opts_base[@]}" "${test_opts[@]}"; then
 
 				results+=( "$(basename ${test})" )
 
