@@ -177,7 +177,7 @@ COMMON_DEPEND="
 	app-arch/bzip2[${MULTILIB_USEDEP}]
 	dev-libs/protobuf:=[${MULTILIB_USEDEP}]
 	sys-libs/zlib[${MULTILIB_USEDEP}]
-	cuda? ( <dev-util/nvidia-cuda-toolkit-12.4:0= )
+	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	cudnn? ( dev-libs/cudnn:= )
 	contribdnn? ( dev-libs/flatbuffers:= )
 	contribhdf? ( sci-libs/hdf5:= )
@@ -280,7 +280,7 @@ unset COMMON_DEPEND
 
 BDEPEND="
 	virtual/pkgconfig
-	cuda? ( dev-util/nvidia-cuda-toolkit:0= )
+	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	doc? (
 		app-text/doxygen[dot]
 		python? (
@@ -301,10 +301,23 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.9.0-drop-python2-detection.patch"
 	"${FILESDIR}/${PN}-4.9.0-ade-0.1.2d.tar.gz.patch"
 	"${FILESDIR}/${PN}-4.9.0-cmake-cleanup.patch"
+	"${FILESDIR}/${PN}-4.9.0-tbb-detection.patch"
+
+	"${FILESDIR}/${PN}-4.9.0-25412.patch" # 25412
+	"${FILESDIR}/${PN}-4.9.0-25658.patch" # 25658
+	"${FILESDIR}/${PN}-4.9.0-25686.patch" # 25686
+
+	"${FILESDIR}/${PN}-4.10.0-cudnn-9.patch" # 25841
+	"${FILESDIR}/${PN}-4.10.0-cuda-fp16.patch" # 25880
 
 	# TODO applied in src_prepare
 	# "${FILESDIR}/${PN}_contrib-${PV}-rgbd.patch"
 	# "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
+	# "${FILESDIR}/${PN}_contrib-4.9.0-3607.patch" # 3607
+	# "${FILESDIR}/${PN}_contrib-4.9.0-cuda-12.4.patch" # 3726
+	# "${FILESDIR}/${PN}_contrib-4.9.0-3742.patch" # 3742
+	# "${FILESDIR}/${PN}_contrib-4.9.0-3744.patch" # 3744
+	# "${FILESDIR}/${PN}_contrib-4.9.0-CUDA-12.6-tuple_size.patch" # 3785
 )
 
 cuda_get_host_compiler() {
@@ -326,7 +339,8 @@ cuda_get_host_compiler() {
 
 	local compiler compiler_type compiler_version
 	local package package_version
-	local NVCC_CCBIN NVCC_CCBIN_default
+	local -x NVCC_CCBIN
+	local NVCC_CCBIN_default
 
 	compiler_type="$(tc-get-compiler-type)"
 	compiler_version="$("${compiler_type}-major-version")"
@@ -407,16 +421,20 @@ src_prepare() {
 	# remove bundled stuff
 	rm -r 3rdparty || die "Removing 3rd party components failed"
 	sed -e '/add_subdirectory(.*3rdparty.*)/ d' \
-		-i CMakeLists.txt cmake/*cmake || die
+	    -i CMakeLists.txt cmake/*cmake || die
 
 	if use contrib; then
 		cd "${WORKDIR}/${PN}_contrib-${PV}" || die
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
-		if has_version ">=dev-util/nvidia-cuda-toolkit-12.4" && use cuda; then
-			# TODO https://github.com/NVIDIA/cccl/pull/1522
-			eapply "${FILESDIR}/${PN}_contrib-4.9.0-cuda-12.4.patch"
+		if ver_test "$(nvcc --version | tail -n 1 | cut -d '_' -f 2- | cut -d '.' -f 1-2)" -ge 12.4; then
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-3607.patch" # 3607
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-cuda-12.4.patch" # 3726
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-3742.patch" # 3742
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-3744.patch" # 3744
+			eapply "${FILESDIR}/${PN}_contrib-4.9.0-CUDA-12.6-tuple_size.patch" # 3785
 		fi
+
 		cd "${S}" || die
 
 		! use contribcvv && { rm -R "${WORKDIR}/${PN}_contrib-${PV}/modules/cvv" || die; }
@@ -588,7 +606,7 @@ multilib_src_configure() {
 		# NOTE set this via MYCMAKEARGS if needed
 		-DWITH_NVCUVID="no" # TODO needs NVIDIA Video Codec SDK
 		-DWITH_NVCUVENC="no" # TODO needs NVIDIA Video Codec SDK
-		-DCUDA_NPP_LIBRARY_ROOT_DIR="$(usex cuda "${EPREFIX}/opt/cuda" "")"
+		-DCUDA_NPP_LIBRARY_ROOT_DIR="$(usex cuda "${CUDA_PATH:=${EPREFIX}/opt/cuda}" "")"
 	# ===================================================
 	# OpenCV build components
 	# ===================================================

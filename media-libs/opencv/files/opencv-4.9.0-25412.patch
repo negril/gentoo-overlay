@@ -1,0 +1,882 @@
+https://github.com/opencv/opencv/issues/24983
+https://github.com/opencv/opencv/pull/25412
+
+From fb10c9bbf0e73bedd2b9f6f85e538a962341c217 Mon Sep 17 00:00:00 2001
+From: Danial Javady <danialjavady96@gmail.com>
+Date: Sun, 14 Apr 2024 17:03:23 -0400
+Subject: [PATCH 01/10] Refactor code to use the updated APIs and remove use of
+ all removed APIs from cudnn 9. Initial work/foundation
+
+Formatting fix.
+
+format.
+--- a/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
+@@ -119,12 +119,17 @@ class RNNDescriptor
+ 
+         try
+         {
+-            CUDA4DNN_CHECK_CUDNN(cudnnSetRNNDescriptor_v6(
+-                handle.get(), descriptor, hidden_size, num_layers, dropoutDesc.get(),
+-                CUDNN_LINEAR_INPUT, bidirectional ? CUDNN_BIDIRECTIONAL : CUDNN_UNIDIRECTIONAL,
+-                rnn_mode,
+-                algo, //CUDNN_RNN_ALGO_STANDARD,
+-                detail::get_data_type<T>()));
++            CUDA4DNN_CHECK_CUDNN(cudnnSetRNNDescriptor_v8(
++           descriptor, algo, rnn_mode,
++          CUDNN_RNN_NO_BIAS, // Where can this come from?
++          bidirectional ? CUDNN_BIDIRECTIONAL : CUDNN_UNIDIRECTIONAL,
++          CUDNN_LINEAR_INPUT, detail::get_data_type<T>(),
++          detail::get_data_type<T>(), // CUDNN_RNN_ALGO_STANDARD,
++          CUDNN_DEFAULT_MATH,         // default precision
++          input_size, hidden_size,
++          0, // where can this come from?
++          num_layers, dropoutDesc.get(),
++          0)); // What other flags do we might want here?
+         }
+         catch (...)
+         {
+@@ -158,36 +163,23 @@ class RNNDescriptor
+     cudnnRNNAlgo_t algo{CUDNN_RNN_ALGO_STANDARD};
+ };
+ 
+-template<class T>
+-size_t getRNNWorkspaceSize(const Handle &handle, const RNNDescriptor<T> &rnnDesc,
+-                           const int seqLength, const TensorDescriptorsArray<T> &inputDesc)
+-{
+-    size_t workSize;
+-    CUDA4DNN_CHECK_CUDNN(cudnnGetRNNWorkspaceSize(handle.get(), rnnDesc.get(), seqLength,
+-                                                  inputDesc.get().data(), &workSize));
+-    return workSize;
+-}
+-
+-template<class T>
++template <class T>
+ void LSTMForward(const Handle &handle, const RNNDescriptor<T> &rnnDesc,
+-                 const FilterDescriptor<T> &filterDesc, DevicePtr<const T> filterPtr,
+-                 const TensorDescriptorsArray<T> &inputDesc, DevicePtr<const T> inputPtr,
+-                 const TensorDescriptor<T> &initialHDesc, DevicePtr<const T> initialH,
+-                 const TensorDescriptor<T> &initialCDesc, DevicePtr<const T> initialC,
+-                 const int seqLength, const TensorDescriptorsArray<T> &outputDesc,
+-                 DevicePtr<T> yOutputPtr, DevicePtr<T> ycOutputPtr, WorkspaceInstance workspace)
+-{
+-    CV_Assert(handle);
+-
+-    CUDA4DNN_CHECK_CUDNN(cudnnRNNForwardInference(handle.get(), rnnDesc.get(), seqLength,
+-                                                  inputDesc.get().data(), inputPtr.get(), // input sequence
+-                                                  initialHDesc.get(), initialH.get(),
+-                                                  initialCDesc.get(), initialC.get(), // hidden
+-                                                  filterDesc.get(), filterPtr.get(), // weights
+-                                                  outputDesc.get().data(), yOutputPtr.get(), // output
+-                                                  nullptr, nullptr,
+-                                                  initialCDesc.get(), ycOutputPtr.get(),
+-                                                  static_cast<void*>(workspace.get()), workspace.size_in_bytes()));
++                 cudnnRNNDataDescriptor_t xDesc, DevicePtr<const T> x,
++                 cudnnRNNDataDescriptor_t yDesc, DevicePtr<T> y,
++                 cudnnTensorDescriptor_t hDesc, DevicePtr<const T> hx,
++                 DevicePtr<T> hy, cudnnTensorDescriptor_t cDesc,
++                 DevicePtr<const T> cx, DevicePtr<T> cy, size_t weightSpaceSize,
++                 DevicePtr<const T> weightSpace, WorkspaceInstance workspace,
++                 size_t reserveSpaceSize, DevicePtr<T> reserveSpace) {
++  CV_Assert(handle);
++  CUDA4DNN_CHECK_CUDNN(cudnnRNNForward(
++      handle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
++      nullptr, // docs say use this as null on >= 8.9.7
++      xDesc, x.get(), yDesc, y.get(), hDesc, hx.get(), hy.get(), cDesc,
++      cx.get(), cy.get(), weightSpaceSize, weightSpace.get(),
++      workspace.size_in_bytes(), workspace.get().get(), reserveSpaceSize,
++      reserveSpace.get()));
+ }
+ 
+ }}}}} /* namespace cv::dnn::cuda4dnn::csl::cudnn */
+--- a/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
+@@ -504,8 +504,6 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         using TensorDescriptor = cudnn::TensorDescriptor<T>;
+         using DropoutDescriptor = cudnn::DropoutDescriptor;
+         using RNNDescriptor = cudnn::RNNDescriptor<T>;
+-        using FilterDescriptor = cudnn::FilterDescriptor<T>;
+-        using TensorDescriptorsArray = cudnn::TensorDescriptorsArray<T>;
+ 
+     public:
+         using RNNMode = typename RNNDescriptor::RNNMode;
+@@ -528,14 +526,24 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         LSTM() = default;
+         LSTM(const LSTM&) = delete;
+         LSTM(LSTM&&) = default;
+-        LSTM(cudnn::Handle handle, const params_type& params)
+-            : cudnnHandle(std::move(handle)), seqLength{params.seqLength},
+-              inputDesc(seqLength, {params.miniBatch, params.inputSize, 1}),
+-              outputDesc(seqLength,
+-                         {params.miniBatch,
+-                          params.bidirectional ? params.hiddenSize * 2 : params.hiddenSize,
+-                          1})
+-        {
++        LSTM(cudnn::Handle handle, const params_type &params)
++            : cudnnHandle(std::move(handle)), seqLength{params.seqLength} {
++          int value = 1;
++          const int *seqLenArr =
++              &value; // following the docs this value is generally 1
++          cudnnCreateRNNDataDescriptor(&xDesc);
++          cudnnSetRNNDataDescriptor(xDesc, cudnn::detail::get_data_type<T>(),
++                                    CUDNN_RNN_DATA_LAYOUT_SEQ_MAJOR_PACKED, seqLength,
++                                    params.miniBatch, params.inputSize, seqLenArr,
++                                    nullptr);
++          cudnnCreateRNNDataDescriptor(&cyDesc);
++          cudnnSetRNNDataDescriptor(
++              cyDesc, cudnn::detail::get_data_type<T>(),
++              CUDNN_RNN_DATA_LAYOUT_SEQ_MAJOR_PACKED, // Is this correct?
++              seqLength, params.miniBatch,
++              params.bidirectional ? params.hiddenSize * 2 : params.hiddenSize,
++              seqLenArr,
++              nullptr); // Should we fill out padding here?
+             dropoutDesc = DropoutDescriptor(cudnnHandle, params.dropout);
+             filterDesc = FilterDescriptor(params.weights_shape);
+             rnnDesc = RNNDescriptor(cudnnHandle, params.type, params.hiddenSize,
+@@ -550,7 +558,11 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+             // Get amount of work space required to execute the RNN described by rnnDesc
+             // with input dimensions defined by inputDesc
+             csl::WorkspaceBuilder builder;
+-            builder.require(cudnn::getRNNWorkspaceSize<T>(cudnnHandle, rnnDesc, seqLength, inputDesc));
++            size_t workSpaceSize;
++            CUDA4DNN_CHECK_CUDNN(cudnnGetRNNTempSpaceSizes(
++                handle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE, xDesc,
++                &workSpaceSize, &reserveSpaceSize));
++            builder.require(workSpaceSize);
+             scratch_mem_in_bytes = builder.required_workspace_size();
+         }
+ 
+@@ -560,9 +572,20 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         void inference(TensorView<T> input, TensorSpan<T> y_output, TensorSpan<T> yc_output, TensorView<T> filters,
+                        TensorView<T> h0, TensorView<T> c0, WorkspaceInstance workspace)
+         {
+-            cudnn::LSTMForward<T>(cudnnHandle, rnnDesc, filterDesc, filters.get(), inputDesc,
+-                                  input.get(), h0TensorDesc, h0.get(), c0TensorDesc, c0.get(),
+-                                  seqLength, outputDesc, y_output.get(), yc_output.get(), workspace);
++          size_t weightSpaceSize =
++              sizeof(typename TensorView<T>::value_type) * filters.size();
++
++          cudnn::LSTMForward<T>(cudnnHandle, rnnDesc, xDesc, input.get(), cyDesc,
++                                y_output.get(), h0TensorDesc.get(), h0.get(),
++                                DevicePtr<T>(nullptr), // hy, final state
++                                c0TensorDesc.get(),    // maps to cxDesc
++                                c0.get(),              // maps to cx
++                                yc_output.get(),       // maps to cy
++                                weightSpaceSize,
++                                filters.get(),          // maps to weightSpace
++                                workspace,              // workSpaceSize and workSpace
++                                reserveSpaceSize,       // reserveSpaceSize
++                                DevicePtr<T>(nullptr)); // reserveSpace
+         }
+ 
+         std::size_t get_workspace_memory_in_bytes() const noexcept { return scratch_mem_in_bytes; }
+@@ -575,13 +598,15 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         RNNDescriptor rnnDesc;
+         DropoutDescriptor dropoutDesc;
+ 
+-        FilterDescriptor filterDesc;
++        size_t weightSpaceSize, reserveSpaceSize;
++
+         TensorDescriptor h0TensorDesc, c0TensorDesc;
+ 
+-        TensorDescriptorsArray inputDesc;
+-        TensorDescriptorsArray outputDesc;
++        cudnnRNNDataDescriptor_t xDesc;
++        cudnnRNNDataDescriptor_t
++            cyDesc; // represents cyDesc or cDesc(now reps both final and beginning)
+     };
+ 
+ }}}} /* namespace cv::dnn::cuda4dnn::csl */
+ 
+-#endif /* OPENCV_DNN_SRC_CUDA4DNN_CSL_TENSOR_OPS_HPP */
++#endif /* OPENCV_DNN_SRC_CUDA4DNN_CSL_TENSOR_OPS_HPP */
+\ No newline at end of file
+--- a/modules/dnn/src/cuda4dnn/primitives/recurrent_cells.hpp
++++ b/modules/dnn/src/cuda4dnn/primitives/recurrent_cells.hpp
+@@ -77,6 +77,7 @@ class LSTMOp final : public CUDABackendNode
+ 
+         csl::WorkspaceAllocator allocator(workspace);
+         lstm.inference(input, y_output, yc_output, filtersTensor, h0Tensor, c0Tensor, allocator.get_instance());
++        // might need to add reserveSpace here.
+     }
+ 
+     std::size_t get_workspace_memory_in_bytes() const noexcept override
+
+From 8eb703b83d09303f95ab53326646522491f6f78f Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Fri, 17 May 2024 15:43:52 +0300
+Subject: [PATCH 02/10] Fixed build issue with cuDNN 9.1.
+
+--- a/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
+@@ -97,7 +97,7 @@ class RNNDescriptor
+ 
+     /**
+     */
+-    RNNDescriptor(const Handle &handle, RNNMode mode, int hidden_size, int num_layers,
++    RNNDescriptor(const Handle &handle, RNNMode mode, int input_size, int hidden_size, int num_layers,
+                   bool bidirectional, const DropoutDescriptor &dropoutDesc)
+     {
+         CUDA4DNN_CHECK_CUDNN(cudnnCreateRNNDescriptor(&descriptor));
+@@ -120,16 +120,16 @@ class RNNDescriptor
+         try
+         {
+             CUDA4DNN_CHECK_CUDNN(cudnnSetRNNDescriptor_v8(
+-           descriptor, algo, rnn_mode,
+-          CUDNN_RNN_NO_BIAS, // Where can this come from?
+-          bidirectional ? CUDNN_BIDIRECTIONAL : CUDNN_UNIDIRECTIONAL,
+-          CUDNN_LINEAR_INPUT, detail::get_data_type<T>(),
+-          detail::get_data_type<T>(), // CUDNN_RNN_ALGO_STANDARD,
+-          CUDNN_DEFAULT_MATH,         // default precision
+-          input_size, hidden_size,
+-          0, // where can this come from?
+-          num_layers, dropoutDesc.get(),
+-          0)); // What other flags do we might want here?
++                                    descriptor, algo, rnn_mode,
++                                    CUDNN_RNN_NO_BIAS, // Where can this come from?
++                                    bidirectional ? CUDNN_BIDIRECTIONAL : CUDNN_UNIDIRECTIONAL,
++                                    CUDNN_LINEAR_INPUT, detail::get_data_type<T>(),
++                                    detail::get_data_type<T>(), // CUDNN_RNN_ALGO_STANDARD,
++                                    CUDNN_DEFAULT_MATH,         // default precision
++                                    input_size, hidden_size,
++                                    0, // where can this come from?
++                                    num_layers, dropoutDesc.get(),
++                                    0)); // What other flags do we might want here?
+         }
+         catch (...)
+         {
+@@ -184,4 +184,4 @@ void LSTMForward(const Handle &handle, const RNNDescriptor<T> &rnnDesc,
+ 
+ }}}}} /* namespace cv::dnn::cuda4dnn::csl::cudnn */
+ 
+-#endif //OPENCV_DNN_CUDA4DNN_CSL_CUDNN_RECURRENT_HPP
+\ No newline at end of file
++#endif //OPENCV_DNN_CUDA4DNN_CSL_CUDNN_RECURRENT_HPP
+--- a/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
+@@ -545,8 +545,8 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+               seqLenArr,
+               nullptr); // Should we fill out padding here?
+             dropoutDesc = DropoutDescriptor(cudnnHandle, params.dropout);
+-            filterDesc = FilterDescriptor(params.weights_shape);
+-            rnnDesc = RNNDescriptor(cudnnHandle, params.type, params.hiddenSize,
++//             filterDesc = FilterDescriptor(params.weights_shape);
++            rnnDesc = RNNDescriptor(cudnnHandle, params.type, params.inputSize, params.hiddenSize,
+                                     params.numLayers, params.bidirectional, dropoutDesc);
+ 
+             int num_direction = params.bidirectional ? 2 : 1;
+@@ -609,4 +609,4 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+ 
+ }}}} /* namespace cv::dnn::cuda4dnn::csl */
+ 
+-#endif /* OPENCV_DNN_SRC_CUDA4DNN_CSL_TENSOR_OPS_HPP */
+\ No newline at end of file
++#endif /* OPENCV_DNN_SRC_CUDA4DNN_CSL_TENSOR_OPS_HPP */
+
+From b1304992e1aa672c97bbdc78b23615ae85f4ba0e Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Fri, 17 May 2024 17:00:25 +0300
+Subject: [PATCH 03/10] Added CuDNN version check for cudnnSetRNNDescriptor_v8
+
+--- a/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
+@@ -119,6 +119,7 @@ class RNNDescriptor
+ 
+         try
+         {
++#if CUDNN_MAJOR >= 9
+             CUDA4DNN_CHECK_CUDNN(cudnnSetRNNDescriptor_v8(
+                                     descriptor, algo, rnn_mode,
+                                     CUDNN_RNN_NO_BIAS, // Where can this come from?
+@@ -130,6 +131,14 @@ class RNNDescriptor
+                                     0, // where can this come from?
+                                     num_layers, dropoutDesc.get(),
+                                     0)); // What other flags do we might want here?
++#else
++            CUDA4DNN_CHECK_CUDNN(cudnnSetRNNDescriptor_v6(
++                                    handle.get(), descriptor, hidden_size, num_layers, dropoutDesc.get(),
++                                    CUDNN_LINEAR_INPUT, bidirectional ? CUDNN_BIDIRECTIONAL : CUDNN_UNIDIRECTIONAL,
++                                    rnn_mode,
++                                    algo, //CUDNN_RNN_ALGO_STANDARD,
++                                    detail::get_data_type<T>()));
++#endif
+         }
+         catch (...)
+         {
+
+From 5b7aca71f946c936e1dbe0249e33aef4d078d579 Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Fri, 17 May 2024 17:28:45 +0300
+Subject: [PATCH 04/10] Fixed code formatting.
+
+--- a/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
+@@ -526,42 +526,42 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         LSTM() = default;
+         LSTM(const LSTM&) = delete;
+         LSTM(LSTM&&) = default;
+-        LSTM(cudnn::Handle handle, const params_type &params)
+-            : cudnnHandle(std::move(handle)), seqLength{params.seqLength} {
+-          int value = 1;
+-          const int *seqLenArr =
+-              &value; // following the docs this value is generally 1
+-          cudnnCreateRNNDataDescriptor(&xDesc);
+-          cudnnSetRNNDataDescriptor(xDesc, cudnn::detail::get_data_type<T>(),
++        LSTM(cudnn::Handle handle, const params_type &params):
++            cudnnHandle(std::move(handle)),
++            seqLength(params.seqLength)
++        {
++            int value = 1;
++            const int *seqLenArr = &value; // following the docs this value is generally 1
++            cudnnCreateRNNDataDescriptor(&xDesc);
++            cudnnSetRNNDataDescriptor(xDesc, cudnn::detail::get_data_type<T>(),
+                                     CUDNN_RNN_DATA_LAYOUT_SEQ_MAJOR_PACKED, seqLength,
+                                     params.miniBatch, params.inputSize, seqLenArr,
+                                     nullptr);
+-          cudnnCreateRNNDataDescriptor(&cyDesc);
+-          cudnnSetRNNDataDescriptor(
+-              cyDesc, cudnn::detail::get_data_type<T>(),
+-              CUDNN_RNN_DATA_LAYOUT_SEQ_MAJOR_PACKED, // Is this correct?
+-              seqLength, params.miniBatch,
+-              params.bidirectional ? params.hiddenSize * 2 : params.hiddenSize,
+-              seqLenArr,
+-              nullptr); // Should we fill out padding here?
++            cudnnCreateRNNDataDescriptor(&cyDesc);
++            cudnnSetRNNDataDescriptor(
++                cyDesc, cudnn::detail::get_data_type<T>(),
++                CUDNN_RNN_DATA_LAYOUT_SEQ_MAJOR_PACKED, // Is this correct?
++                seqLength, params.miniBatch,
++                params.bidirectional ? params.hiddenSize * 2 : params.hiddenSize,
++                seqLenArr,
++                nullptr); // Should we fill out padding here?
++
+             dropoutDesc = DropoutDescriptor(cudnnHandle, params.dropout);
+-//             filterDesc = FilterDescriptor(params.weights_shape);
+             rnnDesc = RNNDescriptor(cudnnHandle, params.type, params.inputSize, params.hiddenSize,
+                                     params.numLayers, params.bidirectional, dropoutDesc);
+ 
+             int num_direction = params.bidirectional ? 2 : 1;
+-            h0TensorDesc = TensorDescriptor(
+-                    {num_direction, params.miniBatch, params.hiddenSize});
+-            c0TensorDesc = TensorDescriptor(
+-                    {num_direction, params.miniBatch, params.hiddenSize});
++            h0TensorDesc = TensorDescriptor(num_direction, params.miniBatch, params.hiddenSize);
++            c0TensorDesc = TensorDescriptor(num_direction, params.miniBatch, params.hiddenSize);
+ 
+             // Get amount of work space required to execute the RNN described by rnnDesc
+             // with input dimensions defined by inputDesc
+             csl::WorkspaceBuilder builder;
+             size_t workSpaceSize;
+             CUDA4DNN_CHECK_CUDNN(cudnnGetRNNTempSpaceSizes(
+-                handle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE, xDesc,
+-                &workSpaceSize, &reserveSpaceSize));
++                                    handle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
++                                    xDesc, &workSpaceSize, &reserveSpaceSize));
++
+             builder.require(workSpaceSize);
+             scratch_mem_in_bytes = builder.required_workspace_size();
+         }
+@@ -572,20 +572,19 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         void inference(TensorView<T> input, TensorSpan<T> y_output, TensorSpan<T> yc_output, TensorView<T> filters,
+                        TensorView<T> h0, TensorView<T> c0, WorkspaceInstance workspace)
+         {
+-          size_t weightSpaceSize =
+-              sizeof(typename TensorView<T>::value_type) * filters.size();
+-
+-          cudnn::LSTMForward<T>(cudnnHandle, rnnDesc, xDesc, input.get(), cyDesc,
+-                                y_output.get(), h0TensorDesc.get(), h0.get(),
+-                                DevicePtr<T>(nullptr), // hy, final state
+-                                c0TensorDesc.get(),    // maps to cxDesc
+-                                c0.get(),              // maps to cx
+-                                yc_output.get(),       // maps to cy
+-                                weightSpaceSize,
+-                                filters.get(),          // maps to weightSpace
+-                                workspace,              // workSpaceSize and workSpace
+-                                reserveSpaceSize,       // reserveSpaceSize
+-                                DevicePtr<T>(nullptr)); // reserveSpace
++            size_t weightSpaceSize = sizeof(typename TensorView<T>::value_type) * filters.size();
++
++            cudnn::LSTMForward<T>(cudnnHandle, rnnDesc, xDesc, input.get(), cyDesc,
++                                  y_output.get(), h0TensorDesc.get(), h0.get(),
++                                  DevicePtr<T>(nullptr), // hy, final state
++                                  c0TensorDesc.get(),    // maps to cxDesc
++                                  c0.get(),              // maps to cx
++                                  yc_output.get(),       // maps to cy
++                                  weightSpaceSize,
++                                  filters.get(),          // maps to weightSpace
++                                  workspace,              // workSpaceSize and workSpace
++                                  reserveSpaceSize,       // reserveSpaceSize
++                                  DevicePtr<T>(nullptr)); // reserveSpace
+         }
+ 
+         std::size_t get_workspace_memory_in_bytes() const noexcept { return scratch_mem_in_bytes; }
+@@ -603,8 +602,7 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         TensorDescriptor h0TensorDesc, c0TensorDesc;
+ 
+         cudnnRNNDataDescriptor_t xDesc;
+-        cudnnRNNDataDescriptor_t
+-            cyDesc; // represents cyDesc or cDesc(now reps both final and beginning)
++        cudnnRNNDataDescriptor_t cyDesc; // represents cyDesc or cDesc(now reps both final and beginning)
+     };
+ 
+ }}}} /* namespace cv::dnn::cuda4dnn::csl */
+
+From b2fda11d5fb95d8a36a91fe507ae6144e68ea45f Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Mon, 20 May 2024 11:58:19 +0300
+Subject: [PATCH 05/10] Fixed sigsegv in test devSeqLengths
+ Test_Model.TextRecognition/0
+
+--- a/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
+@@ -181,14 +181,15 @@ void LSTMForward(const Handle &handle, const RNNDescriptor<T> &rnnDesc,
+                  DevicePtr<const T> cx, DevicePtr<T> cy, size_t weightSpaceSize,
+                  DevicePtr<const T> weightSpace, WorkspaceInstance workspace,
+                  size_t reserveSpaceSize, DevicePtr<T> reserveSpace) {
+-  CV_Assert(handle);
+-  CUDA4DNN_CHECK_CUDNN(cudnnRNNForward(
+-      handle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
+-      nullptr, // docs say use this as null on >= 8.9.7
+-      xDesc, x.get(), yDesc, y.get(), hDesc, hx.get(), hy.get(), cDesc,
+-      cx.get(), cy.get(), weightSpaceSize, weightSpace.get(),
+-      workspace.size_in_bytes(), workspace.get().get(), reserveSpaceSize,
+-      reserveSpace.get()));
++    CV_Assert(handle);
++
++    CUDA4DNN_CHECK_CUDNN(cudnnRNNForward(
++        handle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
++        nullptr, // docs say use this as null on >= 8.9.1
++        xDesc, x.get(), yDesc, y.get(), hDesc, hx.get(), hy.get(), cDesc,
++        cx.get(), cy.get(), weightSpaceSize, weightSpace.get(),
++        workspace.size_in_bytes(), workspace.get().get(), reserveSpaceSize,
++        reserveSpace.get()));
+ }
+ 
+ }}}}} /* namespace cv::dnn::cuda4dnn::csl::cudnn */
+--- a/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
+@@ -559,7 +559,7 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+             csl::WorkspaceBuilder builder;
+             size_t workSpaceSize;
+             CUDA4DNN_CHECK_CUDNN(cudnnGetRNNTempSpaceSizes(
+-                                    handle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
++                                    cudnnHandle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
+                                     xDesc, &workSpaceSize, &reserveSpaceSize));
+ 
+             builder.require(workSpaceSize);
+--- a/modules/dnn/src/cuda4dnn/primitives/recurrent_cells.hpp
++++ b/modules/dnn/src/cuda4dnn/primitives/recurrent_cells.hpp
+@@ -95,4 +95,4 @@ class LSTMOp final : public CUDABackendNode
+ 
+ }}} /* namespace cv::dnn::cuda4dnn */
+ 
+-#endif //OPENCV_DNN_SRC_CUDA4DNN_PRIMITIVES_RECURRENT_CELLS_HPP
+\ No newline at end of file
++#endif //OPENCV_DNN_SRC_CUDA4DNN_PRIMITIVES_RECURRENT_CELLS_HPP
+
+From e242ecb3d119a55f440171b3319ec8d954d8dd2a Mon Sep 17 00:00:00 2001
+From: Alexander Smorkalov <alexander.smorkalov@xperience.ai>
+Date: Tue, 21 May 2024 11:17:21 +0300
+Subject: [PATCH 06/10] Handle reserved space and workspace for cudnn lstm.
+
+--- a/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
+@@ -176,20 +176,26 @@ template <class T>
+ void LSTMForward(const Handle &handle, const RNNDescriptor<T> &rnnDesc,
+                  cudnnRNNDataDescriptor_t xDesc, DevicePtr<const T> x,
+                  cudnnRNNDataDescriptor_t yDesc, DevicePtr<T> y,
+-                 cudnnTensorDescriptor_t hDesc, DevicePtr<const T> hx,
+-                 DevicePtr<T> hy, cudnnTensorDescriptor_t cDesc,
+-                 DevicePtr<const T> cx, DevicePtr<T> cy, size_t weightSpaceSize,
+-                 DevicePtr<const T> weightSpace, WorkspaceInstance workspace,
+-                 size_t reserveSpaceSize, DevicePtr<T> reserveSpace) {
++                 cudnnTensorDescriptor_t hDesc, DevicePtr<const T> hx, DevicePtr<T> hy,
++                 cudnnTensorDescriptor_t cDesc, DevicePtr<const T> cx, DevicePtr<T> cy,
++                 size_t weightSpaceSize, DevicePtr<const T> weightSpace,
++                 size_t cudnn_WorkspaceSize, DevicePtr<T> cudnn_Workspace,
++                 size_t reserveSpaceSize, DevicePtr<T> reserveSpace)
++{
+     CV_Assert(handle);
+ 
++    std::cout << "cudnn_WorkspaceSize: " << cudnn_WorkspaceSize << std::endl;
++    std::cout << "reserveSpaceSize: " << reserveSpaceSize << std::endl;
++
+     CUDA4DNN_CHECK_CUDNN(cudnnRNNForward(
+         handle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
+         nullptr, // docs say use this as null on >= 8.9.1
+-        xDesc, x.get(), yDesc, y.get(), hDesc, hx.get(), hy.get(), cDesc,
+-        cx.get(), cy.get(), weightSpaceSize, weightSpace.get(),
+-        workspace.size_in_bytes(), workspace.get().get(), reserveSpaceSize,
+-        reserveSpace.get()));
++        xDesc, x.get(), yDesc, y.get(),
++        hDesc, hx.get(), hy.get(),
++        cDesc, cx.get(), cy.get(),
++        weightSpaceSize, weightSpace.get(),
++        cudnn_WorkspaceSize, cudnn_Workspace.get(),
++        reserveSpaceSize, reserveSpace.get()));
+ }
+ 
+ }}}}} /* namespace cv::dnn::cuda4dnn::csl::cudnn */
+--- a/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
+@@ -556,24 +556,31 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+ 
+             // Get amount of work space required to execute the RNN described by rnnDesc
+             // with input dimensions defined by inputDesc
+-            csl::WorkspaceBuilder builder;
+-            size_t workSpaceSize;
+             CUDA4DNN_CHECK_CUDNN(cudnnGetRNNTempSpaceSizes(
+                                     cudnnHandle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
+                                     xDesc, &workSpaceSize, &reserveSpaceSize));
+ 
+-            builder.require(workSpaceSize);
++            std::cout << "workSpaceSize from cudnn: " << workSpaceSize << std::endl;
++            std::cout << "reserveSpaceSize from cudnn: " << reserveSpaceSize << std::endl;
++            csl::WorkspaceBuilder builder;
++            builder.require<T>(workSpaceSize);
++            builder.require<T>(reserveSpaceSize);
+             scratch_mem_in_bytes = builder.required_workspace_size();
++            std::cout << "scratch_mem_in_bytes: " << scratch_mem_in_bytes << std::endl;
+         }
+ 
+         LSTM& operator=(const LSTM&) = delete;
+         LSTM& operator=(LSTM&&) = default;
+ 
+         void inference(TensorView<T> input, TensorSpan<T> y_output, TensorSpan<T> yc_output, TensorView<T> filters,
+-                       TensorView<T> h0, TensorView<T> c0, WorkspaceInstance workspace)
++                       TensorView<T> h0, TensorView<T> c0, csl::Workspace& workspace)
+         {
+             size_t weightSpaceSize = sizeof(typename TensorView<T>::value_type) * filters.size();
+ 
++            auto ws_allocator = csl::WorkspaceAllocator(workspace);
++            auto workspaceData = ws_allocator.get_span<T>(workSpaceSize);
++            auto reserveSpaceData = ws_allocator.get_span<T>(reserveSpaceSize);
++
+             cudnn::LSTMForward<T>(cudnnHandle, rnnDesc, xDesc, input.get(), cyDesc,
+                                   y_output.get(), h0TensorDesc.get(), h0.get(),
+                                   DevicePtr<T>(nullptr), // hy, final state
+@@ -582,9 +589,11 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+                                   yc_output.get(),       // maps to cy
+                                   weightSpaceSize,
+                                   filters.get(),          // maps to weightSpace
+-                                  workspace,              // workSpaceSize and workSpace
++                                  workSpaceSize,
++                                  workspaceData.data(),   // workSpaceSize and workSpace
+                                   reserveSpaceSize,       // reserveSpaceSize
+-                                  DevicePtr<T>(nullptr)); // reserveSpace
++                                  reserveSpaceData.data()
++                                 );
+         }
+ 
+         std::size_t get_workspace_memory_in_bytes() const noexcept { return scratch_mem_in_bytes; }
+@@ -597,7 +606,7 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         RNNDescriptor rnnDesc;
+         DropoutDescriptor dropoutDesc;
+ 
+-        size_t weightSpaceSize, reserveSpaceSize;
++        size_t weightSpaceSize, workSpaceSize, reserveSpaceSize;
+ 
+         TensorDescriptor h0TensorDesc, c0TensorDesc;
+ 
+--- a/modules/dnn/src/cuda4dnn/primitives/recurrent_cells.hpp
++++ b/modules/dnn/src/cuda4dnn/primitives/recurrent_cells.hpp
+@@ -55,9 +55,6 @@ class LSTMOp final : public CUDABackendNode
+ 
+         c0Tensor = csl::makeTensorHeader<T>(c0);
+         csl::copyMatToTensor<T>(c0, c0Tensor, stream);
+-
+-        csl::WorkspaceBuilder builder;
+-        builder.require<T>(lstm.get_workspace_memory_in_bytes());
+     }
+ 
+     void forward(const std::vector<cv::Ptr<BackendWrapper>>& inputs,
+@@ -75,8 +72,7 @@ class LSTMOp final : public CUDABackendNode
+         Ptr<wrapper_type> yc_output_wrapper = outputs.size() == 2 ? outputs[1].dynamicCast<wrapper_type>() : Ptr<wrapper_type>();
+         csl::TensorSpan<T> yc_output = yc_output_wrapper.empty() ? csl::TensorSpan<T>() : yc_output_wrapper->getSpan();
+ 
+-        csl::WorkspaceAllocator allocator(workspace);
+-        lstm.inference(input, y_output, yc_output, filtersTensor, h0Tensor, c0Tensor, allocator.get_instance());
++        lstm.inference(input, y_output, yc_output, filtersTensor, h0Tensor, c0Tensor, workspace);
+         // might need to add reserveSpace here.
+     }
+ 
+
+From 9aefd48d1f7adaccea8c341acabca62004445276 Mon Sep 17 00:00:00 2001
+From: Alexander Lyulkov <alexander.lyulkov@opencv.ai>
+Date: Mon, 27 May 2024 11:20:49 +0300
+Subject: [PATCH 07/10] Fixed LSTM in cudnn9, added cudnn6|7|8 and cudnn9
+ branches for LSTM
+
+--- a/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/cudnn/recurrent.hpp
+@@ -121,22 +121,31 @@ class RNNDescriptor
+         {
+ #if CUDNN_MAJOR >= 9
+             CUDA4DNN_CHECK_CUDNN(cudnnSetRNNDescriptor_v8(
+-                                    descriptor, algo, rnn_mode,
+-                                    CUDNN_RNN_NO_BIAS, // Where can this come from?
++                                    descriptor,
++                                    algo,
++                                    rnn_mode,
++                                    CUDNN_RNN_DOUBLE_BIAS,
+                                     bidirectional ? CUDNN_BIDIRECTIONAL : CUDNN_UNIDIRECTIONAL,
+                                     CUDNN_LINEAR_INPUT, detail::get_data_type<T>(),
+-                                    detail::get_data_type<T>(), // CUDNN_RNN_ALGO_STANDARD,
+-                                    CUDNN_DEFAULT_MATH,         // default precision
+-                                    input_size, hidden_size,
+-                                    0, // where can this come from?
+-                                    num_layers, dropoutDesc.get(),
++                                    detail::get_data_type<T>(),
++                                    detail::get_data_type<T>() == CUDNN_DATA_HALF ? CUDNN_TENSOR_OP_MATH : CUDNN_DEFAULT_MATH,
++                                    input_size,
++                                    hidden_size,
++                                    hidden_size,
++                                    num_layers,
++                                    dropoutDesc.get(),
+                                     0)); // What other flags do we might want here?
+ #else
+             CUDA4DNN_CHECK_CUDNN(cudnnSetRNNDescriptor_v6(
+-                                    handle.get(), descriptor, hidden_size, num_layers, dropoutDesc.get(),
+-                                    CUDNN_LINEAR_INPUT, bidirectional ? CUDNN_BIDIRECTIONAL : CUDNN_UNIDIRECTIONAL,
++                                    handle.get(),
++                                    descriptor,
++                                    hidden_size,
++                                    num_layers,
++                                    dropoutDesc.get(),
++                                    CUDNN_LINEAR_INPUT,
++                                    bidirectional ? CUDNN_BIDIRECTIONAL : CUDNN_UNIDIRECTIONAL,
+                                     rnn_mode,
+-                                    algo, //CUDNN_RNN_ALGO_STANDARD,
++                                    algo,
+                                     detail::get_data_type<T>()));
+ #endif
+         }
+@@ -172,6 +181,7 @@ class RNNDescriptor
+     cudnnRNNAlgo_t algo{CUDNN_RNN_ALGO_STANDARD};
+ };
+ 
++#if CUDNN_MAJOR >= 9
+ template <class T>
+ void LSTMForward(const Handle &handle, const RNNDescriptor<T> &rnnDesc,
+                  cudnnRNNDataDescriptor_t xDesc, DevicePtr<const T> x,
+@@ -198,6 +208,30 @@ void LSTMForward(const Handle &handle, const RNNDescriptor<T> &rnnDesc,
+         reserveSpaceSize, reserveSpace.get()));
+ }
+ 
++#else
++template<class T>
++void LSTMForward(const Handle &handle, const RNNDescriptor<T> &rnnDesc,
++                 const FilterDescriptor<T> &filterDesc, DevicePtr<const T> filterPtr,
++                 const TensorDescriptorsArray<T> &inputDesc, DevicePtr<const T> inputPtr,
++                 const TensorDescriptor<T> &initialHDesc, DevicePtr<const T> initialH,
++                 const TensorDescriptor<T> &initialCDesc, DevicePtr<const T> initialC,
++                 const int seqLength, const TensorDescriptorsArray<T> &outputDesc,
++                 DevicePtr<T> yOutputPtr, DevicePtr<T> ycOutputPtr, WorkspaceInstance workspace)
++{
++    CV_Assert(handle);
++
++    CUDA4DNN_CHECK_CUDNN(cudnnRNNForwardInference(handle.get(), rnnDesc.get(), seqLength,
++                                                  inputDesc.get().data(), inputPtr.get(), // input sequence
++                                                  initialHDesc.get(), initialH.get(),
++                                                  initialCDesc.get(), initialC.get(), // hidden
++                                                  filterDesc.get(), filterPtr.get(), // weights
++                                                  outputDesc.get().data(), yOutputPtr.get(), // output
++                                                  nullptr, nullptr,
++                                                  initialCDesc.get(), ycOutputPtr.get(),
++                                                  static_cast<void*>(workspace.get()), workspace.size_in_bytes()));
++}
++#endif
++
+ }}}}} /* namespace cv::dnn::cuda4dnn::csl::cudnn */
+ 
+ #endif //OPENCV_DNN_CUDA4DNN_CSL_CUDNN_RECURRENT_HPP
+--- a/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
+@@ -504,6 +504,8 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         using TensorDescriptor = cudnn::TensorDescriptor<T>;
+         using DropoutDescriptor = cudnn::DropoutDescriptor;
+         using RNNDescriptor = cudnn::RNNDescriptor<T>;
++        using FilterDescriptor = cudnn::FilterDescriptor<T>;
++        using TensorDescriptorsArray = cudnn::TensorDescriptorsArray<T>;
+ 
+     public:
+         using RNNMode = typename RNNDescriptor::RNNMode;
+@@ -526,25 +528,25 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         LSTM() = default;
+         LSTM(const LSTM&) = delete;
+         LSTM(LSTM&&) = default;
+-        LSTM(cudnn::Handle handle, const params_type &params):
+-            cudnnHandle(std::move(handle)),
+-            seqLength(params.seqLength)
++
++#if CUDNN_MAJOR >= 9
++        LSTM(cudnn::Handle handle, const params_type &params)
++            : cudnnHandle(std::move(handle)), seqLength(params.seqLength)
+         {
+-            int value = 1;
+-            const int *seqLenArr = &value; // following the docs this value is generally 1
++            std::vector<int> seqLenArr(params.miniBatch, seqLength);
+             cudnnCreateRNNDataDescriptor(&xDesc);
+             cudnnSetRNNDataDescriptor(xDesc, cudnn::detail::get_data_type<T>(),
+                                     CUDNN_RNN_DATA_LAYOUT_SEQ_MAJOR_PACKED, seqLength,
+-                                    params.miniBatch, params.inputSize, seqLenArr,
++                                    params.miniBatch, params.inputSize, seqLenArr.data(),
+                                     nullptr);
+             cudnnCreateRNNDataDescriptor(&cyDesc);
+             cudnnSetRNNDataDescriptor(
+                 cyDesc, cudnn::detail::get_data_type<T>(),
+-                CUDNN_RNN_DATA_LAYOUT_SEQ_MAJOR_PACKED, // Is this correct?
++                CUDNN_RNN_DATA_LAYOUT_SEQ_MAJOR_PACKED,
+                 seqLength, params.miniBatch,
+                 params.bidirectional ? params.hiddenSize * 2 : params.hiddenSize,
+-                seqLenArr,
+-                nullptr); // Should we fill out padding here?
++                seqLenArr.data(),
++                nullptr);
+ 
+             dropoutDesc = DropoutDescriptor(cudnnHandle, params.dropout);
+             rnnDesc = RNNDescriptor(cudnnHandle, params.type, params.inputSize, params.hiddenSize,
+@@ -568,6 +570,36 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+             scratch_mem_in_bytes = builder.required_workspace_size();
+             std::cout << "scratch_mem_in_bytes: " << scratch_mem_in_bytes << std::endl;
+         }
++#else
++        LSTM(cudnn::Handle handle, const params_type& params)
++            : cudnnHandle(std::move(handle)), seqLength{params.seqLength},
++              inputDesc(seqLength, {params.miniBatch, params.inputSize, 1}),
++              outputDesc(seqLength,
++                         {params.miniBatch,
++                          params.bidirectional ? params.hiddenSize * 2 : params.hiddenSize,
++                          1})
++        {
++            dropoutDesc = DropoutDescriptor(cudnnHandle, params.dropout);
++            filterDesc = FilterDescriptor(params.weights_shape);
++            rnnDesc = RNNDescriptor(cudnnHandle, params.type, params.inputSize, params.hiddenSize,
++                                    params.numLayers, params.bidirectional, dropoutDesc);
++
++            int num_direction = params.bidirectional ? 2 : 1;
++            h0TensorDesc = TensorDescriptor(
++                    {num_direction, params.miniBatch, params.hiddenSize});
++            c0TensorDesc = TensorDescriptor(
++                    {num_direction, params.miniBatch, params.hiddenSize});
++
++            // Get amount of work space required to execute the RNN described by rnnDesc
++            // with input dimensions defined by inputDesc
++            csl::WorkspaceBuilder builder;
++            size_t workSize;
++            CUDA4DNN_CHECK_CUDNN(cudnnGetRNNWorkspaceSize(cudnnHandle.get(), rnnDesc.get(), seqLength,
++                                                          inputDesc.get().data(), &workSize));
++            builder.require(workSize);
++            scratch_mem_in_bytes = builder.required_workspace_size();
++        }
++#endif
+ 
+         LSTM& operator=(const LSTM&) = delete;
+         LSTM& operator=(LSTM&&) = default;
+@@ -575,12 +607,12 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         void inference(TensorView<T> input, TensorSpan<T> y_output, TensorSpan<T> yc_output, TensorView<T> filters,
+                        TensorView<T> h0, TensorView<T> c0, csl::Workspace& workspace)
+         {
+-            size_t weightSpaceSize = sizeof(typename TensorView<T>::value_type) * filters.size();
+-
+             auto ws_allocator = csl::WorkspaceAllocator(workspace);
++
++#if CUDNN_MAJOR >= 9
++            size_t weightSpaceSize = sizeof(typename TensorView<T>::value_type) * filters.size();
+             auto workspaceData = ws_allocator.get_span<T>(workSpaceSize);
+             auto reserveSpaceData = ws_allocator.get_span<T>(reserveSpaceSize);
+-
+             cudnn::LSTMForward<T>(cudnnHandle, rnnDesc, xDesc, input.get(), cyDesc,
+                                   y_output.get(), h0TensorDesc.get(), h0.get(),
+                                   DevicePtr<T>(nullptr), // hy, final state
+@@ -594,6 +626,11 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+                                   reserveSpaceSize,       // reserveSpaceSize
+                                   reserveSpaceData.data()
+                                  );
++#else
++            cudnn::LSTMForward<T>(cudnnHandle, rnnDesc, filterDesc, filters.get(), inputDesc,
++                                  input.get(), h0TensorDesc, h0.get(), c0TensorDesc, c0.get(),
++                                  seqLength, outputDesc, y_output.get(), yc_output.get(), ws_allocator.get_instance());
++#endif
+         }
+ 
+         std::size_t get_workspace_memory_in_bytes() const noexcept { return scratch_mem_in_bytes; }
+@@ -606,12 +643,17 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+         RNNDescriptor rnnDesc;
+         DropoutDescriptor dropoutDesc;
+ 
+-        size_t weightSpaceSize, workSpaceSize, reserveSpaceSize;
+-
+         TensorDescriptor h0TensorDesc, c0TensorDesc;
+ 
++#if CUDNN_MAJOR >= 9
++        size_t weightSpaceSize, workSpaceSize, reserveSpaceSize;
+         cudnnRNNDataDescriptor_t xDesc;
+         cudnnRNNDataDescriptor_t cyDesc; // represents cyDesc or cDesc(now reps both final and beginning)
++#else
++        FilterDescriptor filterDesc;
++        TensorDescriptorsArray inputDesc;
++        TensorDescriptorsArray outputDesc;
++#endif
+     };
+ 
+ }}}} /* namespace cv::dnn::cuda4dnn::csl */
+
+From 3f0cf5b0fc3c5600a336d87ac40b1693d15e9ac3 Mon Sep 17 00:00:00 2001
+From: Danial Javady <122740063+ZelboK@users.noreply.github.com>
+Date: Mon, 27 May 2024 09:02:05 -0400
+Subject: [PATCH 08/10] Update tensor_ops.hpp
+
+Remove print statements.
+--- a/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
+@@ -562,13 +562,10 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+                                     cudnnHandle.get(), rnnDesc.get(), CUDNN_FWD_MODE_INFERENCE,
+                                     xDesc, &workSpaceSize, &reserveSpaceSize));
+ 
+-            std::cout << "workSpaceSize from cudnn: " << workSpaceSize << std::endl;
+-            std::cout << "reserveSpaceSize from cudnn: " << reserveSpaceSize << std::endl;
+             csl::WorkspaceBuilder builder;
+             builder.require<T>(workSpaceSize);
+             builder.require<T>(reserveSpaceSize);
+-            scratch_mem_in_bytes = builder.required_workspace_size();
+-            std::cout << "scratch_mem_in_bytes: " << scratch_mem_in_bytes << std::endl;
++            scratch_mem_in_bytes = builder.required_workspace_size();            
+         }
+ #else
+         LSTM(cudnn::Handle handle, const params_type& params)
+
+From 31475252b7a4eb8332519f4a69927e876d958b7f Mon Sep 17 00:00:00 2001
+From: Danial Javady <122740063+ZelboK@users.noreply.github.com>
+Date: Mon, 27 May 2024 09:02:40 -0400
+Subject: [PATCH 09/10] Update recurrent_cells.hpp
+
+remove redundant coment
+--- a/modules/dnn/src/cuda4dnn/primitives/recurrent_cells.hpp
++++ b/modules/dnn/src/cuda4dnn/primitives/recurrent_cells.hpp
+@@ -73,7 +73,6 @@ class LSTMOp final : public CUDABackendNode
+         csl::TensorSpan<T> yc_output = yc_output_wrapper.empty() ? csl::TensorSpan<T>() : yc_output_wrapper->getSpan();
+ 
+         lstm.inference(input, y_output, yc_output, filtersTensor, h0Tensor, c0Tensor, workspace);
+-        // might need to add reserveSpace here.
+     }
+ 
+     std::size_t get_workspace_memory_in_bytes() const noexcept override
+
+From 4343d8dbc78e90adc280e74dbb06fbbeedbffd55 Mon Sep 17 00:00:00 2001
+From: Danial Javady <122740063+ZelboK@users.noreply.github.com>
+Date: Mon, 27 May 2024 20:58:16 -0400
+Subject: [PATCH 10/10] Update tensor_ops.hpp
+
+Remove trailing white space
+--- a/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
++++ b/modules/dnn/src/cuda4dnn/csl/tensor_ops.hpp
+@@ -565,7 +565,7 @@ namespace cv { namespace dnn { namespace cuda4dnn { namespace csl {
+             csl::WorkspaceBuilder builder;
+             builder.require<T>(workSpaceSize);
+             builder.require<T>(reserveSpaceSize);
+-            scratch_mem_in_bytes = builder.required_workspace_size();            
++            scratch_mem_in_bytes = builder.required_workspace_size();
+         }
+ #else
+         LSTM(cudnn::Handle handle, const params_type& params)
