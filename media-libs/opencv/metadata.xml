@@ -30,6 +30,7 @@
 		<flag name="dnnsamples">Enable dnn caffeemodel samples</flag>
 		<flag name="eigen">Enable usage of <pkg>dev-cpp/eigen</pkg> for computations</flag>
 		<flag name="features2d">Enable features2d module</flag>
+		<flag name="freetype">Enable <pkg>media-libs/freetype</pkg> support for gapi module</flag>
 		<flag name="gdal">Enable support for <pkg>sci-libs/gdal</pkg> library</flag>
 		<flag name="gflags">Use Google's C++ argument parsing library (<pkg>dev-cpp/gflags</pkg>)</flag>
 		<flag name="glog">Use Google's C++ logging library (<pkg>dev-cpp/glog</pkg>)</flag>
