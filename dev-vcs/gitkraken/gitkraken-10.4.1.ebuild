@@ -93,6 +93,11 @@ src_prepare() {
 	)
 
 	rm -Rf "${FILES[@]}" || die
+
+	sed \
+		-e '/^Exec/s/$/ --ozone-platform-hint=auto/' \
+		-i usr/share/applications/*.desktop \
+		|| die
 }
 
 src_configure() {
