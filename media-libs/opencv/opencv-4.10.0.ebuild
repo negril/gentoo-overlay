@@ -75,7 +75,7 @@ IUSE="debug doc +eigen gflags glog java non-free opencvapps python test testprog
 # modules
 IUSE+=" contrib contribcvv contribdnn contribfreetype contribhdf contribovis contribsfm contribxfeatures2d dnnsamples examples features2d"
 # hardware
-IUSE+=" cuda cudnn opencl video_cards_intel"
+IUSE+=" cuda cudnn onnx opencl video_cards_intel"
 # video
 IUSE+=" +ffmpeg gphoto2 gstreamer ieee1394 openni openni2 xine vaapi v4l"
 # image
@@ -233,6 +233,9 @@ COMMON_DEPEND="
 				virtual/lapacke
 			)
 		)
+	)
+	onnx? (
+		sci-libs/onnxruntime
 	)
 	opencl? (
 		virtual/opencl[${MULTILIB_USEDEP}]
@@ -642,6 +645,8 @@ multilib_src_configure() {
 
 		-DWITH_AVIF="$(usex avif)"
 		-DWITH_FREETYPE="$(usex freetype)"
+		-DWITH_ONNX="$(multilib_native_usex onnx)"
+		-DONNXRT_ROOT_DIR="${EPREFIX}/usr/"
 		-DWITH_WAYLAND="$(usex wayland)"
 	# ===================================================
 	# CUDA build components: nvidia-cuda-toolkit

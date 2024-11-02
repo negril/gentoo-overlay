@@ -38,6 +38,7 @@
 		<flag name="jasper">Use <pkg>media-libs/jasper</pkg> for jpeg2k support</flag>
 		<flag name="mkl">Use <pkg>sci-libs/mkl</pkg> for blas, lapack and sparse blas routines</flag>
 		<flag name="non-free">Enable non-free components</flag>
+		<flag name="onnx">Include Microsoft ONNX Runtime support via <pkg>sci-libs/onnxruntime</pkg></flag>
 		<flag name="opencvapps">Enable compilation with opencvapps</flag>
 		<flag name="openni">Adds support for Kinect-like 3D sensors devices with <pkg>dev-libs/OpenNI</pkg></flag>
 		<flag name="openni2">Adds support for Kinect-like 3D sensors devices with <pkg>dev-libs/OpenNI2</pkg> (should be preferred over openni)</flag>
