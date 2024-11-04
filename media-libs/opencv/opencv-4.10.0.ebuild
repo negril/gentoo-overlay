@@ -4,7 +4,7 @@
 EAPI=8
 
 PYTHON_COMPAT=( python3_{10..13} )
-inherit cuda java-pkg-opt-2 cmake-multilib flag-o-matic multilib multiprocessing python-r1 toolchain-funcs virtualx
+inherit cuda java-pkg-opt-2 cmake-multilib flag-o-matic multilib multiprocessing python-r1 toolchain-funcs virtualx xdg-utils
 
 DESCRIPTION="A collection of algorithms and sample code for various computer vision problems"
 HOMEPAGE="https://opencv.org"
@@ -81,7 +81,7 @@ IUSE+=" +ffmpeg gstreamer xine vaapi v4l gphoto2 ieee1394"
 # image
 IUSE+=" avif gdal jasper jpeg jpeg2k openexr png quirc tesseract tiff webp"
 # gui
-IUSE+=" freetype gtk3 qt6 opengl vtk"
+IUSE+=" freetype gtk3 qt6 opengl vtk wayland"
 # parallel
 IUSE+=" openmp tbb"
 # lapack options
@@ -171,13 +171,14 @@ REQUIRED_USE="
 	contribsfm? ( contrib eigen gflags glog )
 	contribxfeatures2d? ( contrib )
 	java? ( python )
-	opengl? ( qt6 )
+	opengl? ( || ( qt6 wayland ) )
 	jasper? ( !abi_x86_32 )
 	python? ( ${PYTHON_REQUIRED_USE} )
 	tesseract? ( contrib )
-	?? ( gtk3 qt6 )
+	?? ( gtk3 qt6 wayland )
 	testprograms? ( test )
 	test? ( || ( ffmpeg gstreamer ) jpeg png tiff features2d )
+	wayland? ( !vtk )
 "
 
 RESTRICT="!test? ( test )"
@@ -271,12 +272,18 @@ COMMON_DEPEND="
 	)
 	webp? ( media-libs/libwebp:=[${MULTILIB_USEDEP}] )
 	xine? ( media-libs/xine-lib )
+	wayland? (
+		x11-libs/libxkbcommon[${MULTILIB_USEDEP}]
+		dev-libs/wayland[${MULTILIB_USEDEP}]
+		>=dev-libs/wayland-protocols-1.13
+	)
 "
 DEPEND="
 	${COMMON_DEPEND}
 	eigen? ( >=dev-cpp/eigen-3.3.8-r1:3 )
 	java? ( >=virtual/jdk-1.8:* )
 	test? (
+		wayland? ( dev-libs/weston[examples,headless,remoting,screen-sharing,wayland-compositor] )
 		gstreamer? (
 			media-plugins/gst-plugins-aom[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-jpeg[${MULTILIB_USEDEP}]
@@ -589,7 +596,7 @@ multilib_src_configure() {
 		-DWITH_OPENJPEG="$(usex jpeg2k "$(multilib_native_usex !jasper)")"
 		-DWITH_WEBP="$(usex webp)"
 		-DWITH_OPENEXR="$(multilib_native_usex openexr)"
-		-DWITH_OPENGL="$(usex opengl)"
+		-DWITH_OPENGL="$(usex qt6 "$(usex opengl)")"
 		-DOpenGL_GL_PREFERENCE="GLVND"
 		-DWITH_OPENVX="no"
 		-DWITH_OPENNI="no"       # Not packaged
@@ -629,6 +636,7 @@ multilib_src_configure() {
 
 		-DWITH_AVIF="$(usex avif)"
 		-DWITH_FREETYPE="$(usex freetype)"
+		-DWITH_WAYLAND="$(usex wayland)"
 	# ===================================================
 	# CUDA build components: nvidia-cuda-toolkit
 	# ===================================================
@@ -1137,10 +1145,24 @@ multilib_src_test() {
 		fi
 	}
 
+	if use wayland; then
+		xdg_environment_reset
+
+		local -x WAYLAND_DISPLAY=wayland-7
+		weston --backend=headless-backend.so --socket="${WAYLAND_DISPLAY}" --idle-time=0 &
+		local compositor=$!
+	fi
+
+	local -x MESA_SHADER_CACHE_DISABLE=true
+
 	if multilib_native_use python; then
-		python_foreach_impl virtx opencv_test
+		virtx python_foreach_impl opencv_test
 	else
 		virtx opencv_test
+	fi
+
+	if use wayland; then
+		kill "${compositor}" || die
 	fi
 }
 
