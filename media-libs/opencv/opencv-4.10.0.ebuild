@@ -1182,4 +1182,9 @@ multilib_src_install() {
 	else
 		cmake_src_install
 	fi
+
+	for plugin in "${ED}/usr/$(get_libdir)/libopencv_"*".$(ver_rs 1-2 '').${ARCH}"* ; do
+		patchelf --set-soname "$(basename "${plugin}" ".$(get_libname)")" "${plugin}"
+	done
+
 }
