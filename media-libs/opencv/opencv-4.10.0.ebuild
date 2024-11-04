@@ -48,10 +48,8 @@ else
 				https://github.com/${PN}/${PN}_3rdparty/archive/${XFEATURES2D_VGG_COMMIT}.tar.gz
 					-> ${PN}_3rdparty-${XFEATURES2D_VGG_COMMIT}.tar.gz
 			)
-			contribdnn? (
 				https://github.com/${PN}/${PN}_3rdparty/archive/${FACE_ALIGNMENT_COMMIT}.tar.gz
 					-> ${PN}_3rdparty-${FACE_ALIGNMENT_COMMIT}.tar.gz
-			)
 			cuda? (
 				https://github.com/NVIDIA/NVIDIAOpticalFlowSDK/archive/${NVIDIA_OPTICAL_FLOW_COMMIT}.tar.gz
 					-> NVIDIAOpticalFlowSDK-${NVIDIA_OPTICAL_FLOW_COMMIT}.tar.gz
@@ -61,6 +59,9 @@ else
 		)
 		test? (
 			https://github.com/${PN}/${PN}_extra/archive/refs/tags/${PV}.tar.gz -> ${PN}_extra-${PV}.tar.gz
+		)
+		contribdnn? (
+			https://github.com/ShiqiYu/libfacedetection.train/raw/02246e79b1e976c83d1e135a85e0628120c93769/onnx/yunet_s_640_640.onnx -> yunet-202303.onnx
 		)
 	"
 	KEYWORDS="~amd64 ~arm ~arm64 ~loong ~ppc ~ppc64 ~riscv ~x86"
@@ -547,6 +548,9 @@ src_prepare() {
 			"${S}/.cache/data/$( \
 				md5sum "${WORKDIR}/${PN}_3rdparty-${FACE_ALIGNMENT_COMMIT}/${file}" | cut -f 1 -d " " \
 			)-${file}" || die
+
+		mkdir -p "${WORKDIR}/${PN}_extra-${PV}/testdata/cv/dnn/onnx/models/" || die
+		mv "${DISTDIR}/yunet-202303.onnx" "${WORKDIR}/${PN}_extra-${PV}/testdata/cv/dnn/onnx/models/" || die
 	fi
 
 	if use cuda; then
