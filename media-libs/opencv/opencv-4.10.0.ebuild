@@ -77,7 +77,7 @@ IUSE+=" contrib contribcvv contribdnn contribfreetype contribhdf contribovis con
 # hardware
 IUSE+=" cuda cudnn opencl video_cards_intel"
 # video
-IUSE+=" +ffmpeg gstreamer xine vaapi v4l gphoto2 ieee1394"
+IUSE+=" +ffmpeg gphoto2 gstreamer ieee1394 openni openni2 xine vaapi v4l"
 # image
 IUSE+=" avif gdal jasper jpeg jpeg2k openexr png quirc tesseract tiff webp"
 # gui
@@ -245,6 +245,12 @@ COMMON_DEPEND="
 	opengl? (
 		virtual/opengl[${MULTILIB_USEDEP}]
 		virtual/glu[${MULTILIB_USEDEP}]
+	)
+	openni? (
+		dev-libs/OpenNI
+	)
+	openni2? (
+		dev-libs/OpenNI2
 	)
 	png? ( media-libs/libpng:0=[${MULTILIB_USEDEP}] )
 	python? (
@@ -599,8 +605,8 @@ multilib_src_configure() {
 		-DWITH_OPENGL="$(usex qt6 "$(usex opengl)")"
 		-DOpenGL_GL_PREFERENCE="GLVND"
 		-DWITH_OPENVX="no"
-		-DWITH_OPENNI="no"       # Not packaged
-		-DWITH_OPENNI2="no"      # Not packaged
+		-DWITH_OPENNI="$(multilib_native_usex openni)"
+		-DWITH_OPENNI2="$(multilib_native_usex openni2)"
 		-DWITH_PNG="$(usex png)"
 		-DWITH_GDCM="no"
 		-DWITH_PVAPI="no"
