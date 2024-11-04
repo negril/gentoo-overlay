@@ -777,6 +777,12 @@ multilib_src_configure() {
 		-DVIDEOIO_PLUGIN_LIST="$(IFS=';'; echo "${VIDEOIO_PLUGIN_LIST[*]}")"
 	)
 
+	if [[ ${PV} != *9999* ]] ; then
+		mycmakeargs+=(
+			-DOPENCV_VCSVERSION="${PV}"
+		)
+	fi
+
 	if use qt6; then
 		mycmakeargs+=(
 			-DWITH_QT="$(multilib_native_usex qt6)"
