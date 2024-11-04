@@ -48,6 +48,7 @@
 		<flag name="testprograms">Build and install programs for testing OpenCV (performance)</flag>
 		<flag name="video_cards_intel">Enable Video Acceleration API for hardware decoding for Intel cards</flag>
 		<flag name="vtk">Build new 3D visualization module viz based on <pkg>sci-libs/vtk</pkg></flag>
+		<flag name="vulkan">Enable experimental Vulkan backend</flag>
 	</use>
 	<upstream>
 		<remote-id type="cpe">cpe:/a:opencv:opencv</remote-id>

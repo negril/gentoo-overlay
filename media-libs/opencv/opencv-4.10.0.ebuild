@@ -81,7 +81,7 @@ IUSE+=" +ffmpeg gphoto2 gstreamer ieee1394 openni openni2 xine vaapi v4l"
 # image
 IUSE+=" avif gdal jasper jpeg jpeg2k openexr png quirc tesseract tiff webp"
 # gui
-IUSE+=" freetype gtk3 qt6 opengl vtk wayland"
+IUSE+=" freetype gtk3 qt6 opengl vtk vulkan wayland"
 # parallel
 IUSE+=" openmp tbb"
 # lapack options
@@ -281,6 +281,9 @@ COMMON_DEPEND="
 	)
 	webp? ( media-libs/libwebp:=[${MULTILIB_USEDEP}] )
 	xine? ( media-libs/xine-lib )
+	vulkan? (
+		media-libs/vulkan-loader[${MULTILIB_USEDEP}]
+	)
 	wayland? (
 		x11-libs/libxkbcommon[${MULTILIB_USEDEP}]
 		dev-libs/wayland[${MULTILIB_USEDEP}]
@@ -647,6 +650,7 @@ multilib_src_configure() {
 		-DWITH_FREETYPE="$(usex freetype)"
 		-DWITH_ONNX="$(multilib_native_usex onnx)"
 		-DONNXRT_ROOT_DIR="${EPREFIX}/usr/"
+		-DWITH_VULKAN="$(usex vulkan)"
 		-DWITH_WAYLAND="$(usex wayland)"
 	# ===================================================
 	# CUDA build components: nvidia-cuda-toolkit
