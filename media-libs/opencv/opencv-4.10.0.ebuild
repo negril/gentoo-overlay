@@ -79,7 +79,7 @@ IUSE+=" cuda cudnn onnx opencl video_cards_intel"
 # video
 IUSE+=" +ffmpeg gphoto2 gstreamer ieee1394 openni openni2 xine vaapi v4l"
 # image
-IUSE+=" avif gdal jasper jpeg jpeg2k openexr png quirc tesseract tiff webp"
+IUSE+=" avif gdal jasper jpeg jpeg2k openexr png quirc spng tesseract tiff webp"
 # gui
 IUSE+=" freetype gtk3 qt6 opengl vtk vulkan wayland"
 # parallel
@@ -255,7 +255,10 @@ COMMON_DEPEND="
 	openni2? (
 		dev-libs/OpenNI2
 	)
-	png? ( media-libs/libpng:0=[${MULTILIB_USEDEP}] )
+	png? (
+		!spng? ( media-libs/libpng:0=[${MULTILIB_USEDEP}] )
+		spng? ( media-libs/libspng[${MULTILIB_USEDEP}] )
+	)
 	python? (
 		${PYTHON_DEPS}
 		dev-python/numpy:=[${PYTHON_USEDEP}]
@@ -614,6 +617,7 @@ multilib_src_configure() {
 		-DWITH_OPENNI="$(multilib_native_usex openni)"
 		-DWITH_OPENNI2="$(multilib_native_usex openni2)"
 		-DWITH_PNG="$(usex png)"
+		-DWITH_SPNG="$(usex png "$(usex spng)")"
 		-DWITH_GDCM="no"
 		-DWITH_PVAPI="no"
 		-DWITH_GIGEAPI="no"
