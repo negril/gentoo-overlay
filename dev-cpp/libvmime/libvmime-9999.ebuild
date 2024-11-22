@@ -24,7 +24,6 @@ RDEPEND="
 	ssl? (
 		!gnutls? ( dev-libs/openssl:= )
 		gnutls? ( net-libs/gnutls:= )
-
 	)
 "
 
@@ -36,26 +35,26 @@ BDEPEND="
 src_configure() {
 	filter-lto
 	local mycmakeargs=(
-	"-DVMIME_BUILD_DOCUMENTATION=$(usex doc)"
-	"-DVMIME_BUILD_SAMPLES=$(usex samples)"
-	"-DVMIME_BUILD_SHARED_LIBRARY=yes"
-	"-DVMIME_BUILD_STATIC_LIBRARY=$(usex static)"
-	"-DVMIME_BUILD_TESTS=$(usex test)"
-	"-DVMIME_CHARSETCONV_LIB=$(usex icu icu iconv)"
+		-DVMIME_BUILD_DOCUMENTATION="$(usex doc)"
+		-DVMIME_BUILD_SAMPLES="$(usex samples)"
+		-DVMIME_BUILD_SHARED_LIBRARY="yes"
+		-DVMIME_BUILD_STATIC_LIBRARY="$(usex static)"
+		-DVMIME_BUILD_TESTS="$(usex test)"
+		-DVMIME_CHARSETCONV_LIB="$(usex icu icu iconv)"
 
-	"-DVMIME_HAVE_FILESYSTEM_FEATURES=$(usex maildir)"
-	"-DVMIME_HAVE_MESSAGING_FEATURES=$(usex imap yes "$(usex maildir yes "$(usex pop yes "$(usex sendmail yes "$(usex smtp yes no)")")")")"
+		-DVMIME_HAVE_FILESYSTEM_FEATURES="$(usex maildir)"
+		-DVMIME_HAVE_MESSAGING_FEATURES="$(usex imap yes "$(usex maildir yes "$(usex pop yes "$(usex sendmail yes "$(usex smtp yes no)")")")")"
 
-	"-DVMIME_HAVE_MESSAGING_PROTO_IMAP=$(usex imap)"
-	"-DVMIME_HAVE_MESSAGING_PROTO_MAILDIR=$(usex maildir)"
-	"-DVMIME_HAVE_MESSAGING_PROTO_POP3=$(usex pop)"
-	"-DVMIME_HAVE_MESSAGING_PROTO_SENDMAIL=$(usex sendmail)"
-	"-DVMIME_HAVE_MESSAGING_PROTO_SMTP=$(usex smtp)"
+		-DVMIME_HAVE_MESSAGING_PROTO_IMAP="$(usex imap)"
+		DVMIME_HAVE_MESSAGING_PROTO_MAILDIR="$(usex maildir)"
+		-DVMIME_HAVE_MESSAGING_PROTO_POP3="$(usex pop)"
+		-DVMIME_HAVE_MESSAGING_PROTO_SENDMAIL="$(usex sendmail)"
+		-DVMIME_HAVE_MESSAGING_PROTO_SMTP="$(usex smtp)"
 
-	"-DVMIME_HAVE_SASL_SUPPORT=$(usex sasl)"
-	"-DVMIME_HAVE_TLS_SUPPORT=$(usex ssl yes "$(usex gnutls)")"
+		-DVMIME_HAVE_SASL_SUPPORT="$(usex sasl)"
+		-DVMIME_HAVE_TLS_SUPPORT="$(usex ssl yes "$(usex gnutls)")"
 
-	"-DVMIME_TLS_SUPPORT_LIB=$(usex ssl openssl "$(usex gnutls gnutls)")"
+		-DVMIME_TLS_SUPPORT_LIB="$(usex ssl openssl "$(usex gnutls gnutls)")"
 	)
 
 	if use debug; then
@@ -63,6 +62,7 @@ src_configure() {
 	else
 		CMAKE_BUILD_TYPE="RelWithDebInfo"
 	fi
+
 	cmake_src_configure
 }
 
