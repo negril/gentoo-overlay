@@ -3,7 +3,7 @@
 
 EAPI=8
 
-inherit git-r3 cmake
+inherit git-r3 flag-o-matic cmake
 
 DESCRIPTION="Library for working with MIME messages and Internet messaging services"
 HOMEPAGE="https://www.vmime.org"
@@ -34,6 +34,7 @@ BDEPEND="
 "
 
 src_configure() {
+	filter-lto
 	local mycmakeargs=(
 	"-DVMIME_BUILD_DOCUMENTATION=$(usex doc)"
 	"-DVMIME_BUILD_SAMPLES=$(usex samples)"
