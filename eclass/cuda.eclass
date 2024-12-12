@@ -143,6 +143,70 @@ unset -f _cuda_set_globals
 # Being verbose during compilation to see underlying commands
 : "${CUDA_VERBOSE:=false}"
 
+# @FUNCTION: cuda_get_host_compiler
+# @USAGE: [-f]
+# @RETURN: compiler name compatible with current cuda
+# @DESCRIPTION:
+# Helper for determination of the latest compiler supported by
+# then current nvidia cuda toolkit.
+cuda_get_host_compiler() {
+	debug-print-function "${FUNCNAME[0]}"
+
+	if [[ -n "${NVCC_CCBIN}" ]]; then
+		echo "${NVCC_CCBIN}"
+		return
+	fi
+
+	if [[ -n "${CUDAHOSTCXX}" ]]; then
+		echo "${CUDAHOSTCXX}"
+		return
+	fi
+
+	einfo "Trying to find working CUDA host compiler"
+
+	if ! tc-is-gcc && ! tc-is-clang; then
+		die "$(tc-get-compiler-type) compiler is not supported"
+	fi
+
+	local compiler compiler_type compiler_version
+	local package package_version
+	local -x NVCC_CCBIN
+	local NVCC_CCBIN_default
+
+	compiler_type="$(tc-get-compiler-type)"
+	compiler_version="$("${compiler_type}-major-version")"
+
+	# try the default compiler first
+	NVCC_CCBIN="$(tc-getCXX)"
+	NVCC_CCBIN_default="${NVCC_CCBIN}-${compiler_version}"
+
+	compiler="${NVCC_CCBIN/%-${compiler_version}}"
+
+	# store the package so we can re-use it later
+	package="sys-devel/${compiler_type}"
+	package_version="${package}"
+
+	ebegin "testing ${NVCC_CCBIN_default} (default)"
+
+	while ! nvcc - -x cu <<<"int main(){}" &>/dev/null; do
+		eend 1
+
+		while true; do
+			# prepare next version
+			if ! package_version="<$(best_version "${package_version}")"; then
+				die "could not find a supported version of ${compiler}"
+			fi
+
+			NVCC_CCBIN="${compiler}-$(ver_cut 1 "${package_version/#<${package}-/}")"
+
+			[[ "${NVCC_CCBIN}" != "${NVCC_CCBIN_default}" ]] && break
+		done
+		ebegin "testing ${NVCC_CCBIN}"
+	done
+	eend $? "non found"
+	echo "${NVCC_CCBIN}"
+	export NVCC_CCBIN
+}
 
 # @FUNCTION: cuda_gccdir
 # @USAGE: [-f]
@@ -157,15 +221,9 @@ unset -f _cuda_set_globals
 # -> --compiler-bindir "/usr/x86_64-pc-linux-gnu/gcc-bin/4.6.3"
 # @CODE
 cuda_gccdir() {
-	debug-print-function ${FUNCNAME} "$@"
+	debug-print-function "${FUNCNAME[0]}" "$@"
 
-	local dirs gcc_bindir ver vers="" flag
-
-	# Currently we only support the gnu compiler suite
-	if ! tc-is-gcc ; then
-		ewarn "Currently we only support the gnu compiler suite"
-		return 2
-	fi
+	local dirs gcc_bindir ver flag
 
 	while [[ "$1" ]]; do
 		case $1 in
@@ -178,44 +236,18 @@ cuda_gccdir() {
 		shift
 	done
 
-	if ! vers="$(cuda-config -s)"; then
+	if ! NVCC_CCBIN="$(cuda_get_host_compiler)"; then
 		eerror "Could not execute cuda-config"
-		eerror "Make sure >=dev-util/nvidia-cuda-toolkit-4.2.9-r1 is installed"
-		die "cuda-config not found"
 	fi
-	if [[ -z ${vers} ]]; then
-		die "Could not determine supported gcc versions from cuda-config"
+	if [[ -z ${NVCC_CCBIN} ]]; then
+		die "Could not determine supported compiler versions from cuda-config"
 	fi
 
-	# Try the current gcc version first
-	ver=$(gcc-version)
-	if [[ -n "${ver}" ]] && [[ ${vers} =~ ${ver} ]]; then
-		dirs=( "${EPREFIX}"/usr/*pc-linux-gnu/gcc-bin/${ver%.*}*/ )
-		gcc_bindir="${dirs[${#dirs[@]}-1]}"
-	fi
-
-	if [[ -z ${gcc_bindir} ]]; then
-		ver=$(best_version "sys-devel/gcc")
-		ver=$(ver_cut 1-2 "${ver##*sys-devel/gcc-}")
-
-		if [[ -n "${ver}" ]] && [[ ${vers} =~ ${ver} ]]; then
-			dirs=( "${EPREFIX}"/usr/*pc-linux-gnu/gcc-bin/${ver%.*}*/ )
-			gcc_bindir="${dirs[${#dirs[@]}-1]}"
-		fi
-	fi
-
-	for ver in ${vers}; do
-		if has_version "=sys-devel/gcc-${ver}*"; then
-			dirs=( "${EPREFIX}"/usr/*pc-linux-gnu/gcc-bin/${ver%.*}*/ )
-			gcc_bindir="${dirs[${#dirs[@]}-1]}"
-		fi
-	done
-
-	if [[ -n ${gcc_bindir} ]]; then
-		if [[ -n ${flag} ]]; then
-			echo "${flag}\"${gcc_bindir%/}\""
+	if [[ -n ${NVCC_CCBIN} ]]; then
+		if [[ -n ${NVCC_CCBIN} ]]; then
+			echo "${flag}\"$(type -p "${NVCC_CCBIN}")\""
 		else
-			echo "${gcc_bindir%/}"
+			echo "${NVCC_CCBIN}"
 		fi
 		return 0
 	else
@@ -231,7 +263,7 @@ cuda_gccdir() {
 # Correct NVCCFLAGS by adding the necessary reference to gcc bindir and
 # passing CXXFLAGS to underlying compiler without disturbing nvcc.
 cuda_sanitize() {
-	debug-print-function ${FUNCNAME} "$@"
+	debug-print-function "${FUNCNAME[0]}"
 
 	local rawldflags=$(raw-ldflags)
 	# Be verbose if wanted
@@ -253,7 +285,7 @@ cuda_sanitize() {
 # Add nvidia dev nodes to the sandbox predict list.
 # with -w, add to the sandbox write list.
 cuda_add_sandbox() {
-	debug-print-function ${FUNCNAME} "$@"
+	debug-print-function "${FUNCNAME[0]}" "$@"
 
 	# /dev/char/195:0 -> ../nvidia0
 	# /dev/char/195:254 -> ../nvidia-modeset
@@ -280,7 +312,7 @@ cuda_add_sandbox() {
 	# /dev/dri/card*
 	# /dev/dri/renderD*
 	# readarray -t dri <<<"$(find /sys/module/nvidia/drivers/*/*:*:*.*/drm -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sed 's:^:/dev/dri/:')"
-	readarray -t dri <<<"$(find -maxdepth 1 -regextype  egrep -regex ".*/(card|renderD)[0-9]*" -exec basename {} \; | sed 's:^:/dev/dri/:')"
+	readarray -t dri <<<"$(find /sys/class/drm -maxdepth 1 -regextype  egrep -regex ".*/(card|renderD)[0-9]*" -exec basename {} \; | sed 's:^:/dev/dri/:')"
 
 	# /dev/nvidia{0-9}
 	readarray -t cards <<<"$(find /dev -regextype sed -regex '/dev/nvidia[0-9]*')"
@@ -330,7 +362,7 @@ cuda_add_sandbox() {
 # @DESCRIPTION:
 # echo the installed version of dev-util/nvidia-cuda-toolkit
 cuda_toolkit_version() {
-	debug-print-function ${FUNCNAME} "$@"
+	debug-print-function "${FUNCNAME[0]}" "$@"
 
 	local v
 	v="$(best_version dev-util/nvidia-cuda-toolkit)"
@@ -342,7 +374,7 @@ cuda_toolkit_version() {
 # @DESCRIPTION:
 # echo the installed version of dev-libs/cudnn
 cuda_cudnn_version() {
-	debug-print-function ${FUNCNAME} "$@"
+	debug-print-function "${FUNCNAME[0]}" "$@"
 
 	local v
 	v="$(best_version dev-libs/cudnn)"
@@ -354,7 +386,7 @@ cuda_cudnn_version() {
 # @DESCRIPTION:
 # Sanitise and export NVCCFLAGS by default
 cuda_src_prepare() {
-	debug-print-function ${FUNCNAME} "$@"
+	debug-print-function "${FUNCNAME[0]}" "$@"
 
 	cuda_sanitize
 }
