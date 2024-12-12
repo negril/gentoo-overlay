@@ -37,7 +37,7 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}"
 RDEPEND="${PYTHON_DEPS}
 	|| (
 		<sys-devel/gcc-$(( GCC_MAX_VER + 1 ))_pre[cxx]
-		<sys-devel/clang-$(( CLANG_MAX_VER + 1 ))_pre
+		<llvm-core/clang-$(( CLANG_MAX_VER + 1 ))_pre
 	)
 	sys-process/numactl
 	examples? (
