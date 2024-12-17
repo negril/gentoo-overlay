@@ -1,0 +1,13 @@
+--- a/spm/CMakeLists.txt
++++ b/spm/CMakeLists.txt
+@@ -10,8 +10,8 @@
+ #  @date 2022-02-22
+ #
+ ###
+-cmake_minimum_required (VERSION 3.5)
+-project (SPM C Fortran)
++set(SPM_SOURCE_DIR "${CMAKE_SOURCE_DIR}/spm")
++set(SPM_BINARY_DIR "${CMAKE_BINARY_DIR}/spm")
+ 
+ # Check if compiled independently or within another project
+ if ( ${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
