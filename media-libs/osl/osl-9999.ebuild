@@ -3,10 +3,10 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+PYTHON_COMPAT=( python3_{10..13} )
 
 # Check this on updates
-LLVM_COMPAT=( {15..18} )
+LLVM_COMPAT=( {15..19} )
 
 inherit cmake cuda flag-o-matic llvm-r1 toolchain-funcs python-single-r1
 
@@ -45,8 +45,8 @@ RDEPEND="
 	>=media-libs/openexr-3:0=
 	>=media-libs/openimageio-2.4:=
 	$(llvm_gen_dep '
-		sys-devel/clang:${LLVM_SLOT}
-		sys-devel/llvm:${LLVM_SLOT}
+		llvm-core/clang:${LLVM_SLOT}
+		llvm-core/llvm:${LLVM_SLOT}
 	')
 	sys-libs/zlib:=
 	optix? ( dev-libs/optix[-headers-only] )

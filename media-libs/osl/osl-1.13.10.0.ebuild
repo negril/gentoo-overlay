@@ -45,8 +45,8 @@ RDEPEND="
 	>=media-libs/openexr-3:0=
 	>=media-libs/openimageio-2.4:=
 	$(llvm_gen_dep '
-		sys-devel/clang:${LLVM_SLOT}
-		sys-devel/llvm:${LLVM_SLOT}
+		llvm-core/clang:${LLVM_SLOT}
+		llvm-core/llvm:${LLVM_SLOT}
 	')
 	sys-libs/zlib:=
 	optix? ( dev-libs/optix[-headers-only] )
@@ -82,11 +82,6 @@ BDEPEND="
 	sys-devel/flex
 	virtual/pkgconfig
 "
-
-PATCHES=(
-	"${FILESDIR}/${PN}-1.13.10.0-dz-m_dz-type.patch"
-	"${FILESDIR}/${PN}-1.13.10.0-include-cstdint.patch"
-)
 
 pkg_setup() {
 	llvm-r1_pkg_setup
@@ -258,11 +253,11 @@ src_test() {
 			"${BUILD_DIR}/bin/" || die
 
 		# NOTE this should go to cuda eclass
-		# addwrite /dev/nvidiactl
-		# addwrite /dev/nvidia0
-		# addwrite /dev/nvidia-uvm
-		# addwrite /dev/nvidia-caps
-		# addwrite "/dev/char/"
+		addwrite /dev/nvidiactl
+		addwrite /dev/nvidia0
+		addwrite /dev/nvidia-uvm
+		addwrite /dev/nvidia-caps
+		addwrite "/dev/char/"
 	fi
 
 	CMAKE_SKIP_TESTS=(
