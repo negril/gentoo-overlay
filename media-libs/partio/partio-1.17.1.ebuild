@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+PYTHON_COMPAT=( python3_{10..12} )
 inherit cmake python-single-r1
 
 if [[ ${PV} == *9999 ]]; then
@@ -11,7 +11,7 @@ if [[ ${PV} == *9999 ]]; then
 	EGIT_REPO_URI="https://github.com/wdas/partio.git"
 else
 	SRC_URI="https://github.com/wdas/${PN}/archive/v${PV}.tar.gz -> ${P}.tar.gz"
-	KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~x86"
+	KEYWORDS="amd64 ~arm ~arm64 ~ppc64 x86"
 fi
 
 DESCRIPTION="Library for particle IO and manipulation"
@@ -45,16 +45,7 @@ BDEPEND="
 
 src_configure() {
 	local mycmakeargs=(
-		"$(cmake_use_find_package doc Doxygen)"
-
-		-DPARTIO_GTEST_ENABLED="$(usex test)" # "Enable GTest for tests"
-		-DPARTIO_ORIGIN_RPATH="no" # "Enable ORIGIN rpath in the installed libraries"
-
-		-DPARTIO_USE_GLVND="yes" # "Use GLVND for OpenGL"
-		-DPARTIO_BUILD_SHARED_LIBS="yes" # "Enabled shared libraries"
-
-		-DWDAS_CXX_STANDARD=17
+		$(cmake_use_find_package doc Doxygen)
 	)
-
 	cmake_src_configure
 }
