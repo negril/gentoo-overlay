@@ -168,7 +168,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-9.3.0-core-octree_node.txx.patch"
 	"${FILESDIR}/${PN}-9.3.0-ThirdParty-gcc15.patch"
 	"${FILESDIR}/${PN}-9.3.0-r1-expat-2.6.0.patch"
-	"${FILESDIR}/${PN}-9.3.0-update-for-cuda-12.6.patch"
+	"${FILESDIR}/${PN}-9.3.1-fix-fmt-11.patch"
 )
 
 DOCS=( CONTRIBUTING.md README.md )
@@ -847,7 +847,6 @@ src_test() {
 		"${SEQUENTIAL_TESTS[@]}"
 	)
 
-	nonfatal \
 	virtx cmake_src_test
 	unset CMAKE_SKIP_TESTS
 
