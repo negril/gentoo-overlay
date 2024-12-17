@@ -1,0 +1,66 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -175,6 +175,9 @@ option(PASTIX_GENERATE_MODEL
+ option(PASTIX_WITH_FORTRAN
+   "Enable Fortran files/interface/examples to be compiled" ON)
+ 
++option(PASTIX_WITH_PYTHON
++  "Install Python wrapper and examples" ON)
++
+ cmake_dependent_option(PASTIX_THREAD_COMM
+  "Enable the specific communication thread (requires PASTIX_WITH_MPI)" ON "PASTIX_WITH_MPI" OFF)
+ 
+--- a/spm/CMakeLists.txt
++++ b/spm/CMakeLists.txt
+@@ -68,6 +68,13 @@ set(CTEST_LABELS_FOR_SUBPROJECTS spm)
+ option(SPM_INT64
+   "Choose between int32 and int64 for integer representation" ON)
+ 
++if ( DEFINED PASTIX_WITH_PYTHON )
++  set( SPM_WITH_PYTHON ${PASTIX_WITH_PYTHON} )
++else()
++  option(SPM_WITH_PYTHON
++    "Install Python wrapper and examples" ON)
++endif()
++
+ option(SPM_WITH_FORTRAN
+   "Enable Fortran files/interface/examples to be compiled" ON)
+ 
+--- a/spm/wrappers/CMakeLists.txt
++++ b/spm/wrappers/CMakeLists.txt
+@@ -15,9 +15,10 @@ if (SPM_WITH_FORTRAN)
+   add_subdirectory( fortran90 )
+ endif()
+ 
+-if (BUILD_SHARED_LIBS)
+-  add_subdirectory( python )
+-  add_subdirectory( julia )
+-else()
+-  message(STATUS "--- Python and Julia wrappers are disabled with static libraries")
+-endif()
++if (SPM_WITH_PYTHON)
++  if (BUILD_SHARED_LIBS)
++    add_subdirectory( python )
++  else (BUILD_SHARED_LIBS)
++    message(FATAL_ERROR "--- Python wrapper requested but it cannot be built with static libraries")
++  endif (BUILD_SHARED_LIBS)
++endif (SPM_WITH_PYTHON)
+--- a/wrappers/CMakeLists.txt
++++ b/wrappers/CMakeLists.txt
+@@ -13,9 +13,10 @@ if (PASTIX_WITH_FORTRAN)
+   add_subdirectory( fortran90 )
+ endif()
+ 
+-if (BUILD_SHARED_LIBS)
+-  add_subdirectory( python )
+-  add_subdirectory( julia )
+-else()
+-  message(STATUS "--- Python and Julia wrappers are disabled with static libraries")
+-endif()
++if (PASTIX_WITH_PYTHON)
++  if (BUILD_SHARED_LIBS)
++    add_subdirectory( python )
++  else (BUILD_SHARED_LIBS)
++    message(FATAL_ERROR "--- Python wrapper requested but it cannot be built with static libraries")
++  endif (BUILD_SHARED_LIBS)
++endif (PASTIX_WITH_PYTHON)

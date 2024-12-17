@@ -1,0 +1,20 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -330,6 +330,7 @@ if( PASTIX_WITH_CUDA )
+ 
+     if (CUDA_INCLUDE_DIRS)
+       set_target_properties(CUDA::CUDA PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CUDA_INCLUDE_DIRS}")
++      include_directories("${CUDA_INCLUDE_DIRS}")
+     else()
+       message(WARNING "PASTIX_WITH_CUDA requires"
+         "\n   CUDA_INCLUDE_DIRS to be found. Be sure you have"
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -989,6 +989,7 @@ if(PASTIX_WITH_PARSEC)
+ endif()
+ 
+ if(PASTIX_WITH_CUDA)
++  target_link_libraries(pastix PRIVATE CUDA::CUDA CUDA::CUBLAS)
+   list(APPEND PASTIX_PKGCONFIG_LIBS pastix_kernels_cuda)
+ endif()
+ 

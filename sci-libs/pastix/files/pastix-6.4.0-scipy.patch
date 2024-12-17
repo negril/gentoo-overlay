@@ -1,0 +1,22 @@
+--- a/wrappers/python/examples/schur.py
++++ b/wrappers/python/examples/schur.py
+@@ -106,7 +106,7 @@ else:
+     pastix.rhsSchurGet( pastix_data, Px, schur_x )
+ 
+     # 3- Solve the Schur complement part
+-    schur_x = la.solve(S, schur_x, sym_pos=True, lower=True)
++    schur_x = la.solve(S, schur_x, assume_a='pos', lower=True)
+ 
+     pastix.rhsSchurSet( pastix_data, schur_x, Px )
+ 
+--- a/wrappers/python/examples/schur_obj.py
++++ b/wrappers/python/examples/schur_obj.py
+@@ -45,7 +45,7 @@ solver = pastix.solver(verbose=2)
+ solver.schur(A, schurlist)
+ S = solver.S
+ f = solver.schur_forward(x)
+-y = la.solve(S, f, sym_pos=True, lower=True)
++y = la.solve(S, f, assume_a='pos', lower=True)
+ x = solver.schur_backward(y)
+ 
+ # Check the solution
