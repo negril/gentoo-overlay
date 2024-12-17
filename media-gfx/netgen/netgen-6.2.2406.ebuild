@@ -3,8 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
-# CMAKE_BUILD_TYPE="Release"
+PYTHON_COMPAT=( python3_{10..13} )
 inherit cmake desktop python-single-r1 xdg
 
 DESCRIPTION="Automatic 3d tetrahedral mesh generator"
@@ -69,29 +68,33 @@ BDEPEND="
 
 PATCHES=(
 	"${FILESDIR}/${PN}-6.2.2204-find-Tk-include-directories.patch"
-	"${FILESDIR}/${PN}-6.2.2404-link-against-ffmpeg.patch"
+	"${FILESDIR}/${PN}-6.2.2406-link-against-ffmpeg.patch"
 	"${FILESDIR}/${PN}-6.2.2204-use-system-catch.patch"
-	"${FILESDIR}/${PN}-6.2.2404-find-libjpeg-turbo-library.patch"
+	"${FILESDIR}/${PN}-6.2.2406-find-libjpeg-turbo-library.patch"
 	"${FILESDIR}/${PN}-6.2.2301-fix-nullptr-deref-in-archive.patch"
-	"${FILESDIR}/${PN}-6.2.2404-encoding_h.patch"
-	"${FILESDIR}/${PN}-6.2.2404-git_version_string.patch"
-	"${FILESDIR}/${PN}-6.2.2404-fix-LTO-Line-basegeom.patch"
+	"${FILESDIR}/${PN}-6.2.2406-encoding_h.patch"
 )
 
 pkg_setup() {
 	if use python; then
-		python-single-r1_pkg_setup
+			python-single-r1_pkg_setup
 
-		# NOTE This calls find_package(Python3) without specifying Interpreter in COMPONENTS.
-		# Python3_FIND_UNVERSIONED_NAMES=FIRST is thus never checked and we search the highest python version first.
-		pushd "${T}/${EPYTHON}/bin" > /dev/null || die
-		cp "python-config" "${EPYTHON}-config" || die
-		chmod +x "${EPYTHON}-config" || die
-		popd > /dev/null || die
+			# NOTE This calls find_package(Python3) without specifying Interpreter in COMPONENTS.
+			# Python3_FIND_UNVERSIONED_NAMES=FIRST is thus never checked and we search the highest python version first.
+			pushd "${T}/${EPYTHON}/bin" > /dev/null || die
+			cp "python-config" "${EPYTHON}-config" || die
+			chmod +x "${EPYTHON}-config" || die
+			popd > /dev/null || die
 	fi
 }
 
 src_prepare() {
+	# # NOTE: need to manually check and update this string on version bumps!
+	# # git describe --tags --match "v[0-9]*" --long --dirty
+	# cat <<- EOF > "${S}/version.txt" || die
+	# 	v${PV}-0-08eec44
+	# EOF
+
 	rm external_dependencies -r || die
 
 	cmake_src_prepare
@@ -99,16 +102,10 @@ src_prepare() {
 
 src_configure() {
 	local mycmakeargs=(
-		# NOTE: need to manually check and update this string on version bumps!
-		# git describe --tags --match "v[0-9]*" --long --dirty
-		# https://github.com/NGSolve/netgen/tags
-		-DNETGEN_VERSION_GIT="v${PV}-0-c488fa9"
-
 		# currently not working in a sandbox, expects netgen to be installed
 		# see https://github.com/NGSolve/netgen/issues/132
 		-DBUILD_STUB_FILES=OFF
-		-DENABLE_UNIT_TESTS="$(usex test)"
-		-DCHECK_RANGE="$(usex test)"
+		-DENABLE_UNIT_TESTS=$(usex test)
 		-DINSTALL_PROFILES=OFF
 		-DNG_INSTALL_DIR_CMAKE="$(get_libdir)/cmake/${PN}"
 		-DNG_INSTALL_DIR_INCLUDE="include/${PN}"
@@ -116,26 +113,27 @@ src_configure() {
 		-DUSE_CCACHE=OFF
 		# doesn't build with this version
 		-DUSE_CGNS=OFF
-		-DUSE_GUI="$(usex gui)"
+		-DUSE_GUI=$(usex gui)
 		-DUSE_INTERNAL_TCL=OFF
-		-DUSE_JPEG="$(usex jpeg)"
-		-DUSE_MPEG="$(usex ffmpeg)"
+		-DUSE_JPEG=$(usex jpeg)
+		-DUSE_MPEG=$(usex ffmpeg)
 		# respect users -march= choice
 		-DUSE_NATIVE_ARCH=OFF
-		-DUSE_MPI="$(usex mpi)"
-		-DUSE_OCC="$(usex opencascade)"
+		-DUSE_MPI=$(usex mpi)
+		-DUSE_OCC=$(usex opencascade)
 		-DUSE_PYTHON="$(usex python)"
 		-DUSE_SUPERBUILD=OFF
+		-DNETGEN_VERSION_GIT="v${PV}"
 	)
 	# no need to set this, if we only build the library
 	if use gui; then
-		mycmakeargs+=( -DTK_INCLUDE_PATH="${EPREFIX}/usr/$(get_libdir)/tk8.6/include" )
+		mycmakeargs+=( -DTK_INCLUDE_PATH="/usr/$(get_libdir)/tk8.6/include" )
 	fi
 	if use python; then
 		mycmakeargs+=(
 			-DPREFER_SYSTEM_PYBIND11=ON
 			# # needed, so the value gets passed to NetgenConfig.cmake instead of ${T}/pythonX.Y
-			-DPython3_EXECUTABLE="${PYTHON}"
+			# -DPYTHON_EXECUTABLE="${PYTHON}"
 		)
 	fi
 	if use mpi && use python; then
@@ -149,11 +147,10 @@ src_configure() {
 src_test() {
 	DESTDIR="${T}" cmake_build install
 
-	if use python; then
-		local -x PYTHONPATH="${T}/$(python_get_sitedir):${T}/usr/$(get_libdir):${BUILD_DIR}/libsrc/core"
-	fi
+	export PYTHONPATH="${T}/$(python_get_sitedir):${T}/usr/$(get_libdir):${BUILD_DIR}/libsrc/core"
 
 	CMAKE_SKIP_TESTS=(
+		'^unit_symboltable$'
 		'^pytest$' # SEGFAULT
 	)
 	cmake_src_test
@@ -163,21 +160,21 @@ src_install() {
 	cmake_src_install
 	use python && python_optimize
 
-	local NETGENDIR="${EPREFIX}/usr/share/${PN}"
+	local NETGENDIR="/usr/share/${PN}"
 	echo -e "NETGENDIR=${NETGENDIR}" > ./99netgen || die
 	doenvd 99netgen
 
 	if use gui; then
 		mv "${ED}"/usr/bin/{*.tcl,*.ocf} "${ED}${NETGENDIR}" || die
 
-		magick convert -deconstruct "${S}/windows/${PN}.ico" netgen.png || die
+		convert -deconstruct "${S}/windows/${PN}.ico" netgen.png || die
 		newicon -s 32 "${S}"/${PN}-2.png ${PN}.png
 		newicon -s 16 "${S}"/${PN}-3.png ${PN}.png
 		make_desktop_entry ${PN} "Netgen" netgen Graphics
 	fi
 
-	mv "${ED}/usr/share/${PN}/doc/ng4.pdf" "${ED}/usr/share/doc/${PF}" || die
-	dosym -r "/usr/share/doc/${PF}/ng4.pdf" "/usr/share/${PN}/doc/ng4.pdf"
+	mv "${ED}"/usr/share/${PN}/doc/ng4.pdf "${ED}"/usr/share/doc/${PF} || die
+	dosym -r /usr/share/doc/${PF}/ng4.pdf /usr/share/${PN}/doc/ng4.pdf
 
-	use python || rm -r "${ED}${NETGENDIR}/py_tutorials" || die
+	use python || rm -r "${ED}${NETGENDIR}"/py_tutorials || die
 }

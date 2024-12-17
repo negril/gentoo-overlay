@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
 	<maintainer type="project" proxied="proxy">
 		<email>sci-mathematics@gentoo.org</email>
@@ -10,6 +10,7 @@
 		<name>Paul Zander</name>
 	</maintainer>
 	<use>
+		<flag name="logging">Enable logging through <pkg>dev-libs/spdlog</pkg></flag>
 		<flag name="opencascade">Enable OpenCASCADE support</flag>
 	</use>
 	<upstream>
