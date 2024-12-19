@@ -129,9 +129,29 @@ src_install() {
 		/usr/share/gitkraken/resources/app.asar.unpacked/src/js/redux/domain/Rebase/GitSequenceEditor.sh
 		/usr/share/gitkraken/resources/bin/gitkraken.sh
 		/usr/share/lintian/overrides/gitkraken
+
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/applypatch-msg.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/commit-msg.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/fsmonitor-watchman.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/post-update.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/pre-applypatch.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/pre-commit.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/pre-merge-commit.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/pre-push.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/pre-rebase.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/pre-receive.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/prepare-commit-msg.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/push-to-checkout.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/sendemail-validate.sample
+		/usr/share/gitkraken/resources/app.asar.unpacked/tutorials/Intro/._git_/hooks/update.sample
 	)
 
-	readarray -t NODEFILES <<<"$(find usr/share/gitkraken/resources/app.asar.unpacked/node_modules/ -name '*.node' )"
+	readarray -t NODEFILES < <(
+		find usr/share/gitkraken/resources/app.asar.unpacked/node_modules/ -executable -name '*.node' -printf '/%p\n'
+	)
+
+	[[ -n "${NODEFILES[*]}" ]] && EXEFILES+=( "${NODEFILES[@]}" )
+	unset NODEFILES
 
 	if ! use system-chromium; then
 		EXEFILES+=(
@@ -139,7 +159,7 @@ src_install() {
 			/usr/share/gitkraken/chrome-sandbox
 		)
 		fperms u+s /usr/share/gitkraken/chrome-sandbox
-		pax-mark m usr/share/gitkraken/chrome-sandbox
+		pax-mark m "${ED}/usr/share/gitkraken/chrome-sandbox"
 	fi
 
 	if ! use system-ffmpeg; then
@@ -148,11 +168,15 @@ src_install() {
 		)
 	fi
 
-	fperms +x "${EXEFILES[@]}" "${NODEFILES[@]}"
-	pax-mark m usr/share/gitkraken/gitkraken
+	fperms +x "${EXEFILES[@]}"
 
-	if [[ $(find "${S}" -type f -executable -ls | wc -l) -ne $(( ${#EXEFILES[@]} + ${#NODEFILES[@]} )) ]]; then
+	pax-mark m "${ED}/usr/share/gitkraken/gitkraken"
+
+	if [[ $(find "${S}" -type f -executable | wc -l) -ne ${#EXEFILES[@]} ]]; then
 		eqawarn "incomplete EXEFILES"
+		colordiff -Naurw \
+			<(find "${S}" -type f -executable | sort) \
+			<(printf "${PWD}%s\n" "${EXEFILES[@]}" | sort)
 	fi
 
 	for lib in "${SYSTEMLIBS[@]}"; do
