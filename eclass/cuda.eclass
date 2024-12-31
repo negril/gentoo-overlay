@@ -15,7 +15,7 @@
 # inherit cuda
 
 case ${EAPI} in
-	7|8) ;;
+	8) ;;
 	*) die "${ECLASS}: EAPI ${EAPI:-0} not supported" ;;
 esac
 
@@ -27,7 +27,7 @@ inherit flag-o-matic toolchain-funcs
 # @ECLASS_VARIABLE: CUDA_REQUIRED_USE
 # @OUTPUT_VARIABLE
 # @DESCRIPTION:
-# Requires at least one AMDGPU target to be compiled.
+# Requires at least one NVPTX target to be compiled.
 # Example use for CUDA libraries:
 # @CODE
 # REQUIRED_USE="${CUDA_REQUIRED_USE}"
@@ -42,20 +42,20 @@ inherit flag-o-matic toolchain-funcs
 # @OUTPUT_VARIABLE
 # @DESCRIPTION:
 # This is an eclass-generated USE-dependency string which can be used to
-# depend on another CUDA package being built for the same AMDGPU architecture.
+# depend on another CUDA package being built for the same NVPTX architecture.
 #
 # The generated USE-flag list is compatible with packages using cuda.eclass.
 #
 # Example use:
 # @CODE
-# DEPEND="sci-libs/rocBLAS[${CUDA_USEDEP}]"
+# DEPEND="media-libs/opencv[${CUDA_USEDEP}]"
 # @CODE
 
 # @ECLASS_VARIABLE: CUDA_SKIP_GLOBALS
 # @DESCRIPTION:
 # Controls whether _cuda_set_globals() is executed. This variable is for
-# ebuilds that call check_amdgpu() without the need to define amdgpu_targets_*
-# USE-flags, such as dev-util/hip and dev-libs/rocm-opencl-runtime.
+# ebuilds that call check_nvptx() without the need to define nvptx_targets_*
+# USE-flags.
 #
 # Example use:
 # @CODE
@@ -104,24 +104,28 @@ _cuda_set_globals() {
 			native
 		)
 
-		IUSE="${nvptx_device_targets[*]/#/nvptx_targets_sm_} +${nvptx_named_targets[*]/#/nvptx_targets_}"
+		IUSE="${nvptx_device_targets[*]/#/nvptx_targets_sm_} ${nvptx_device_targets[*]/#/nvptx_targets_compute_} +${nvptx_named_targets[*]/#/nvptx_targets_}"
 
 		CUDA_REQUIRED_USE="
 			?? (
-				|| ( ${nvptx_device_targets[*]/#/nvptx_targets_sm_} )
+				|| (
+					${nvptx_device_targets[*]/#/nvptx_targets_sm_}
+					${nvptx_device_targets[*]/#/nvptx_targets_compute_}
+				)
 				${nvptx_named_targets[*]/#/nvptx_targets_}
 			)
 		"
 
 		local all_nvptx_targets=(
 			"${nvptx_device_targets[@]/#/nvptx_targets_sm_}"
+			"${nvptx_device_targets[@]/#/nvptx_targets_compute_}"
 			"${nvptx_named_targets[@]/#/nvptx_targets_}"
 		)
 
 		local optflags="${all_nvptx_targets[*]/%/(-)?}"
 		CUDA_USEDEP=${optflags// /,}
 
-		for target in "${nvptx_device_targets_11_8[@]/#/nvptx_targets_sm_}"; do
+		for target in "${nvptx_device_targets_11_8[@]/#/nvptx_targets_sm_}" "${nvptx_device_targets_11_8[@]/#/nvptx_targets_compute_}"; do
 			DEPEND+=" $(printf "%s? ( <dev-util/nvidia-cuda-toolkit-12.0 )" "${target}")"
 		done
 	fi
@@ -150,8 +154,6 @@ unset -f _cuda_set_globals
 # Helper for determination of the latest compiler supported by
 # then current nvidia cuda toolkit.
 cuda_get_host_compiler() {
-	debug-print-function "${FUNCNAME[0]}"
-
 	if [[ -n "${NVCC_CCBIN}" ]]; then
 		echo "${NVCC_CCBIN}"
 		return
@@ -188,7 +190,7 @@ cuda_get_host_compiler() {
 
 	ebegin "testing ${NVCC_CCBIN_default} (default)"
 
-	while ! nvcc - -x cu <<<"int main(){}" &>/dev/null; do
+	while ! nvcc -v -ccbin "${NVCC_CCBIN}" - -x cu <<<"int main(){}" &>> "${T}/cuda_get_host_compiler.log" ; do
 		eend 1
 
 		while true; do
@@ -203,9 +205,16 @@ cuda_get_host_compiler() {
 		done
 		ebegin "testing ${NVCC_CCBIN}"
 	done
-	eend $? "non found"
+	eend $?
+
 	echo "${NVCC_CCBIN}"
 	export NVCC_CCBIN
+}
+
+cuda_get_host_native_arch() {
+	[[ -n ${CUDAARCHS} ]] && echo "${CUDAARCHS}"
+
+	__nvcc_device_query || die "failed to query the native device"
 }
 
 # @FUNCTION: cuda_gccdir
@@ -380,6 +389,25 @@ cuda_cudnn_version() {
 	v="$(best_version dev-libs/cudnn)"
 	v="${v##*cudnn-}"
 	ver_cut 1-2 "${v}"
+}
+
+cuda_pkg_pretend() {
+	if use cuda; then
+		if [[ -z "${CUDA_GENERATION}" ]] && [[ -z "${CUDA_ARCH_BIN}" ]]; then # TODO CUDAARCHS
+			einfo "The target CUDA architecture can be set via one of:"
+			einfo "  - CUDA_GENERATION set to one of Maxwell, Pascal, Volta, Turing, Ampere, Lovelace, Hopper, Auto"
+			einfo "  - CUDA_ARCH_BIN, (and optionally CUDA_ARCH_PTX) in the form of x.y tuples."
+			einfo "      You can specify multiple tuple separated by \";\"."
+			einfo ""
+			einfo "The CUDA architecture tuple for your device can be found at https://developer.nvidia.com/cuda-gpus."
+		fi
+
+		# When building binpkgs you probably want to include all targets
+		if [[ ${MERGE_TYPE} == "buildonly" ]] && [[ -n "${CUDA_GENERATION}" || -n "${CUDA_ARCH_BIN}" ]]; then
+			local info_message="When building a binary package it's recommended to unset CUDA_GENERATION and CUDA_ARCH_BIN"
+			einfo "$info_message so all available architectures are build."
+		fi
+	fi
 }
 
 # @FUNCTION: cuda_src_prepare
