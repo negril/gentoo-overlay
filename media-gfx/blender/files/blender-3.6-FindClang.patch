@@ -1,0 +1,22 @@
+From e4f298dbafd0cf7369e41b2f1ed7cbd546a1c9ba Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 4 Jan 2025 19:02:57 +0100
+Subject: [PATCH] look for the merged clang library so we can find clang
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/build_files/cmake/Modules/FindClang.cmake b/build_files/cmake/Modules/FindClang.cmake
+index 9f9c0a3..51459ce 100644
+--- a/build_files/cmake/Modules/FindClang.cmake
++++ b/build_files/cmake/Modules/FindClang.cmake
+@@ -81,6 +81,7 @@ set(_CLANG_FIND_COMPONENTS
+   clangLex
+   clangBasic
+   clangSupport
++  clang-cpp
+ )
+ 
+ set(_CLANG_LIBRARIES)
+-- 
+2.47.1
+

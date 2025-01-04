@@ -5,7 +5,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {15..18} )
+LLVM_COMPAT=( {15..20} )
 LLVM_OPTIONAL=1
 
 inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 toolchain-funcs xdg-utils virtualx
@@ -13,20 +13,23 @@ inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 to
 DESCRIPTION="3D Creation/Animation/Publishing System"
 HOMEPAGE="https://www.blender.org"
 
-# NOTE BLENDER_VERSION https://projects.blender.org/blender/blender/src/branch/main/source/blender/blenkernel/BKE_blender_version.h
-BLENDER_RELEASE=4.3
+# # NOTE BLENDER_VERSION
+# https://projects.blender.org/blender/blender/src/branch/main/source/blender/blenkernel/BKE_blender_version.h
+# BLENDER_RELEASE=4.4
 BLENDER_BRANCH="$(ver_cut 1-2)"
 
 if [[ ${PV} = *9999* ]] ; then
-	EGIT_LFS="yes"
 	inherit git-r3
+
+	EGIT_LFS="yes"
 	EGIT_REPO_URI="https://projects.blender.org/blender/blender.git"
 	EGIT_SUBMODULES=( '*' '-lib/*' )
 	if ver_test "${BLENDER_BRANCH}" -lt "4.2"; then
 		ADDONS_EGIT_REPO_URI="https://projects.blender.org/blender/blender-addons.git"
 	fi
 
-	if ver_test "${BLENDER_BRANCH}" -lt "${BLENDER_RELEASE}"; then
+	# if ver_test "${BLENDER_BRANCH}" -lt "${BLENDER_RELEASE}"; then
+	if [[ ${PV} != 9999* ]] ; then
 		EGIT_BRANCH="blender-v${BLENDER_BRANCH}-release"
 	fi
 
@@ -37,6 +40,7 @@ else
 	"
 	# 	test? (
 	# 		https://projects.blender.org/blender/blender-test-data/archive/blender-v${BLENDER_BRANCH}-release.tar.gz
+	# 		https://projects.blender.org/blender/blender-test-data/archive/v${PV}.tar.gz
 	# 	)
 	# "
 	KEYWORDS="~amd64 ~arm ~arm64"
@@ -52,8 +56,7 @@ IUSE="
 	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip jack
 	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +openmp +openpgl
 	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
-	renderdoc sdl +sndfile +tbb test +tiff valgrind vulkan wayland +webp X
-	+otf
+	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
 
 if [[ ${PV} = *9999* ]] ; then
@@ -161,7 +164,7 @@ RDEPEND="${PYTHON_DEPS}
 		dev-util/glslang
 		media-libs/vulkan-loader
 	)
-	otf? (
+	truetype? (
 		media-libs/harfbuzz
 	)
 	renderdoc? (
@@ -397,7 +400,7 @@ src_configure() {
 		-DWITH_GHOST_X11=$(usex X)
 		-DWITH_GMP=$(usex gmp)
 		-DWITH_GTESTS=$(usex test)
-		-DWITH_HARFBUZZ="$(usex otf)"
+		-DWITH_HARFBUZZ="$(usex truetype)"
 		-DWITH_HARU=$(usex pdf)
 		-DWITH_HEADLESS=$($(use X || use wayland) && echo "no" || echo "yes")
 		-DWITH_HYDRA="no" # TODO: Package Hydra
@@ -452,15 +455,22 @@ src_configure() {
 	if [[ ${PV} = *9999* ]] ; then
 		mycmakeargs+=(
 			-DWITH_BUILDINFO="yes"
-			-DWITH_EXPERIMENTAL_FEATURES="yes"
+			-DWITH_EXPERIMENTAL_FEATURES="$(usex experimental)"
 		)
 	else
 		mycmakeargs+=( -DWITH_BUILDINFO="no" )
 	fi
 
 	if use cuda; then
+		if [[ -z "${CUDAARCHS}" ]]; then
+			CUDAARCHS="all-major"
+		else
+			CUDAARCHS="sm_${CUDAARCHS}"
+		fi
+
 		mycmakeargs+=(
 			-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
+			-DCYCLES_CUDA_BINARIES_ARCH="${CUDAARCHS}"
 		)
 	fi
 
@@ -489,7 +499,7 @@ src_configure() {
 	use arm64 && append-flags -flax-vector-conversions
 
 	append-cflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
-	append-cppflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
+	append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
 
 	if tc-is-gcc ; then
 		# These options only exist when GCC is detected.
@@ -654,7 +664,8 @@ src_install() {
 
 	python_optimize "${ED}/usr/share/blender/${BV}/scripts"
 
-	mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" || die "blender-thumbnailer version rename failed"
+	mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" \
+		|| die "blender-thumbnailer version rename failed"
 	mv "${ED}/usr/bin/blender" "${ED}/usr/bin/blender-${BV}" || die "blender version rename failed"
 }
 
