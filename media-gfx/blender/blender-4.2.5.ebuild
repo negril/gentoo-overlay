@@ -5,7 +5,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {15..18} )
+LLVM_COMPAT=( {15..20} )
 LLVM_OPTIONAL=1
 
 inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 toolchain-funcs xdg-utils virtualx
@@ -13,20 +13,23 @@ inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 to
 DESCRIPTION="3D Creation/Animation/Publishing System"
 HOMEPAGE="https://www.blender.org"
 
-# NOTE BLENDER_VERSION https://projects.blender.org/blender/blender/src/branch/main/source/blender/blenkernel/BKE_blender_version.h
-BLENDER_RELEASE=4.3
+# # NOTE BLENDER_VERSION
+# https://projects.blender.org/blender/blender/src/branch/main/source/blender/blenkernel/BKE_blender_version.h
+# BLENDER_RELEASE=4.4
 BLENDER_BRANCH="$(ver_cut 1-2)"
 
 if [[ ${PV} = *9999* ]] ; then
-	EGIT_LFS="yes"
 	inherit git-r3
+
+	EGIT_LFS="yes"
 	EGIT_REPO_URI="https://projects.blender.org/blender/blender.git"
 	EGIT_SUBMODULES=( '*' '-lib/*' )
 	if ver_test "${BLENDER_BRANCH}" -lt "4.2"; then
 		ADDONS_EGIT_REPO_URI="https://projects.blender.org/blender/blender-addons.git"
 	fi
 
-	if ver_test "${BLENDER_BRANCH}" -lt "${BLENDER_RELEASE}"; then
+	# if ver_test "${BLENDER_BRANCH}" -lt "${BLENDER_RELEASE}"; then
+	if [[ ${PV} != 9999* ]] ; then
 		EGIT_BRANCH="blender-v${BLENDER_BRANCH}-release"
 	fi
 
@@ -37,6 +40,7 @@ else
 	"
 	# 	test? (
 	# 		https://projects.blender.org/blender/blender-test-data/archive/blender-v${BLENDER_BRANCH}-release.tar.gz
+	# 		https://projects.blender.org/blender/blender-test-data/archive/v${PV}.tar.gz
 	# 	)
 	# "
 	KEYWORDS="~amd64 ~arm ~arm64"
@@ -52,8 +56,7 @@ IUSE="
 	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip jack
 	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +openmp +openpgl
 	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
-	renderdoc sdl +sndfile +tbb test +tiff valgrind vulkan wayland +webp X
-	+otf
+	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
 
 if [[ ${PV} = *9999* ]] ; then
@@ -161,7 +164,7 @@ RDEPEND="${PYTHON_DEPS}
 		dev-util/glslang
 		media-libs/vulkan-loader
 	)
-	otf? (
+	truetype? (
 		media-libs/harfbuzz
 	)
 	renderdoc? (
@@ -334,8 +337,6 @@ src_prepare() {
 		sed '1i #include <cstdint>' -i extern/gtest/src/gtest-death-test.cc || die
 	fi
 
-	unset info_file test_file
-
 	if use vulkan; then
 		sed -e "s/extern_vulkan_memory_allocator/extern_vulkan_memory_allocator\nSPIRV-Tools-opt\nSPIRV-Tools\nSPIRV-Tools-link\nglslang\nSPIRV\nSPVRemapper/" -i source/blender/gpu/CMakeLists.txt || die
 	fi
@@ -356,6 +357,7 @@ src_configure() {
 	local mycmakeargs=(
 		# we build a host-specific binary
 		-DWITH_INSTALL_PORTABLE="no"
+		-DWITH_CPU_CHECK="no"
 
 		-DWITH_LIBS_PRECOMPILED="no"
 		-DBUILD_SHARED_LIBS="no" # this over-ridden by cmake.eclass
@@ -396,7 +398,7 @@ src_configure() {
 		-DWITH_GHOST_X11=$(usex X)
 		-DWITH_GMP=$(usex gmp)
 		-DWITH_GTESTS=$(usex test)
-		-DWITH_HARFBUZZ="$(usex otf)"
+		-DWITH_HARFBUZZ="$(usex truetype)"
 		-DWITH_HARU=$(usex pdf)
 		-DWITH_HEADLESS=$($(use X || use wayland) && echo "no" || echo "yes")
 		-DWITH_HYDRA="no" # TODO: Package Hydra
@@ -451,15 +453,22 @@ src_configure() {
 	if [[ ${PV} = *9999* ]] ; then
 		mycmakeargs+=(
 			-DWITH_BUILDINFO="yes"
-			-DWITH_EXPERIMENTAL_FEATURES="yes"
+			-DWITH_EXPERIMENTAL_FEATURES="$(usex experimental)"
 		)
 	else
 		mycmakeargs+=( -DWITH_BUILDINFO="no" )
 	fi
 
 	if use cuda; then
+		if [[ -z "${CUDAARCHS}" ]]; then
+			CUDAARCHS="all-major"
+		else
+			CUDAARCHS="sm_${CUDAARCHS}"
+		fi
+
 		mycmakeargs+=(
 			-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
+			-DCYCLES_CUDA_BINARIES_ARCH="${CUDAARCHS}"
 		)
 	fi
 
@@ -488,7 +497,7 @@ src_configure() {
 	use arm64 && append-flags -flax-vector-conversions
 
 	append-cflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
-	append-cppflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
+	append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
 
 	if tc-is-gcc ; then
 		# These options only exist when GCC is detected.
@@ -547,13 +556,58 @@ src_test() {
 		addwrite "/dev/char/"
 	fi
 
-	if use X; then
+	addwrite "/dev/char/"
+	addwrite "/dev/nvidiactl"
+	addwrite "/dev/nvidia0"
+	addwrite "/dev/nvidia-modeset"
+	addwrite "/dev/dri/"
+
+	local -x CMAKE_SKIP_TESTS=(
+		draw
+		gpu
+		script_load_modules
+		script_bundled_modules
+		script_pyapi_bpy_driver_secure_eval
+		blendfile_versioning_5_over_8
+		blendfile_versioning_7_over_8
+		cycles_motion_blur_cpu
+		cycles_volume_cpu
+		cycles_motion_blur_cuda
+		cycles_volume_cuda
+		eevee_next_grease_pencil
+		eevee_next_light
+		eevee_next_motion_blur
+		eevee_next_pointcloud
+		eevee_next_render_layer
+		eevee_next_volume
+		workbench_motion_blur
+		workbench_volume
+		compositor_multiple_node_setups_realtime
+		compositor_distort_realtime
+	)
+
+	if use wayland; then
 		xdg_environment_reset
+
+		local compositor exit_code
+		local logfile=${T}/weston.log
+		weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
+		compositor=$!
+		export WAYLAND_DISPLAY=wayland-5
+		sleep 1 # wait for xwayland to be up
+		export DISPLAY=$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)
+
+		cmake_src_test
+
+		exit_code=$?
+		kill "${compositor}"
+
+	elif use X; then
+		xdg_environment_reset
+		virtx cmake_src_test
+	else
+		cmake_src_test
 	fi
-
-	addwrite /dev/dri
-
-	cmake_src_test
 
 	# Clean up the image directory for src_install
 	rm -fr "${T}/usr" || die
@@ -608,7 +662,8 @@ src_install() {
 
 	python_optimize "${ED}/usr/share/blender/${BV}/scripts"
 
-	mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" || die "blender-thumbnailer version rename failed"
+	mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" \
+		|| die "blender-thumbnailer version rename failed"
 	mv "${ED}/usr/bin/blender" "${ED}/usr/bin/blender-${BV}" || die "blender version rename failed"
 }
 

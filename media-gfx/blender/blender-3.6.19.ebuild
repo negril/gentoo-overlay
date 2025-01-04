@@ -3,30 +3,33 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..11} )
+PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {15..18} )
+LLVM_COMPAT=( {15..20} )
 LLVM_OPTIONAL=1
 
-inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 toolchain-funcs xdg-utils
+inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 toolchain-funcs xdg-utils virtualx
 
 DESCRIPTION="3D Creation/Animation/Publishing System"
 HOMEPAGE="https://www.blender.org"
 
-# NOTE BLENDER_VERSION https://projects.blender.org/blender/blender/src/branch/main/source/blender/blenkernel/BKE_blender_version.h
-BLENDER_RELEASE=4.3
+# # NOTE BLENDER_VERSION
+# https://projects.blender.org/blender/blender/src/branch/main/source/blender/blenkernel/BKE_blender_version.h
+# BLENDER_RELEASE=4.4
 BLENDER_BRANCH="$(ver_cut 1-2)"
 
 if [[ ${PV} = *9999* ]] ; then
-	EGIT_LFS="yes"
 	inherit git-r3
+
+	EGIT_LFS="yes"
 	EGIT_REPO_URI="https://projects.blender.org/blender/blender.git"
 	EGIT_SUBMODULES=( '*' '-lib/*' )
 	if ver_test "${BLENDER_BRANCH}" -lt "4.2"; then
 		ADDONS_EGIT_REPO_URI="https://projects.blender.org/blender/blender-addons.git"
 	fi
 
-	if ver_test "${BLENDER_BRANCH}" -lt "${BLENDER_RELEASE}"; then
+	# if ver_test "${BLENDER_BRANCH}" -lt "${BLENDER_RELEASE}"; then
+	if [[ ${PV} != 9999* ]] ; then
 		EGIT_BRANCH="blender-v${BLENDER_BRANCH}-release"
 	fi
 
@@ -37,6 +40,7 @@ else
 	"
 	# 	test? (
 	# 		https://projects.blender.org/blender/blender-test-data/archive/blender-v${BLENDER_BRANCH}-release.tar.gz
+	# 		https://projects.blender.org/blender/blender-test-data/archive/v${PV}.tar.gz
 	# 	)
 	# "
 	KEYWORDS="~amd64 ~arm ~arm64"
@@ -48,28 +52,34 @@ SLOT="${BLENDER_BRANCH}"
 
 # NOTE +openpgl breaks on very old amd64 hardware
 IUSE="
-	+bullet +fluid +openexr +tbb
-	alembic collada +color-management cuda +cycles
-	debug doc +embree +ffmpeg +fftw +gmp jack jemalloc jpeg2k
-	man +nanovdb ndof nls openal +oidn +openmp +opensubdiv
-	+openvdb optix osl +pdf +potrace +pugixml pulseaudio sdl
-	+sndfile test valgrind
-	cycles-bin-kernels +openpgl wayland X
+	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
+	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip jack
+	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +openmp +openpgl
+	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
+	renderdoc sdl +sndfile +tbb test +tiff valgrind vulkan wayland +webp X
 "
+
+if [[ ${PV} = *9999* ]] ; then
+	IUSE+="experimental"
+fi
 
 REQUIRED_USE="${PYTHON_REQUIRED_USE}
 	alembic? ( openexr )
 	cuda? ( cycles )
-	cycles? ( openexr )
+	cycles? ( openexr tiff tbb )
 	fluid? ( tbb )
-	openvdb? ( tbb )
+	gnome? ( wayland )
+	hip? ( cycles )
+	nanovdb? ( openvdb )
+	openvdb? ( tbb openexr )
 	optix? ( cuda )
-	osl? ( cycles )
+	osl? ( cycles pugixml )
 	test? ( color-management )"
 
 # Library versions for official builds can be found in the blender source directory in:
-# build_files/build_environment/install_deps.sh
+# build_files/build_environment/cmake/versions.cmake
 RDEPEND="${PYTHON_DEPS}
+	app-arch/zstd
 	dev-libs/boost:=[nls?]
 	dev-libs/lzo:2=
 	$(python_gen_cond_dep '
@@ -96,6 +106,15 @@ RDEPEND="${PYTHON_DEPS}
 	ffmpeg? ( media-video/ffmpeg:=[x264,mp3,encode,theora,jpeg2k?,vpx,vorbis,opus,xvid] )
 	fftw? ( sci-libs/fftw:3.0= )
 	gmp? ( dev-libs/gmp[cxx] )
+	gnome? ( gui-libs/libdecor )
+	hip? (
+		llvm_slot_17? (
+			dev-util/hip:0/5.7
+		)
+		llvm_slot_18? (
+			>=dev-util/hip-6.1:=[llvm_slot_18(-)]
+		)
+	)
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
 	jpeg2k? ( media-libs/openjpeg:2= )
@@ -105,7 +124,8 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
-	oidn? ( >=media-libs/oidn-1.4.1[${LLVM_USEDEP}] )
+	oidn? ( >=media-libs/oidn-2.1.0[${LLVM_USEDEP}] )
+	oneapi? ( dev-libs/intel-compute-runtime[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.4-r2:=
 		>=media-libs/openexr-3:0=
@@ -118,7 +138,7 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	optix? ( dev-libs/optix )
 	osl? (
-		<media-libs/osl-1.13:=[${LLVM_USEDEP}]
+		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
 	)
 	pdf? ( media-libs/libharu )
@@ -128,14 +148,24 @@ RDEPEND="${PYTHON_DEPS}
 	sdl? ( media-libs/libsdl2[sound,joystick] )
 	sndfile? ( media-libs/libsndfile )
 	tbb? ( dev-cpp/tbb:= )
-	media-libs/tiff:=
+	tiff? ( media-libs/tiff:= )
 	valgrind? ( dev-debug/valgrind )
 	wayland? (
 		>=dev-libs/wayland-1.12
 		>=dev-libs/wayland-protocols-1.15
 		>=x11-libs/libxkbcommon-0.2.0
+		dev-util/wayland-scanner
 		media-libs/mesa[wayland]
 		sys-apps/dbus
+	)
+	vulkan? (
+		media-libs/shaderc
+		dev-util/spirv-tools
+		dev-util/glslang
+		media-libs/vulkan-loader
+	)
+	renderdoc? (
+		media-gfx/renderdoc
 	)
 	X? (
 		x11-libs/libX11
@@ -146,6 +176,10 @@ RDEPEND="${PYTHON_DEPS}
 
 DEPEND="${RDEPEND}
 	dev-cpp/eigen:=
+	vulkan? (
+		dev-util/spirv-headers
+		dev-util/vulkan-headers
+	)
 "
 
 BDEPEND="
@@ -163,10 +197,13 @@ BDEPEND="
 	wayland? (
 		dev-util/wayland-scanner
 	)
+	X? (
+		x11-base/xorg-proto
+	)
 "
 
 PATCHES=(
-	"${FILESDIR}/${PN}-4.0.1-openvdb-11.patch"
+	"${FILESDIR}/${PN}-3.6-FindClang.patch"
 	"${FILESDIR}/${PN}-4.0.2-CUDA_NVCC_FLAGS.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
@@ -190,6 +227,12 @@ blender_get_version() {
 
 pkg_pretend() {
 	blender_check_requirements
+
+	if use oneapi; then
+		einfo "The Intel oneAPI support is rudimentary."
+		einfo ""
+		einfo "Please report any bugs you find to https://bugs.gentoo.org/"
+	fi
 }
 
 pkg_setup() {
@@ -292,6 +335,10 @@ src_prepare() {
 	fi
 
 	unset info_file test_file
+
+	if use vulkan; then
+		sed -e "s/extern_vulkan_memory_allocator/extern_vulkan_memory_allocator\nSPIRV-Tools-opt\nSPIRV-Tools\nSPIRV-Tools-link\nglslang\nSPIRV\nSPVRemapper/" -i source/blender/gpu/CMakeLists.txt || die
+	fi
 }
 
 src_configure() {
@@ -309,7 +356,9 @@ src_configure() {
 	local mycmakeargs=(
 		# we build a host-specific binary
 		-DWITH_INSTALL_PORTABLE="no"
+		-DWITH_CPU_CHECK="no"
 
+		-DWITH_LIBS_PRECOMPILED="no"
 		-DBUILD_SHARED_LIBS="no" # this over-ridden by cmake.eclass
 
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
@@ -322,22 +371,31 @@ src_configure() {
 		-DWITH_CODEC_FFMPEG=$(usex ffmpeg)
 		-DWITH_CODEC_SNDFILE=$(usex sndfile)
 		-DWITH_CXX_GUARDEDALLOC=$(usex debug)
+
 		-DWITH_CYCLES=$(usex cycles)
+
 		-DWITH_CYCLES_DEVICE_CUDA=$(usex cuda)
 		-DWITH_CYCLES_CUDA_BINARIES="$(usex cuda $(usex cycles-bin-kernels))"
 		-DWITH_CYCLES_DEVICE_OPTIX=$(usex optix)
+
+		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
+		-DWITH_CYCLES_HIP_BINARIES=$(usex hip $(usex cycles-bin-kernels))
+
+		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
+		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi $(usex cycles-bin-kernels))"
+
+		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
 		-DWITH_CYCLES_EMBREE="$(usex embree)"
 		-DWITH_CYCLES_OSL=$(usex osl)
 		-DWITH_CYCLES_PATH_GUIDING=$(usex openpgl)
 		-DWITH_CYCLES_STANDALONE="no"
 		-DWITH_CYCLES_STANDALONE_GUI="no"
+
 		-DWITH_DOC_MANPAGE=$(usex man)
+		-DWITH_DRACO="no" # TODO: Package Draco
 		-DWITH_FFTW3=$(usex fftw)
 		-DWITH_GHOST_WAYLAND=$(usex wayland)
-		-DWITH_GHOST_WAYLAND_APP_ID="blender-${BV}"
-		-DWITH_GHOST_WAYLAND_DBUS=$(usex wayland)
 		-DWITH_GHOST_WAYLAND_DYNLOAD="no"
-		-DWITH_GHOST_WAYLAND_LIBDECOR="no"
 		-DWITH_GHOST_X11=$(usex X)
 		-DWITH_GMP=$(usex gmp)
 		-DWITH_GTESTS=$(usex test)
@@ -345,9 +403,11 @@ src_configure() {
 		-DWITH_HEADLESS=$($(use X || use wayland) && echo "no" || echo "yes")
 		-DWITH_IMAGE_OPENEXR=$(usex openexr)
 		-DWITH_IMAGE_OPENJPEG=$(usex jpeg2k)
+		-DWITH_IMAGE_WEBP=$(usex webp)
 		-DWITH_INPUT_NDOF=$(usex ndof)
 		-DWITH_INTERNATIONAL=$(usex nls)
 		-DWITH_JACK=$(usex jack)
+		-DWITH_MATERIALX="no" # TODO: Package MaterialX
 		-DWITH_MEM_JEMALLOC=$(usex jemalloc)
 		-DWITH_MEM_VALGRIND=$(usex valgrind)
 		-DWITH_MOD_FLUID=$(usex fluid)
@@ -365,14 +425,20 @@ src_configure() {
 		-DWITH_PUGIXML=$(usex pugixml)
 		-DWITH_PULSEAUDIO=$(usex pulseaudio)
 		-DWITH_PYTHON_INSTALL="no"
+		-DWITH_PYTHON_INSTALL_NUMPY="no"
+		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
+		-DWITH_RENDERDOC="$(usex renderdoc)"
 		-DWITH_SDL=$(usex sdl)
 		-DWITH_STATIC_LIBS="no"
+		-DWITH_STRICT_BUILD_OPTIONS="yes"
 		-DWITH_SYSTEM_EIGEN3="yes"
 		-DWITH_SYSTEM_FREETYPE="yes"
 		-DWITH_SYSTEM_LZO="yes"
 		-DWITH_TBB=$(usex tbb)
-		-DWITH_USD="no"
+		-DWITH_USD="no" # TODO: Package USD
+		-DWITH_VULKAN_BACKEND="$(usex vulkan)"
 		-DWITH_XR_OPENXR="no"
+		-DWITH_UNITY_BUILD="no"
 	)
 
 	if has_version ">=dev-python/numpy-2"; then
@@ -384,14 +450,31 @@ src_configure() {
 
 	# requires dev-vcs/git
 	if [[ ${PV} = *9999* ]] ; then
-		mycmakeargs+=( -DWITH_BUILDINFO="yes" )
+		mycmakeargs+=(
+			-DWITH_BUILDINFO="yes"
+			-DWITH_EXPERIMENTAL_FEATURES="$(usex experimental)"
+		)
 	else
 		mycmakeargs+=( -DWITH_BUILDINFO="no" )
 	fi
 
 	if use cuda; then
+		if [[ -z "${CUDAARCHS}" ]]; then
+			CUDAARCHS="all-major"
+		else
+			CUDAARCHS="sm_${CUDAARCHS}"
+		fi
+
 		mycmakeargs+=(
 			-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
+			-DCYCLES_CUDA_BINARIES_ARCH="${CUDAARCHS}"
+		)
+	fi
+
+	if use hip; then
+		mycmakeargs+=(
+			-DROCM_PATH="$(hipconfig -R)"
+			-DHIP_HIPCC_FLAGS="-fcf-protection=none"
 		)
 	fi
 
@@ -402,11 +485,18 @@ src_configure() {
 		)
 	fi
 
+	if use wayland; then
+		mycmakeargs+=(
+			-DWITH_GHOST_WAYLAND_APP_ID="blender-${BV}"
+			-DWITH_GHOST_WAYLAND_LIBDECOR="$(usex gnome)"
+		)
+	fi
+
 	# This is currently needed on arm64 to get the NEON SIMD wrapper to compile the code successfully
 	use arm64 && append-flags -flax-vector-conversions
 
 	append-cflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
-	append-cppflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
+	append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
 
 	if tc-is-gcc ; then
 		# These options only exist when GCC is detected.
@@ -431,10 +521,14 @@ src_configure() {
 		if use cycles-bin-kernels; then
 			use cuda && CYCLES_TEST_DEVICES+=( "CUDA" )
 			use optix && CYCLES_TEST_DEVICES+=( "OPTIX" )
+			use hip && CYCLES_TEST_DEVICES+=( "HIP" )
 		fi
 		mycmakeargs+=(
-			-DCMAKE_INSTALL_PREFIX_WITH_CONFIG="${T}"
+			-DCMAKE_INSTALL_PREFIX_WITH_CONFIG="${T}/usr"
 			-DCYCLES_TEST_DEVICES="$(local IFS=";"; echo "${CYCLES_TEST_DEVICES[*]}")"
+			-DWITH_COMPOSITOR_REALTIME_TESTS="yes"
+			-DWITH_GPU_DRAW_TESTS="yes"
+			-DWITH_GPU_RENDER_TESTS="yes"
 		)
 	fi
 
@@ -461,13 +555,58 @@ src_test() {
 		addwrite "/dev/char/"
 	fi
 
-	if use X; then
+	addwrite "/dev/char/"
+	addwrite "/dev/nvidiactl"
+	addwrite "/dev/nvidia0"
+	addwrite "/dev/nvidia-modeset"
+	addwrite "/dev/dri/"
+
+	local -x CMAKE_SKIP_TESTS=(
+		draw
+		gpu
+		script_load_modules
+		script_bundled_modules
+		script_pyapi_bpy_driver_secure_eval
+		blendfile_versioning_5_over_8
+		blendfile_versioning_7_over_8
+		cycles_motion_blur_cpu
+		cycles_volume_cpu
+		cycles_motion_blur_cuda
+		cycles_volume_cuda
+		eevee_next_grease_pencil
+		eevee_next_light
+		eevee_next_motion_blur
+		eevee_next_pointcloud
+		eevee_next_render_layer
+		eevee_next_volume
+		workbench_motion_blur
+		workbench_volume
+		compositor_multiple_node_setups_realtime
+		compositor_distort_realtime
+	)
+
+	if use wayland; then
 		xdg_environment_reset
+
+		local compositor exit_code
+		local logfile=${T}/weston.log
+		weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
+		compositor=$!
+		export WAYLAND_DISPLAY=wayland-5
+		sleep 1 # wait for xwayland to be up
+		export DISPLAY=$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)
+
+		cmake_src_test
+
+		exit_code=$?
+		kill "${compositor}"
+
+	elif use X; then
+		xdg_environment_reset
+		virtx cmake_src_test
+	else
+		cmake_src_test
 	fi
-
-	addwrite /dev/dri
-
-	cmake_src_test
 
 	# Clean up the image directory for src_install
 	rm -fr "${T}/usr" || die
@@ -522,7 +661,8 @@ src_install() {
 
 	python_optimize "${ED}/usr/share/blender/${BV}/scripts"
 
-	mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" || die "blender-thumbnailer version rename failed"
+	mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" \
+		|| die "blender-thumbnailer version rename failed"
 	mv "${ED}/usr/bin/blender" "${ED}/usr/bin/blender-${BV}" || die "blender version rename failed"
 }
 
