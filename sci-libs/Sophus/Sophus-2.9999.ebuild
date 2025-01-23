@@ -1,4 +1,4 @@
-# Copyright 2023 Gentoo Authors
+# Copyright 2023-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -12,7 +12,9 @@ HOMEPAGE="https://github.com/strasdat/Sophus"
 if [[ ${PV} == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/strasdat/Sophus.git"
-	EGIT_BRANCH="main-1.x"
+	if [[ ${PV} == 2.9999* ]]; then
+		EGIT_BRANCH="sophus2"
+	fi
 	EGIT_SUBMODULES=(
 		'-*'
 	)
@@ -22,7 +24,7 @@ else
 fi
 
 LICENSE="MIT"
-SLOT="0/1"
+SLOT="0/$(ver_cut 1)"
 
 IUSE="examples +fmt +python test"
 
@@ -65,7 +67,7 @@ src_configure() {
 		-DBUILD_SOPHUS_TESTS="$(usex test)"
 
 		-DSOPHUS_USE_BASIC_LOGGING="$(usex !fmt)"
-		-DSOPHUS_INSTALL="ON"
+		-DSOPHUS_INSTALL="yes"
 	)
 
 	if use python; then

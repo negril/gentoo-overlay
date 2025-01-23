@@ -1,4 +1,4 @@
-# Copyright 2023 Gentoo Authors
+# Copyright 2023-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -12,7 +12,9 @@ HOMEPAGE="https://github.com/strasdat/Sophus"
 if [[ ${PV} == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/strasdat/Sophus.git"
-	EGIT_BRANCH="sophus2"
+	if [[ ${PV} == 2.9999* ]]; then
+		EGIT_BRANCH="sophus2"
+	fi
 	EGIT_SUBMODULES=(
 		'-*'
 	)
@@ -22,7 +24,7 @@ else
 fi
 
 LICENSE="MIT"
-SLOT="0/2"
+SLOT="0/$(ver_cut 1)"
 
 IUSE="examples +fmt +python test"
 
@@ -42,7 +44,7 @@ DEPEND="
 		')
 	)
 	test? (
-		sci-libs/ceres-solver
+		>=sci-libs/ceres-solver-2
 	)
 "
 
@@ -54,7 +56,6 @@ REQUIRED_USE="
 RESTRICT="!test? ( test )"
 
 PATCHES=(
-	"${FILESDIR}/${PN}-9999-cmake-fix-build-flags.patch"
 	"${FILESDIR}/${PN}-9999-use-system-pybind11.patch"
 )
 
@@ -65,7 +66,7 @@ src_configure() {
 		-DBUILD_SOPHUS_TESTS="$(usex test)"
 
 		-DSOPHUS_USE_BASIC_LOGGING="$(usex !fmt)"
-		-DSOPHUS_INSTALL="ON"
+		-DSOPHUS_INSTALL="yes"
 	)
 
 	if use python; then
