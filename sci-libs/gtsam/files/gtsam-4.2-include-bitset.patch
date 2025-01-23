@@ -1,0 +1,22 @@
+From e48683af60eebe3d574406ae15bf41303120f695 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 18 Jan 2025 22:03:11 +0100
+Subject: [PATCH] include bitset
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/gtsam/hybrid/tests/testHybridEstimation.cpp b/gtsam/hybrid/tests/testHybridEstimation.cpp
+index a0195d0..7cf334a 100644
+--- a/gtsam/hybrid/tests/testHybridEstimation.cpp
++++ b/gtsam/hybrid/tests/testHybridEstimation.cpp
+@@ -36,6 +36,7 @@
+ #include <CppUnitLite/TestHarness.h>
+ 
+ #include "Switching.h"
++#include <bitset>
+ 
+ using namespace std;
+ using namespace gtsam;
+-- 
+2.48.0
+

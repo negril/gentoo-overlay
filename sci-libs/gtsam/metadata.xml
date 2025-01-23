@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person" proxied="yes">
+		<email>negril.nx+gentoo@gmail.com</email>
+		<name>Paul Zander</name>
+	</maintainer>
+	<maintainer type="project" proxied="proxy">
+		<email>proxy-maint@gentoo.org</email>
+		<name>Proxy Maintainers</name>
+	</maintainer>
+	<longdescription> GTSAM is a library of C++ classes that implement smoothing and mapping (SAM) in robotics and vision, using factor graphs and Bayes networks as the underlying computing paradigm rather than sparse matrices.</longdescription>
+	<use>
+		<flag name="asan">Enable memory sanitizer</flag>
+		<flag name="boost">Enable Boost serialization</flag>
+		<flag name="doc">Enable building of doxygen docs</flag>
+		<flag name="examples">Build examples</flag>
+		<flag name="gperf">Enable Gperftools</flag>
+		<flag name="gprof">Enable the next-generation gprofng profiler</flag>
+		<flag name="html">Enable doxygen HTML output</flag>
+		<flag name="latex">Enable doxygen LaTeX output</flag>
+		<flag name="metis">Add support for metis (<pkg>sci-libs/metis</pkg>)</flag>
+		<flag name="mkl">Eigen will use Intel MKL if available</flag>
+		<flag name="python">Enable Python module with <pkg>pybind11</pkg></flag>
+		<flag name="quaternion">Enable using an internal Quaternion representation for rotations instead of rotation matrices. If enable, Rot3::EXPMAP is enforced by default.</flag>
+		<flag name="openmp">enable OpenMP support</flag>
+	</use>
+	<upstream>
+		<remote-id type="github">borglab/gtsam</remote-id>
+	</upstream>
+</pkgmetadata>
