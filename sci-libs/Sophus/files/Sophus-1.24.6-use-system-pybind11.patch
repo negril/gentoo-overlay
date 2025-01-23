@@ -1,0 +1,30 @@
+From 7c5aba8fe66f39ba764c0a9ca6d05b0c7d4a4f18 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Mon, 20 Jan 2025 23:03:38 +0100
+Subject: [PATCH] use system pybind11
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c4f3185..fbbaf8f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -115,14 +115,8 @@ if(BUILD_PYTHON_BINDINGS)
+   if(NOT TARGET fmt::fmt)
+     find_package(fmt REQUIRED)
+   endif()
+-  include(FetchContent)
+-  FetchContent_Declare(
+-    pybind11
+-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+-    GIT_TAG master)
+-  FetchContent_MakeAvailable(pybind11)
+-
+-  add_subdirectory(${pybind11_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/pybind)
++  find_package(Python COMPONENTS Interpreter Development REQUIRED)
++  find_package(pybind11 CONFIG REQUIRED)
+   pybind11_add_module(sophus_pybind
+                       ${CMAKE_CURRENT_SOURCE_DIR}/sophus_pybind/bindings.cpp)
+   target_link_libraries(sophus_pybind PUBLIC sophus fmt::fmt)
+-- 
+2.48.0

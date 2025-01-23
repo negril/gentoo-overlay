@@ -11,7 +11,7 @@
   </maintainer>
   <use>
     <flag name="examples">Build Examples</flag>
-    <flag name="fmt">Don't usee basic logging (in ensure and test macros)</flag>
+    <flag name="fmt">Don't use basic logging (in ensure and test macros)</flag>
     <flag name="python">Build python sophus bindings</flag>
     <flag name="test">Build Tests</flag>
   </use>
