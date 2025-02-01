@@ -28,6 +28,7 @@ BDEPEND="${PYTHON_DEPS}
 "
 RDEPEND="
 	dev-cpp/glog[gflags?,${MULTILIB_USEDEP}]
+	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	lapack? ( virtual/lapack )
 	sparse? (
 		sci-libs/amd
@@ -44,6 +45,7 @@ DOCS=( README.md VERSION )
 
 PATCHES=(
 	"${FILESDIR}/${PN}-2.0.0-system-mathjax.patch"
+	"${FILESDIR}/${PN}-2.2.0-include-algorithm.patch"
 )
 
 # cuda_get_cuda_compiler() {
@@ -99,7 +101,6 @@ PATCHES=(
 # }
 
 src_prepare() {
-
 	cmake_src_prepare
 
 	filter-lto
