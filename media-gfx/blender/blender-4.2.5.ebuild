@@ -1,11 +1,11 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {15..20} )
+LLVM_COMPAT=( {15..19} )
 LLVM_OPTIONAL=1
 
 inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 toolchain-funcs xdg-utils virtualx
@@ -103,7 +103,10 @@ RDEPEND="${PYTHON_DEPS}
 	color-management? ( media-libs/opencolorio:= )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	embree? ( media-libs/embree:=[raymask] )
-	ffmpeg? ( media-video/ffmpeg:=[x264,mp3,encode,theora,jpeg2k?,vpx,vorbis,opus,xvid] )
+	ffmpeg? (
+		media-video/ffmpeg:=[encode(+),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid]
+		|| ( media-video/ffmpeg[lame(-)] media-video/ffmpeg[mp3(-)] )
+	)
 	fftw? ( sci-libs/fftw:3.0= )
 	gmp? ( dev-libs/gmp[cxx] )
 	gnome? ( gui-libs/libdecor )
@@ -124,7 +127,7 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
-	oidn? ( >=media-libs/oidn-2.1.0[${LLVM_USEDEP}] )
+	oidn? ( >=media-libs/oidn-2.1.0 )
 	oneapi? ( dev-libs/intel-compute-runtime[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
@@ -210,6 +213,8 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-CUDA_NVCC_FLAGS.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
+
+	"${FILESDIR}/${PN}-4.3.2-openvdb-12.patch"
 )
 
 blender_check_requirements() {
@@ -544,7 +549,7 @@ src_test() {
 	blender_get_version
 	# Define custom blender data/script file paths not be able to find them otherwise during testing.
 	# (Because the data is in the image directory and it will default to look in /usr/share)
-	export BLENDER_SYSTEM_RESOURCES="${T}/usr/share/blender/${BV}"
+	local -x BLENDER_SYSTEM_RESOURCES="${T%/}/usr/share/blender/${BV}"
 
 	# Sanity check that the script and datafile path is valid.
 	# If they are not vaild, blender will fallback to the default path which is not what we want.
@@ -629,7 +634,7 @@ src_install() {
 	if use doc; then
 		# Define custom blender data/script file paths. Otherwise Blender will not be able to find them during doc building.
 		# (Because the data is in the image directory and it will default to look in /usr/share)
-		export BLENDER_SYSTEM_RESOURCES="${T}/usr/share/blender/${BV}"
+		local -x BLENDER_SYSTEM_RESOURCES="${ED}/usr/share/blender/${BV}"
 
 		# Workaround for binary drivers.
 		addpredict /dev/ati
