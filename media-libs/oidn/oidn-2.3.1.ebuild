@@ -6,13 +6,14 @@ EAPI=8
 PYTHON_COMPAT=( python3_{10..13} )
 LLVM_COMPAT=( {15..19} )
 ROCM_VERSION=6.1
+CUDA_DEVICE_TARGETS=1
 
 inherit cmake cuda llvm-r1 python-any-r1 rocm
 
 DESCRIPTION="Intel® Open Image Denoise library"
 HOMEPAGE="https://www.openimagedenoise.org https://github.com/RenderKit/oidn"
 
-if [[ ${PV} = *9999 ]]; then
+if [[ ${PV} = *9999* ]]; then
 	EGIT_REPO_URI="https://github.com/RenderKit/oidn.git"
 	EGIT_BRANCH="master"
 	inherit git-r3
@@ -51,7 +52,6 @@ PATCHES=(
 src_prepare() {
 	if use cuda; then
 		cuda_src_prepare
-		addpredict "/proc/self/task/"
 	fi
 
 	if use hip; then
@@ -61,6 +61,8 @@ src_prepare() {
 	fi
 
 	sed -e "/^install.*llvm_macros.cmake.*cmake/d" -i CMakeLists.txt || die
+	# do not fortify source -- bug 895018
+	sed -e "s/-D_FORTIFY_SOURCE=2//g" -i {cmake/oidn_platform,external/mkl-dnn/cmake/SDL}.cmake || die
 
 	cmake_src_prepare
 }
@@ -103,6 +105,6 @@ src_install() {
 
 	if use hip || use cuda ; then
 		# remove garbage in /var/tmp left by subprojects
-		rm -rf "${ED}"/var || die
+		rm -r "${ED}"/var || die
 	fi
 }
