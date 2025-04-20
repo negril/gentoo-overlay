@@ -3,22 +3,39 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+# TODO
+# drop OPENVDB_SIMD
+
+PYTHON_COMPAT=( python3_{11..13} )
+
+inherit cmake cuda flag-o-matic python-single-r1 toolchain-funcs
+# inherit multibuild
 
 LLVM_COMPAT=( 15 )
-
-inherit cmake cuda flag-o-matic llvm-r2 multibuild python-single-r1 toolchain-funcs
+inherit llvm-r2
 
 DESCRIPTION="Library for the efficient manipulation of volumetric data"
 HOMEPAGE="https://www.openvdb.org"
 SRC_URI="https://github.com/AcademySoftwareFoundation/${PN}/archive/v${PV}.tar.gz -> ${P}.tar.gz"
 
 LICENSE="MPL-2.0"
+
 OPENVDB_ABI=$(ver_cut 1)
 SLOT="0/$(ver_cut 1-2)"
-KEYWORDS="amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
-IUSE="abi$((OPENVDB_ABI + 1))-compat +abi${OPENVDB_ABI}-compat abi$((OPENVDB_ABI - 1))-compat abi$((OPENVDB_ABI - 2))-compat alembic ax +blosc cpu_flags_x86_avx cpu_flags_x86_sse4_2
-	cuda doc examples jpeg +nanovdb numpy openexr png python static-libs test utils zlib"
+
+KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
+IUSE="
+	abi$((OPENVDB_ABI + 1))-compat
+	+abi${OPENVDB_ABI}-compat
+	abi$((OPENVDB_ABI - 1))-compat
+	abi$((OPENVDB_ABI - 2))-compat
+	cpu_flags_x86_avx
+	cpu_flags_x86_sse4_2
+	cpu_flags_arm_neon
+	alembic +blosc cuda doc examples jpeg +nanovdb numpy openexr pdal png python static-libs test utils +zlib
+"
+
+IUSE+=" ax"
 RESTRICT="!test? ( test )"
 
 REQUIRED_USE="
@@ -37,55 +54,67 @@ REQUIRED_USE="
 # 	dev-util/gcovr
 # )
 
+# NOTE utils? links to OpenGL::GL, so needs GLX via media-libs/libglvnd[X]
 RDEPEND="
 	>=dev-cpp/tbb-2020.3:=
 	dev-libs/boost:=
 	dev-libs/jemalloc:=
-	dev-libs/imath:=
-	ax? (
-		$(llvm_gen_dep '
-			llvm-core/llvm:${LLVM_SLOT}=
-		')
-	)
 	blosc? (
 		dev-libs/c-blosc:=
-		sys-libs/zlib:=
 	)
 	nanovdb? (
-		zlib? (
-			sys-libs/zlib:=
-		)
 		cuda? (
 			dev-util/nvidia-cuda-toolkit:=
 		)
+		python? ( ${PYTHON_DEPS}
+			$(python_gen_cond_dep '
+				dev-python/nanobind[${PYTHON_USEDEP}]
+			')
+		)
 	)
+	openexr? ( >=media-libs/openexr-3:= )
 	python? (
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
 			dev-libs/boost:=[numpy?,${PYTHON_USEDEP}]
 			dev-python/pybind11[${PYTHON_USEDEP}]
+			dev-python/nanobind[${PYTHON_USEDEP}]
 			numpy? ( dev-python/numpy[${PYTHON_USEDEP}] )
 		')
 	)
 	utils? (
-		x11-libs/libXcursor
-		x11-libs/libXi
-		x11-libs/libXinerama
-		x11-libs/libXrandr
 		media-libs/glfw
 		media-libs/glu
 		alembic? ( media-gfx/alembic )
 		jpeg? ( media-libs/libjpeg-turbo:= )
+		pdal? ( sci-libs/pdal:= )
 		png? ( media-libs/libpng:= )
 		openexr? ( >=media-libs/openexr-3:= )
-		media-libs/libglvnd
+		media-libs/libglvnd[X]
+	)
+	zlib? (
+		sys-libs/zlib:=
+	)
+"
+
+RDEPEND+="
+	ax? (
+		$(llvm_gen_dep '
+			llvm-core/llvm:${LLVM_SLOT}=
+		')
 	)
 	!ax? (
 		dev-libs/log4cplus:=
 	)
 "
 
-DEPEND="${RDEPEND}"
+DEPEND="${RDEPEND}
+	utils? (
+		openexr? (
+			dev-libs/imath:=
+		)
+	)
+"
 BDEPEND="
 	virtual/pkgconfig
 	doc? (
@@ -107,12 +136,16 @@ PATCHES=(
 
 	"${FILESDIR}/${PN}-9.0.0-fix-atomic.patch"
 
-	"${FILESDIR}/${PN}-10.0.1-fix-linking-of-vdb_tool-with-OpenEXR.patch"
 	"${FILESDIR}/${PN}-10.0.1-log4cplus-version.patch"
 
-	"${FILESDIR}/${PN}-11.0.0-constexpr-version.patch"
 	"${FILESDIR}/${PN}-11.0.0-cmake_fixes.patch"
-# 	"${FILESDIR}/${PN}-11.0.0-gcc15.patch"
+
+	"${FILESDIR}/${PN}-12.0.0-drop-obsolete-isActive-gcc-15.patch" #938253
+	"${FILESDIR}/${PN}-12.0.0-fix-linking-of-vdb_tool-with-OpenEXR.patch"
+	# "${FILESDIR}/${PN}-12.0.0-fix-ifcombine-gcc-15-snapshot-ICE.patch"
+	"${FILESDIR}/${PN}-12.0.0-OFF-support-vdb_tool.patch"
+	"${FILESDIR}/${PN}-12.0.0-loosen-float-equality-tolerances.patch"
+	"${FILESDIR}/${PN}-12.0.0-remove-c-style-casts.patch"
 )
 
 cuda_get_host_compiler() {
@@ -185,8 +218,8 @@ pkg_setup() {
 }
 
 src_prepare() {
-	MULTIBUILD_VARIANTS=( install )
-	use test && MULTIBUILD_VARIANTS+=( test )
+	# MULTIBUILD_VARIANTS=( install )
+	# use test && MULTIBUILD_VARIANTS+=( test )
 
 	rm "cmake/Find"{OpenEXR,TBB}".cmake" || die
 
@@ -196,13 +229,31 @@ src_prepare() {
 			-i "nanovdb/nanovdb/"*"/CMakeLists.txt" || die
 	fi
 
+	# sed \
+	# 	-e "/find_package(OpenGL/s#OpenGL#OpenGL COMPONENTS OpenGL GLX#g" \
+	# 	-i openvdb_cmd/vdb_view/CMakeLists.txt || die
+
+	sed \
+		-e '/find_package(Boost/s/)/ CONFIG)/g' \
+		-i \
+			openvdb/openvdb/CMakeLists.txt \
+			cmake/FindOpenVDB.cmake \
+		|| die
+
 	cmake_src_prepare
 
+	# fix shebang
 	sed -e 's|/usr/local/bin/python|/usr/bin/python|' \
 		-i "${S}"/openvdb/openvdb/python/test/TestOpenVDB.py || die
 }
 
-my_src_configure() {
+src_configure() {
+	# -Werror=strict-aliasing
+	# https://bugs.gentoo.org/926820
+	# https://github.com/AcademySoftwareFoundation/openvdb/issues/1784
+	# append-flags -fno-strict-aliasing
+	# filter-lto
+
 	local version abi_version
 	version=$(ver_cut 1)
 	abi_version="${version}"
@@ -215,39 +266,39 @@ my_src_configure() {
 	fi
 
 	local mycmakeargs=(
+		# -DCMAKE_CXX_STANDARD="20"
 		-DCMAKE_FIND_PACKAGE_PREFER_CONFIG="yes"
 		-DCMAKE_INSTALL_DOCDIR="share/doc/${PF}/"
 
 		-DOPENVDB_ABI_VERSION_NUMBER="${abi_version}"
+
 		-DOPENVDB_BUILD_DOCS="$(usex doc)"
+		-DOPENVDB_BUILD_AX="$(usex ax)"
+		# -DOPENVDB_BUILD_MAYA_PLUGIN="no"
+		-DOPENVDB_BUILD_BINARIES="$(usex utils)"
+		-DOPENVDB_BUILD_NANOVDB="$(usex nanovdb)"
 		-DOPENVDB_BUILD_UNITTESTS="$(usex test)"
-		-DOPENVDB_BUILD_VDB_LOD="$(usex utils)"
-		-DOPENVDB_BUILD_VDB_RENDER="$(usex utils)"
-		-DOPENVDB_BUILD_VDB_TOOL="$(usex utils)"
-		-DOPENVDB_BUILD_VDB_VIEW="$(usex utils)"
+
 		-DOPENVDB_CORE_SHARED="yes"
 		-DOPENVDB_CORE_STATIC="$(usex static-libs)"
 		# -DOPENVDB_CXX_STRICT="yes"
 		-DOPENVDB_ENABLE_UNINSTALL="no"
+		-DOPENVDB_FUTURE_DEPRECATION="yes"
+		# -DOPENVDB_USE_DELAYED_LOADING="yes"
 
-		-DUSE_AX="$(usex ax)"
-
-		-DOPENVDB_BUILD_HOUDINI_PLUGIN="no"
-		# -DOPENVDB_DOXYGEN_HOUDINI="no"
-
-		-DUSE_BLOSC="$(usex blosc)"
 		-DUSE_CCACHE="no"
-		-DUSE_COLORED_OUTPUT="yes"
-		# OpenEXR is only needed by the vdb_render tool and defaults to OFF
-		-DUSE_EXR="$(usex openexr "$(usex utils)")"
+		# -DUSE_COLORED_OUTPUT="no" # only adds the flag
+		-DUSE_EXPLICIT_INSTANTIATION="OFF"
+
 		# not packaged
-		-DUSE_HOUDINI="no"
-		 # replaces openexr half
-		-DUSE_IMATH_HALF="yes"
+		# -DOPENVDB_BUILD_HOUDINI_PLUGIN="no"
+		# -DOPENVDB_BUILD_HOUDINI_ABITESTS="$(usex houdini "$(usex test)"))"
+
 		-DUSE_LOG4CPLUS="$(usex !ax)"
-		-DUSE_PKGCONFIG="yes"
-		# PNG is only needed by the vdb_render tool and defaults to OFF
-		-DUSE_PNG="$(usex png "$(usex utils)")"
+		# -DUSE_LOG4CPLUS="yes"
+
+		# for nanovdb
+		-DUSE_BLOSC="$(usex blosc)"
 		-DUSE_TBB="yes"
 		-DUSE_ZLIB="$(usex zlib)"
 
@@ -257,20 +308,39 @@ my_src_configure() {
 	)
 
 	if use ax; then
+	# NOTE Certain tests expect bit equality and don't set tolerance violating the C standard
+	# 6.5 8)
+	# A floating expression may be contracted, that is, evaluated as though it were an atomic operation,
+	# thereby omitting rounding errors implied by the source code and the expression evaluation method.
+	# The FP_CONTRACT pragma in <math.h> provides a way to disallow contracted expressions.
+	# Otherwise, whether and how expressions are contracted is implementation-defined.
+	#
+	# To reproduce the upstream tests the testsuite is compiled separate with FP_CONTRACT=OFF
+	# append-cflags   "-ffp-contract=off"
+	# append-cxxflags "-ffp-contract=off"
 		mycmakeargs+=(
 			-DOPENVDB_AX_STATIC="$(usex static-libs)"
-			-DOPENVDB_DOXYGEN_AX="$(usex doc)"
 			# due to multibuild
-			# -DOPENVDB_AX_TEST_CMD="$(usex test)"
-			# -DOPENVDB_AX_TEST_CMD_DOWNLOADS="$(usex test)"
+			-DOPENVDB_AX_TEST_CMD="$(usex test)"
+			-DOPENVDB_AX_TEST_CMD_DOWNLOADS="$(usex test)"
 			-DOPENVDB_BUILD_AX_UNITTESTS="$(usex test)" # FIXME: log4cplus init and other errors
-			-DOPENVDB_BUILD_VDB_AX="$(usex utils)"
+			# -DOPENVDB_BUILD_VDB_AX="$(usex utils)"
+		)
+	fi
+
+	if use doc; then
+		mycmakeargs+=(
+			-DOPENVDB_DOXYGEN_AX="$(usex ax)"
+		)
+		mycmakeargs+=(
+			-DOPENVDB_DOXYGEN_HOUDINI="no"
+			-DOPENVDB_DOXYGEN_NANOVDB="$(usex nanovdb)"
+			-DOPENVDB_DOXYGEN_INTERNAL="no"
 		)
 	fi
 
 	if use nanovdb; then
 		mycmakeargs+=(
-			-DUSE_NANOVDB="yes"
 			# NOTE intentional so it breaks in sandbox if files are missing
 			-DNANOVDB_ALLOW_FETCHCONTENT="yes"
 			-DNANOVDB_BUILD_EXAMPLES="$(usex examples)"
@@ -307,16 +377,16 @@ my_src_configure() {
 					grep LIBRARY_PATH | cut -d '=' -f 2 | cut -d ':' -f 1
 				)
 			fi
-
-			# NOTE tbb includes immintrin.h, which breaks nvcc so we pretend they are already included
-			# export CUDAFLAGS="-D_AVX512BF16VLINTRIN_H_INCLUDED -D_AVX512BF16INTRIN_H_INCLUDED"
 		fi
 
-		if use utils; then
+		if use python; then
+			if use test; then
+				# we are building openvdb, so ensure the just build openvdb python bindings are used
+				local -x PYTHONPATH="${BUILD_DIR}/openvdb/openvdb/python"
+			fi
 			mycmakeargs+=(
-				-DOPENVDB_TOOL_USE_NANO="yes"
-				-DOPENVDB_TOOL_NANO_USE_BLOSC="$(usex blosc)"
-				-DOPENVDB_TOOL_NANO_USE_ZIP="$(usex zlib)"
+				-DNANOVDB_BUILD_PYTHON_MODULE="yes"
+				-DNANOVDB_BUILD_PYTHON_UNITTESTS="$(usex test)"
 			)
 		fi
 	fi
@@ -325,25 +395,50 @@ my_src_configure() {
 		mycmakeargs+=(
 			-DOPENVDB_BUILD_PYTHON_MODULE="yes"
 			-DUSE_NUMPY="$(usex numpy)"
-			-DPYOPENVDB_INSTALL_DIRECTORY="$(python_get_sitedir)"
+			-DVDB_PYTHON_INSTALL_DIRECTORY="$(python_get_sitedir)"
 			-DPython_INCLUDE_DIR="$(python_get_includedir)"
+			-Dnanobind_DIR="$(python_get_sitedir)/nanobind/cmake"
 		)
-		use test && mycmakeargs+=(
-			-DPython_EXECUTABLE="${PYTHON}"
-			-DOPENVDB_BUILD_PYTHON_UNITTESTS="yes"
-		)
+		if use test; then
+			mycmakeargs+=(
+				-DPython_EXECUTABLE="${PYTHON}"
+				-DOPENVDB_BUILD_PYTHON_UNITTESTS="yes"
+			)
+		fi
 	fi
 
 	# options for the new vdb_tool binary
 	if use utils; then
 		mycmakeargs+=(
-			-DBUILD_TEST="$(usex test)"
 			-DOPENVDB_BUILD_VDB_AX="$(usex ax)"
+		)
+		mycmakeargs+=(
+			-DOPENVDB_BUILD_VDB_LOD="yes"
+			-DOPENVDB_BUILD_VDB_RENDER="yes"
+			-DOPENVDB_BUILD_VDB_TOOL="yes"
+			-DOPENVDB_BUILD_VDB_VIEW="yes"
 
-			-DOPENVDB_TOOL_USE_ABC="$(usex alembic)" # Alembic
-			-DOPENVDB_TOOL_USE_EXR="$(usex openexr)" # OpenEXR
+			# vdb_tool
+			-DOPENVDB_BUILD_VDB_TOOL_UNITTESTS="$(usex test)"
+
+			-DOPENVDB_TOOL_USE_NANO="$(usex nanovdb)"
+			-DOPENVDB_TOOL_NANO_USE_BLOSC="$(usex nanovdb "$(usex blosc)")"
+			-DOPENVDB_TOOL_NANO_USE_ZIP="$(usex nanovdb "$(usex zlib)")"
+
+			-DOPENVDB_TOOL_USE_ABC="$(usex alembic)"
+
+			# only used by vdb_tool, defaults to OFF
+			-DOPENVDB_TOOL_USE_EXR="$(usex openexr)"
+			# only used by vdb_render, defaults to OFF
+			-DUSE_EXR="$(usex openexr)"
+
 			-DOPENVDB_TOOL_USE_JPG="$(usex jpeg)" # libjpeg-turbo
+			-DOPENVDB_TOOL_USE_PDAL="$(usex pdal)"
+
+			# only used by vdb_tool, defaults to OFF
 			-DOPENVDB_TOOL_USE_PNG="$(usex png)" # libpng
+			# only used by vdb_render, defaults to OFF
+			-DUSE_PNG="$(usex png)"
 		)
 	fi
 
@@ -351,49 +446,22 @@ my_src_configure() {
 		mycmakeargs+=( -DOPENVDB_SIMD="AVX" )
 	elif use cpu_flags_x86_sse4_2; then
 		mycmakeargs+=( -DOPENVDB_SIMD="SSE42" )
-	fi
-
-	if [[ "${MULTIBUILD_VARIANT}" == "test" ]]; then
-		# NOTE Certain tests expect bit equality and don't set tolerance violating the C standard
-		# 6.5 8)
-		# A floating expression may be contracted, that is, evaluated as though it were an atomic operation,
-		# thereby omitting rounding errors implied by the source code and the expression evaluation method.
-		# The FP_CONTRACT pragma in <math.h> provides a way to disallow contracted expressions.
-		# Otherwise, whether and how expressions are contracted is implementation-defined.
-		#
-		# To reproduce the upstream tests the testsuite is compiled separate with FP_CONTRACT=OFF
-		append-cflags   "-ffp-contract=off"
-		append-cxxflags "-ffp-contract=off"
-		if use ax; then
-			mycmakeargs+=(
-				-DOPENVDB_AX_TEST_CMD="yes"
-				-DOPENVDB_AX_TEST_CMD_DOWNLOADS="yes"
-			)
-		fi
+	elif use cpu_flags_arm_neon; then
+		# NOTE openvdb/openvdb/Platform.h -> /// SIMD Intrinsic Headers
+		# arm_neon.h is only included when OPENVDB_USE_SSE42 or OPENVDB_USE_AVX are defined
+		# The AVX and SSE42 is guarded by CMAKE_SYSTEM_PROCESSOR checks
+		mycmakeargs+=( -DOPENVDB_SIMD="AVX" )
 	fi
 
 	cmake_src_configure
-		# local default_compiler="${compiler}-$(${compiler}-major-version)"
-
-	if use cuda; then
-		cmake_ver="$(cmake --version | head -n1  | sed -e 's/cmake version //')"
-		local compiler=$(tc-get-compiler-type)
-		local compiler_version="$("${compiler}-major-version")"
-
-		sed \
-			-e "s#CMAKE_CUDA_HOST_LINK_LAUNCHER .*#CMAKE_CUDA_HOST_LINK_LAUNCHER \"/usr/x86_64-pc-linux-gnu/gcc-bin/${compiler_version}/g++\")#" \
-			-e "s#CMAKE_CUDA_COMPILER_LINKER .*#CMAKE_CUDA_COMPILER_LINKER \"/usr/x86_64-pc-linux-gnu/bin/ld\")#" \
-			-i "${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake" || die
-
-		ewarn "$(grep CMAKE_CUDA_HOST_LINK_LAUNCHER "${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake")"
-	fi
 }
 
-my_src_test() {
-	[[ "${MULTIBUILD_VARIANT}" != "test" ]] && return
-
+src_test() {
 	if use ax; then
 		ln -sr "${CMAKE_USE_DIR}/openvdb_ax/openvdb_ax/test" "${BUILD_DIR}/test" || die
+		local CMAKE_SKIP_TESTS=(
+			"^vdb_ax_unit_test$"
+		)
 	fi
 
 	if use cuda; then
@@ -401,31 +469,4 @@ my_src_test() {
 	fi
 
 	cmake_src_test
-}
-
-my_src_install() {
-	[[ "${MULTIBUILD_VARIANT}" == "test" ]] && return
-	cmake_src_install
-}
-
-src_configure() {
-	# -Werror=strict-aliasing
-	# https://bugs.gentoo.org/926820
-	# https://github.com/AcademySoftwareFoundation/openvdb/issues/1784
-	append-flags -fno-strict-aliasing
-	filter-lto
-
-	multibuild_foreach_variant my_src_configure
-}
-
-src_compile() {
-	multibuild_foreach_variant cmake_src_compile
-}
-
-src_test() {
-	multibuild_foreach_variant my_src_test
-}
-
-src_install() {
-	multibuild_foreach_variant my_src_install
 }
