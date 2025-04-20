@@ -1,10 +1,10 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
 PYTHON_COMPAT=( python3_{10..13} )
-inherit cmake desktop python-single-r1 xdg
+inherit cmake desktop flag-o-matic python-single-r1 xdg
 
 DESCRIPTION="Automatic 3d tetrahedral mesh generator"
 HOMEPAGE="https://ngsolve.org/ https://github.com/NGSolve/netgen"
@@ -101,6 +101,8 @@ src_prepare() {
 }
 
 src_configure() {
+	filter-lto
+
 	local mycmakeargs=(
 		# currently not working in a sandbox, expects netgen to be installed
 		# see https://github.com/NGSolve/netgen/issues/132
@@ -147,11 +149,17 @@ src_configure() {
 src_test() {
 	DESTDIR="${T}" cmake_build install
 
-	export PYTHONPATH="${T}/$(python_get_sitedir):${T}/usr/$(get_libdir):${BUILD_DIR}/libsrc/core"
+	if use python; then
+		# local -x PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+		local -x NETGENDIR="${T}/usr/bin"
+		export PYTHONPATH="${T}$(python_get_sitedir):${T}/usr/$(get_libdir):${BUILD_DIR}/libsrc/core"
+		echo "PYTHONPATH $PYTHONPATH"
+	fi
 
 	CMAKE_SKIP_TESTS=(
 		'^unit_symboltable$'
 		'^pytest$' # SEGFAULT
+		'^pytest-mpi$' # needs pytest-mpi
 	)
 	cmake_src_test
 }
