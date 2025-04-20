@@ -1,9 +1,9 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+PYTHON_COMPAT=( python3_{10..13} )
 
 inherit cmake cuda flag-o-matic python-any-r1 toolchain-funcs virtualx xdg
 
@@ -47,7 +47,7 @@ RDEPEND="
 	opencl? ( virtual/opencl )
 	openmp? ( || (
 		sys-devel/gcc:*[openmp]
-		sys-libs/libomp
+		llvm-runtimes/openmp
 	) )
 	ptex? ( media-libs/ptex )
 	tbb? ( dev-cpp/tbb:= )
