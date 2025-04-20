@@ -96,7 +96,7 @@ RDEPEND="
 	gdal? ( sci-libs/gdal:= )
 	java? ( >=virtual/jdk-11:= )
 	las? ( sci-geosciences/liblas )
-	mpi? ( virtual/mpi[cxx,romio] )
+	mpi? ( virtual/mpi[romio] )
 	mysql? ( dev-db/mariadb-connector-c )
 	odbc? ( dev-db/unixODBC )
 	openvdb? ( media-gfx/openvdb:= )
