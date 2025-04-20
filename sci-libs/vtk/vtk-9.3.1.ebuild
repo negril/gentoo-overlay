@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -91,7 +91,10 @@ RDEPEND="
 	sci-libs/proj:=
 	sys-libs/zlib
 	boost? ( dev-libs/boost:=[mpi?] )
-	cgns? ( >=sci-libs/cgnslib-4.1.1:=[hdf5,mpi=] )
+	cgns? (
+		>=sci-libs/cgnslib-4.1.1:=[hdf5,mpi=]
+		sci-libs/hdf5[cxx]
+	)
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	ffmpeg? ( media-video/ffmpeg:= )
 	gdal? ( sci-libs/gdal:= )
@@ -107,7 +110,7 @@ RDEPEND="
 		>=media-libs/libharu-2.4.0:=
 		media-libs/libtheora
 	)
-	mpi? ( virtual/mpi[cxx,romio] )
+	mpi? ( virtual/mpi[romio] )
 	mysql? ( dev-db/mariadb-connector-c )
 	netcdf? ( sci-libs/netcdf:=[mpi=] )
 	odbc? ( dev-db/unixODBC )
