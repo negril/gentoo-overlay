@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -19,7 +19,9 @@ HOMEPAGE="https://partio.us/"
 
 LICENSE="BSD"
 SLOT="0"
-IUSE="doc"
+IUSE="doc test"
+RESTRICT="!test? ( test )"
+
 REQUIRED_USE="${PYTHON_REQUIRED_USE}"
 
 RDEPEND="${PYTHON_DEPS}
@@ -29,7 +31,11 @@ RDEPEND="${PYTHON_DEPS}
 	virtual/opengl
 "
 
-DEPEND="${RDEPEND}"
+DEPEND="${RDEPEND}
+	test? (
+		dev-cpp/gtest
+	)
+"
 
 BDEPEND="
 	dev-lang/swig
@@ -57,4 +63,14 @@ src_configure() {
 	)
 
 	cmake_src_configure
+}
+
+src_test() {
+	CMAKE_SKIP_TESTS=(
+		# fail on import partjson, partio
+		testpartjson
+		testpartio
+	)
+
+	cmake_src_test
 }
