@@ -5,9 +5,9 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{10..12} )
 
-LLVM_MAX_SLOT=15
+LLVM_COMPAT=( 15 )
 
-inherit cmake cuda flag-o-matic llvm multibuild python-single-r1 toolchain-funcs
+inherit cmake cuda flag-o-matic llvm-r2 multibuild python-single-r1 toolchain-funcs
 
 DESCRIPTION="Library for the efficient manipulation of volumetric data"
 HOMEPAGE="https://www.openvdb.org"
@@ -15,7 +15,7 @@ SRC_URI="https://github.com/AcademySoftwareFoundation/${PN}/archive/v${PV}.tar.g
 
 LICENSE="MPL-2.0"
 OPENVDB_ABI=$(ver_cut 1)
-SLOT="0/$PV"
+SLOT="0/$(ver_cut 1-2)"
 KEYWORDS="amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
 IUSE="abi$((OPENVDB_ABI + 1))-compat +abi${OPENVDB_ABI}-compat abi$((OPENVDB_ABI - 1))-compat abi$((OPENVDB_ABI - 2))-compat alembic ax +blosc cpu_flags_x86_avx cpu_flags_x86_sse4_2
 	cuda doc examples jpeg +nanovdb numpy openexr png python static-libs test utils zlib"
@@ -43,7 +43,9 @@ RDEPEND="
 	dev-libs/jemalloc:=
 	dev-libs/imath:=
 	ax? (
-		<sys-devel/llvm-$(( LLVM_MAX_SLOT + 1 )):=
+		$(llvm_gen_dep '
+			llvm-core/llvm:${LLVM_SLOT}=
+		')
 	)
 	blosc? (
 		dev-libs/c-blosc:=
@@ -54,7 +56,7 @@ RDEPEND="
 			sys-libs/zlib:=
 		)
 		cuda? (
-			>=dev-util/nvidia-cuda-toolkit-11
+			dev-util/nvidia-cuda-toolkit:=
 		)
 	)
 	python? (
@@ -110,50 +112,75 @@ PATCHES=(
 
 	"${FILESDIR}/${PN}-11.0.0-constexpr-version.patch"
 	"${FILESDIR}/${PN}-11.0.0-cmake_fixes.patch"
-	"${FILESDIR}/${PN}-11.0.0-gcc15.patch"
+# 	"${FILESDIR}/${PN}-11.0.0-gcc15.patch"
 )
 
-cuda_set_CUDAHOSTCXX() {
-	local compiler
-	tc-is-gcc && compiler="gcc"
-	tc-is-clang && compiler="clang"
-	[[ -z "$compiler" ]] && die "no compiler specified"
+cuda_get_host_compiler() {
+	if [[ -n "${NVCC_CCBIN}" ]]; then
+		echo "${NVCC_CCBIN}"
+		return
+	fi
 
-	local package="sys-devel/${compiler}"
-	local version="${package}"
-	local CUDAHOSTCXX_test
-	while
-		CUDAHOSTCXX="${CUDAHOSTCXX_test}"
-		version=$(best_version "${version}")
-		if [[ -z "${version}" ]]; then
-			if [[ -z "${CUDAHOSTCXX}" ]]; then
-				die "could not find supported version of ${package}"
+	if [[ -n "${CUDAHOSTCXX}" ]]; then
+		echo "${CUDAHOSTCXX}"
+		return
+	fi
+
+	einfo "Trying to find working CUDA host compiler"
+
+	if ! tc-is-gcc && ! tc-is-clang; then
+		die "$(tc-get-compiler-type) compiler is not supported"
+	fi
+
+	local compiler compiler_type compiler_version
+	local package package_version
+	local -x NVCC_CCBIN
+	local NVCC_CCBIN_default
+
+	compiler_type="$(tc-get-compiler-type)"
+	compiler_version="$("${compiler_type}-major-version")"
+
+	# try the default compiler first
+	NVCC_CCBIN="$(tc-getCXX)"
+	NVCC_CCBIN_default="${NVCC_CCBIN}-${compiler_version}"
+
+	compiler="${NVCC_CCBIN/%-${compiler_version}}"
+
+	# store the package so we can re-use it later
+	package="sys-devel/${compiler_type}"
+	package_version="${package}"
+
+	ebegin "testing ${NVCC_CCBIN_default} (default)"
+
+	while ! nvcc -v -ccbin "${NVCC_CCBIN}" - -x cu <<<"int main(){}" &>> "${T}/cuda_get_host_compiler.log" ; do
+		eend 1
+
+		while true; do
+			# prepare next version
+			if ! package_version="<$(best_version "${package_version}")"; then
+				die "could not find a supported version of ${compiler}"
 			fi
-			break
-		fi
-		CUDAHOSTCXX_test="$(
-			dirname "$(
-				realpath "$(
-					which "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
-				)"
-			)"
-		)"
-		version="<${version}"
-	do ! echo "int main(){}" | nvcc "-ccbin ${CUDAHOSTCXX_test}" - -x cu &>/dev/null; done
 
-	export CUDAHOSTCXX
+			NVCC_CCBIN="${compiler}-$(ver_cut 1 "${package_version/#<${package}-/}")"
+
+			[[ "${NVCC_CCBIN}" != "${NVCC_CCBIN_default}" ]] && break
+		done
+		ebegin "testing ${NVCC_CCBIN}"
+	done
+	eend $?
+
+	echo "${NVCC_CCBIN}"
+	export NVCC_CCBIN
 }
 
-cuda_get_host_arch() {
-	[[ -z "${CUDAARCHS}" ]] && einfo "trying to determine host CUDAARCHS"
-	: "${CUDAARCHS:=$(__nvcc_device_query)}"
-	einfo "building for CUDAARCHS = ${CUDAARCHS}"
+cuda_get_host_native_arch() {
+	[[ -n ${CUDAARCHS} ]] && echo "${CUDAARCHS}"
 
-	export CUDAARCHS
+	__nvcc_device_query || die "failed to query the native device"
 }
 
 pkg_setup() {
-	use ax && llvm_pkg_setup
+	use ax && llvm-r2_pkg_setup
 	use python && python-single-r1_pkg_setup
 }
 
@@ -264,11 +291,25 @@ my_src_configure() {
 
 		if use cuda; then
 			cuda_add_sandbox -w
-			cuda_set_CUDAHOSTCXX
-			cuda_get_host_arch
+
+			local -x CUDAARCHS
+			: "${CUDAARCHS:="$(cuda_get_host_native_arch)"}"
+
+			local -x CUDAHOSTCXX CUDAHOSTLD
+			CUDAHOSTCXX="$(cuda_get_host_compiler)"
+			CUDAHOSTLD="$(tc-getCXX)"
+
+			if tc-is-gcc; then
+				# Filter out IMPLICIT_LINK_DIRECTORIES picked up by CMAKE_DETERMINE_COMPILER_ABI(CUDA)
+				# See /usr/share/cmake/Help/variable/CMAKE_LANG_IMPLICIT_LINK_DIRECTORIES.rst
+				CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES_EXCLUDE=$(
+					"${CUDAHOSTLD}" -E -v - <<<"int main(){}" |& \
+					grep LIBRARY_PATH | cut -d '=' -f 2 | cut -d ':' -f 1
+				)
+			fi
 
 			# NOTE tbb includes immintrin.h, which breaks nvcc so we pretend they are already included
-			export CUDAFLAGS="-D_AVX512BF16VLINTRIN_H_INCLUDED -D_AVX512BF16INTRIN_H_INCLUDED -D_AMXTILEINTRIN_H_INCLUDED"
+			# export CUDAFLAGS="-D_AVX512BF16VLINTRIN_H_INCLUDED -D_AVX512BF16INTRIN_H_INCLUDED"
 		fi
 
 		if use utils; then
@@ -337,14 +378,14 @@ my_src_configure() {
 	if use cuda; then
 		cmake_ver="$(cmake --version | head -n1  | sed -e 's/cmake version //')"
 		local compiler=$(tc-get-compiler-type)
-    local compiler_version="$("${compiler}-major-version")"
+		local compiler_version="$("${compiler}-major-version")"
 
 		sed \
 			-e "s#CMAKE_CUDA_HOST_LINK_LAUNCHER .*#CMAKE_CUDA_HOST_LINK_LAUNCHER \"/usr/x86_64-pc-linux-gnu/gcc-bin/${compiler_version}/g++\")#" \
 			-e "s#CMAKE_CUDA_COMPILER_LINKER .*#CMAKE_CUDA_COMPILER_LINKER \"/usr/x86_64-pc-linux-gnu/bin/ld\")#" \
 			-i "${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake" || die
 
-		ewarn "$(grep CMAKE_CUDA_HOST_LINK_LAUNCHER ${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake)"
+		ewarn "$(grep CMAKE_CUDA_HOST_LINK_LAUNCHER "${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake")"
 	fi
 }
 

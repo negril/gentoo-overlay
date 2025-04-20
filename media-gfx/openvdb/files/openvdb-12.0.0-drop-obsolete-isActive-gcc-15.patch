@@ -1,11 +1,15 @@
+From cf70b49104f6ceaeca787d5d457a467ccc3b0c6d Mon Sep 17 00:00:00 2001
 From: Paul Zander <negril.nx+gentoo@gmail.com>
-Date: Wed, 21 Aug 2024 16:43:50 +0200
-Subject: [PATCH] drop obsolete isActive
+Date: Fri, 10 Jan 2025 17:29:47 +0100
+Subject: [PATCH] drop obsolete isActive [gcc-15]
 
 See-also: https://bugs.gentoo.org/938253
 Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
---- a/nanovdb/nanovdb/util/GridBuilder.h
-+++ b/nanovdb/nanovdb/util/GridBuilder.h
+
+diff --git a/nanovdb/nanovdb/tools/GridBuilder.h b/nanovdb/nanovdb/tools/GridBuilder.h
+index 3038566..4b95376 100644
+--- a/nanovdb/nanovdb/tools/GridBuilder.h
++++ b/nanovdb/nanovdb/tools/GridBuilder.h
 @@ -1158,7 +1158,6 @@ struct LeafNode
          ValueIterator& operator=(const ValueIterator&) = default;
          ValueType operator*() const { NANOVDB_ASSERT(*this); return mParent->mValues[mPos];}
@@ -14,3 +18,6 @@ Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
          operator bool() const {return mPos < SIZE;}
          ValueIterator& operator++() {++mPos; return *this;}
          ValueIterator operator++(int) {
+-- 
+2.47.1
+
