@@ -1,0 +1,32 @@
+From 0d8a4c29599a58f4e6c7d178b11b1d75817c302b Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Wed, 9 Apr 2025 13:58:53 +0200
+Subject: [PATCH 1/2] valgrind optional
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 15a3aef..7d6f35d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,6 +20,7 @@ SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+ option(RAPIDJSON_BUILD_DOC "Build rapidjson documentation." ON)
+ option(RAPIDJSON_BUILD_EXAMPLES "Build rapidjson examples." ON)
+ option(RAPIDJSON_BUILD_TESTS "Build rapidjson perftests and unittests." ON)
++option(RAPIDJSON_BUILD_TESTS_VALGRIND "Build rapidjson valgrind_unittest." OFF)
+ option(RAPIDJSON_BUILD_THIRDPARTY_GTEST
+     "Use gtest installation in `thirdparty/gtest` by default if available" OFF)
+ 
+@@ -55,7 +56,9 @@ if(CCACHE_FOUND)
+     endif()
+ endif(CCACHE_FOUND)
+ 
++if(RAPIDJSON_BUILD_TESTS_VALGRIND)
+ find_program(VALGRIND_FOUND valgrind)
++endif()
+ 
+ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+     if(RAPIDJSON_ENABLE_INSTRUMENTATION_OPT AND NOT CMAKE_CROSSCOMPILING)
+-- 
+2.49.0
+
