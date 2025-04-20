@@ -1,11 +1,11 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {15..20} )
+LLVM_COMPAT=( {15..19} )
 LLVM_OPTIONAL=1
 
 inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 toolchain-funcs xdg-utils virtualx
@@ -103,7 +103,10 @@ RDEPEND="${PYTHON_DEPS}
 	color-management? ( media-libs/opencolorio:= )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	embree? ( >=media-libs/embree-3.10.0:=[raymask] )
-	ffmpeg? ( media-video/ffmpeg:=[x264,mp3,encode,theora,jpeg2k?,vpx,vorbis,opus,xvid] )
+	ffmpeg? (
+		media-video/ffmpeg:=[encode(+),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid]
+		|| ( media-video/ffmpeg[lame(-)] media-video/ffmpeg[mp3(-)] )
+	)
 	fftw? ( sci-libs/fftw:3.0= )
 	gmp? ( dev-libs/gmp[cxx] )
 	gnome? ( gui-libs/libdecor )
@@ -124,13 +127,13 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
-	oidn? ( >=media-libs/oidn-2.1.0[${LLVM_USEDEP}] )
+	oidn? ( >=media-libs/oidn-2.1.0 )
 	oneapi? ( dev-libs/intel-compute-runtime[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.4-r2:=
 		>=media-libs/openexr-3:0=
 	)
-	openpgl? ( media-libs/openpgl:= )
+	openpgl? ( media-libs/openpgl:0/0.5 )
 	opensubdiv? ( >=media-libs/opensubdiv-3.4.0 )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
@@ -138,7 +141,7 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	optix? ( dev-libs/optix )
 	osl? (
-		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
+		=media-libs/osl-1.12*:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
 	)
 	pdf? ( media-libs/libharu )
@@ -203,8 +206,22 @@ BDEPEND="
 "
 
 PATCHES=(
+# 	"${FILESDIR}/${PN}-3.2.2-Cycles-add-option-to-specify-OptiX-runtime-root-dire.patch"
+# 	"${FILESDIR}/${PN}-3.2.2-Fix-T100845-wrong-Cycles-OptiX-runtime-compilation-i.patch"
+# 	"${FILESDIR}/${PN}-3.2.2-support-building-with-musl-libc.patch"
+	"${FILESDIR}/${PN}-3.3.0-fix-build-with-boost-1.81.patch"
+	"${FILESDIR}/${PN}-3.3.6-cycles-gcc13.patch"
 	"${FILESDIR}/${PN}-3.6-FindClang.patch"
+# 	"${FILESDIR}/${PN}-3.6-osl-1.13.3.patch"
+# 	"${FILESDIR}/${PN}-3.6-openpgl-0.5.0_2.patch"
+# 	"${FILESDIR}/${PN}-3.6-openpgl-0.5.0_1.patch"
+# 	"${FILESDIR}/${PN}-3.6-openpgl-0.5.0.patch"
+# 	"${FILESDIR}/${PN}-3.6-openpgl-0.6.0.patch"
+# 	"${FILESDIR}/${PN}-4.0.1-fix-cflags-cleaner.patch"
+	"${FILESDIR}/${PN}-4.0.1-openvdb-11.patch"
 	"${FILESDIR}/${PN}-4.0.2-CUDA_NVCC_FLAGS.patch"
+	# "${FILESDIR}/${PN}-4.0.2-FindClang.patch"
+# 	"${FILESDIR}/${PN}-4.0.2-r1-osl-1.13.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
 )
@@ -356,7 +373,7 @@ src_configure() {
 	local mycmakeargs=(
 		# we build a host-specific binary
 		-DWITH_INSTALL_PORTABLE="no"
-		-DWITH_CPU_CHECK="no"
+		-DRPMBUILD="no"
 
 		-DWITH_LIBS_PRECOMPILED="no"
 		-DBUILD_SHARED_LIBS="no" # this over-ridden by cmake.eclass
@@ -451,6 +468,7 @@ src_configure() {
 	# requires dev-vcs/git
 	if [[ ${PV} = *9999* ]] ; then
 		mycmakeargs+=(
+			-DWITH_CPU_CHECK="no"
 			-DWITH_BUILDINFO="yes"
 			-DWITH_EXPERIMENTAL_FEATURES="$(usex experimental)"
 		)
@@ -533,6 +551,8 @@ src_configure() {
 	fi
 
 	cmake_src_configure
+
+	einfo "BLENDER_VERSION_CYCLE $(pcregrep -o1  ".*#define[ \t]+BLENDER_VERSION_CYCLE[ \t]+([a-z]+).*" "${BUILD_DIR}/source/blender/blenkernel/BKE_blender_version.h.done")"
 }
 
 src_test() {
@@ -543,7 +563,7 @@ src_test() {
 	blender_get_version
 	# Define custom blender data/script file paths not be able to find them otherwise during testing.
 	# (Because the data is in the image directory and it will default to look in /usr/share)
-	export BLENDER_SYSTEM_RESOURCES="${T}/usr/share/blender/${BV}"
+	local -x BLENDER_SYSTEM_RESOURCES="${T%/}/usr/share/blender/${BV}"
 
 	# Sanity check that the script and datafile path is valid.
 	# If they are not vaild, blender will fallback to the default path which is not what we want.
@@ -628,7 +648,7 @@ src_install() {
 	if use doc; then
 		# Define custom blender data/script file paths. Otherwise Blender will not be able to find them during doc building.
 		# (Because the data is in the image directory and it will default to look in /usr/share)
-		export BLENDER_SYSTEM_RESOURCES="${T}/usr/share/blender/${BV}"
+		local -x BLENDER_SYSTEM_RESOURCES="${ED}/usr/share/blender/${BV}"
 
 		# Workaround for binary drivers.
 		addpredict /dev/ati

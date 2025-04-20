@@ -1,0 +1,28 @@
+From 6ddbdb9b80a15cc3e86f7948b68199cfcb0e5e77 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sun, 20 Apr 2025 17:39:25 +0200
+Subject: [PATCH] optix compile flags
+
+pass CUDA_NVCC_FLAGS into the custom nvcc call for optix, as for
+WITH_CYCLES_CUDA_BINARIES
+use CYCLES_CUDA_BINARIES_ARCH for optix instead of sm_50
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/intern/cycles/kernel/CMakeLists.txt b/intern/cycles/kernel/CMakeLists.txt
+index d6e531b3dff..a41340f2035 100644
+--- a/intern/cycles/kernel/CMakeLists.txt
++++ b/intern/cycles/kernel/CMakeLists.txt
+@@ -885,7 +885,8 @@ if(WITH_CYCLES_DEVICE_OPTIX AND WITH_CYCLES_CUDA_BINARIES)
+       COMMAND
+         ${CUDA_NVCC_EXECUTABLE}
+         --ptx
+-        -arch=sm_50
++        -arch=${CYCLES_CUDA_BINARIES_ARCH}
++        ${CUDA_NVCC_FLAGS}
+         ${cuda_flags}
+         ${input}
+       WORKING_DIRECTORY
+-- 
+2.49.0
+
