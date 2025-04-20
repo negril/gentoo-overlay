@@ -4,7 +4,8 @@
 EAPI=8
 
 PYTHON_COMPAT=( python3_{10..13} )
-inherit cmake flag-o-matic optfeature python-any-r1 xdg
+VIRTUALX_WM=( weston_xwayland )
+inherit cmake flag-o-matic optfeature python-any-r1 virtualx xdg
 
 DESCRIPTION="The Programmers Solid 3D CAD Modeller"
 HOMEPAGE="https://openscad.org/"
@@ -20,7 +21,7 @@ if [[ ${PV} = *9999* ]] ; then
 	)
 else
 	if [[ ${PV} = *pre* ]] ; then
-		COMMIT="756e080c7e49072d9926cf9ce766def180a0dcae"
+		COMMIT="c16cae66bd407179616bc9f833c4939495f6c491"
 		SANITIZERS_CMAKE_COMMIT="0573e2ea8651b9bb3083f193c41eb086497cc80a"
 		MCAD_COMMIT="bd0a7ba3f042bfbced5ca1894b236cea08904e26"
 
@@ -46,11 +47,10 @@ fi
 LICENSE="GPL-3+ LGPL-2.1"
 SLOT="0"
 
-IUSE="cgal dbus +egl experimental glx +gui hidapi +manifold mimalloc pdf spacenav test"
+IUSE="dbus +egl experimental glx +gui hidapi +manifold mimalloc pdf spacenav test"
 RESTRICT="!test? ( test )"
 
 REQUIRED_USE="
-	|| ( cgal manifold )
 	dbus? ( gui )
 	hidapi? ( gui )
 	spacenav? ( gui )
@@ -63,14 +63,12 @@ RDEPEND="
 	dev-libs/glib:2
 	dev-libs/libxml2
 	dev-libs/libzip:=
-	media-gfx/opencsg
+	>=media-gfx/opencsg-1.7.0:=
 	media-libs/fontconfig
 	media-libs/freetype
 	media-libs/harfbuzz:=
 	media-libs/lib3mf:=
-	cgal? (
-		sci-mathematics/cgal:=
-	)
+	sci-mathematics/cgal:=
 	sci-mathematics/clipper2
 	media-libs/libglvnd
 	glx? (
@@ -78,7 +76,7 @@ RDEPEND="
 	)
 	gui? (
 		dev-qt/qt5compat:6
-		dev-qt/qtbase:6[concurrent,dbus?,network,opengl,widgets]
+		dev-qt/qtbase:6[concurrent,dbus?,-gles2-only,network,opengl,widgets]
 		dev-qt/qtmultimedia:6
 		dev-qt/qtsvg:6
 		x11-libs/qscintilla:=[qt6]
@@ -108,10 +106,6 @@ BDEPEND="
 			dev-python/pillow[${PYTHON_USEDEP}]
 			dev-python/pip[${PYTHON_USEDEP}]
 		')
-		|| (
-			gui-wm/tinywl
-			<gui-libs/wlroots-0.17.3[tinywl(-)]
-		)
 	)
 "
 
@@ -157,7 +151,7 @@ src_configure() {
 	local mycmakeargs=(
 		-DCLANG_TIDY="no"
 		-DENABLE_CAIRO="$(usex pdf)"
-		-DENABLE_CGAL="$(usex cgal)"
+		-DENABLE_CGAL="yes"
 		-DENABLE_EGL="$(usex egl)"
 		-DENABLE_GLX="$(usex glx)"
 		-DENABLE_MANIFOLD="$(usex manifold)"
@@ -207,58 +201,35 @@ src_configure() {
 	cmake_src_configure
 }
 
-hardware_add_gpu_sandbox() {
-	local dris cards PREDICT=() WRITE=()
+src_test() {
+	local i WRITE=()
 
-	# mesa will make use of udmabuf if it exists
-	if [[ -c "/dev/udmabuf" ]]; then
+	if [[ -d "/dev/udmabuf" ]]; then
 		WRITE+=(
 			"/dev/udmabuf"
 		)
 	fi
 
-	# /dev/dri/card[%d]
-	# /dev/dri/renderD[128+%d]
-	readarray -t dris <<<"$(
-		find /sys/class/drm/*/device/drm \
-			-mindepth 1 -maxdepth 1 -type d -exec basename {} \; \
-			| sort | uniq | sed 's:^:/dev/dri/:'
-	)"
-
-	[[ -n "${dris[*]}" ]] && WRITE+=( "${dris[@]}" )
-
 	if [[ -d /sys/module/nvidia ]]; then
-		stat --printf="%Hr:%Lr"
-		PREDICT+=(
-			# /dev/char/195:X   # ../nvidiaX
-			# /dev/char/195:254 # ../nvidia-modeset
-			# /dev/char/195:255 # ../nvidiactl
-			/dev/char/
-		)
+		# /dev/dri/card*
+		# /dev/dri/renderD*
+		readarray -t dri <<<"$(
+			find /sys/module/nvidia/drivers/*/*:*:*.*/drm \
+				-mindepth 1 -maxdepth 1 -type d -exec basename {} \; \
+				| sed 's:^:/dev/dri/:'
+			)"
 
 		# /dev/nvidia{0-9}
-		readarray -t nvidia_devs <<<"$(
-			find /dev -regextype posix-extended  -regex '/dev/nvidia(|-(nvswitch|vgpu))[0-9]*'
-		)"
-		[[ -n "${nvidia_devs[*]}" ]] && WRITE+=( "${nvidia_devs[@]}" )
+		readarray -t cards <<<"$(find /dev -regextype sed -regex '/dev/nvidia[0-9]*')"
 
 		WRITE+=(
+			"${dri[@]}"
+			"${cards[@]}"
 			"/dev/nvidiactl"
-			# "/dev/nvidia-caps/nvidia-cap%d"
 			"/dev/nvidia-caps/"
-
-			# "/dev/nvidia-caps-imex-channels/channel%d"
-			"/dev/nvidia-caps-imex-channels/"
-
 			"/dev/nvidia-modeset"
-
-			"/dev/nvidia-nvlink"
-			"/dev/nvidia-nvswitchctl"
-
 			"/dev/nvidia-uvm"
 			"/dev/nvidia-uvm-tools"
-
-			"/dev/nvidia-vgpuctl"
 		)
 	fi
 
@@ -266,72 +237,16 @@ hardware_add_gpu_sandbox() {
 		# for portage
 		"/proc/self/task/"
 	)
+	for i in "${WRITE[@]}"; do
+		if [[ ! -w "$i" ]]; then
+			eqawarn "addwrite $i"
+			addwrite "$i"
 
-	eqawarn "SANDBOX_WRITE   ${SANDBOX_WRITE//:/ }"
-	eqawarn "SANDBOX_PREDICT ${SANDBOX_PREDICT//:/ }"
-
-	local dev
-	for dev in "${WRITE[@]}"; do
-		if [[ ! -e "${dev}" ]]; then
-			eqawarn "${dev} does not exist"
-			continue
-		fi
-
-		if [[ -w "${dev}" ]]; then
-			eqawarn "${dev} is already writable"
-			continue
-		fi
-
-		eqawarn "${dev} addwrite"
-		addwrite "${dev}"
-
-		if [[ ! -d "${dev}" ]] && [[ ! -w "${dev}" ]]; then
-			eerror "can not access ${dev} after addwrite"
+			if [[ ! -d "$i" ]] && [[ ! -w "$i" ]]; then
+				eqawarn "can not access $i after addwrite"
+			fi
 		fi
 	done
-
-	local dev
-	for dev in "${PREDICT[@]}"; do
-		if [[ ! -e "${dev}" ]]; then
-			eqawarn "${dev} does not exist"
-			continue
-		fi
-
-		eqawarn "${dev} addpredict"
-		addpredict "${dev}"
-	done
-
-	eqawarn "SANDBOX_WRITE   ${SANDBOX_WRITE//:/ }"
-	eqawarn "SANDBOX_PREDICT ${SANDBOX_PREDICT//:/ }"
-}
-
-virtwl() {
-	debug-print-function "${FUNCNAME[0]}" "$@"
-
-	[[ $# -lt 1 ]] && die "${FUNCNAME[0]} needs at least one argument"
-
-	# [[ -n $XDG_RUNTIME_DIR ]] || die "${FUNCNAME[0]} needs XDG_RUNTIME_DIR to be set; try xdg_environment_reset"
-
-	tinywl -h >/dev/null || die 'tinywl -h failed'
-
-	local VIRTWL VIRTWL_PID
-	coproc VIRTWL { WLR_BACKENDS=headless exec tinywl -s 'echo $WAYLAND_DISPLAY; read _; kill $PPID'; }
-	local -x WAYLAND_DISPLAY
-	read -r WAYLAND_DISPLAY <&"${VIRTWL[0]}"
-
-	debug-print "${FUNCNAME[0]}: $*"
-	nonfatal "$@"
-	local r=$?
-
-	[[ -n $VIRTWL_PID ]] || die "tinywl exited unexpectedly"
-	exec {VIRTWL[0]}<&- {VIRTWL[1]}>&-
-	return "$r"
-}
-
-src_test() {
-	# xdg_environment_reset
-
-	hardware_add_gpu_sandbox
 
 	sed \
 		-e "s/OPENSCAD_BINARY/OPENSCADPATH/g" \
@@ -344,7 +259,7 @@ src_test() {
 	ln -s "${CMAKE_USE_DIR}/locale" . || die
 	ln -s "${CMAKE_USE_DIR}/shaders" . || die
 
-	virtwl cmake_src_test -j1
+	virtx cmake_src_test -j1
 }
 
 src_install() {
