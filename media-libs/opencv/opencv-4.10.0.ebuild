@@ -82,7 +82,7 @@ IUSE+=" +ffmpeg gphoto2 gstreamer ieee1394 openni openni2 xine vaapi v4l"
 # image
 IUSE+=" avif gdal jasper jpeg jpeg2k openexr png quirc spng tesseract tiff webp"
 # gui
-IUSE+=" freetype gtk3 qt6 opengl vtk vulkan wayland"
+IUSE+=" gtk3 qt6 opengl truetype vtk vulkan wayland"
 # parallel
 IUSE+=" openmp tbb"
 # lapack options
@@ -202,7 +202,7 @@ COMMON_DEPEND="
 	)
 	contribovis? ( >=dev-games/ogre-1.12:= )
 	ffmpeg? ( media-video/ffmpeg:0=[${MULTILIB_USEDEP}] )
-	freetype? ( media-libs/freetype:2[${MULTILIB_USEDEP}] )
+	truetype? ( media-libs/freetype:2[${MULTILIB_USEDEP}] )
 	gdal? ( sci-libs/gdal:= )
 	gflags? ( dev-cpp/gflags:=[${MULTILIB_USEDEP}] )
 	glog? ( dev-cpp/glog:=[${MULTILIB_USEDEP}] )
@@ -377,7 +377,6 @@ cuda_get_host_compiler() {
 
 	local compiler compiler_type compiler_version
 	local package package_version
-	local -x NVCC_CCBIN
 	local NVCC_CCBIN_default
 
 	compiler_type="$(tc-get-compiler-type)"
@@ -395,7 +394,7 @@ cuda_get_host_compiler() {
 
 	ebegin "testing ${NVCC_CCBIN_default} (default)"
 
-	while ! nvcc - -x cu <<<"int main(){}" &>/dev/null; do
+	while ! nvcc -v -ccbin "${NVCC_CCBIN}" - -x cu <<<"int main(){}" &>> "${T}/cuda_get_host_compiler.log" ; do
 		eend 1
 
 		while true; do
@@ -473,7 +472,7 @@ src_prepare() {
 		cd "${WORKDIR}/${PN}_contrib-${PV}" || die
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
-		if ver_test "$(nvcc --version | tail -n 1 | cut -d '_' -f 2- | cut -d '.' -f 1-2)" -ge 12.4; then
+		if type -P nvcc &> /dev/null && ver_test "$(nvcc --version | tail -n 1 | cut -d '_' -f 2- | cut -d '.' -f 1-2)" -ge 12.4; then
 			eapply "${DISTDIR}/${PN}_contrib-4.10.0-3607.patch"
 			eapply "${FILESDIR}/${PN}_contrib-4.10.0-CUDA-12.6-tuple_size.patch" # 3785
 		fi
@@ -655,7 +654,7 @@ multilib_src_configure() {
 		-DWITH_ITT="no" # 3dparty libs itt_notify
 
 		-DWITH_AVIF="$(usex avif)"
-		-DWITH_FREETYPE="$(usex freetype)"
+		-DWITH_FREETYPE="$(usex truetype)"
 		-DWITH_ONNX="$(multilib_native_usex onnx)"
 		-DONNXRT_ROOT_DIR="${EPREFIX}/usr/"
 		-DWITH_VULKAN="$(usex vulkan)"
@@ -762,7 +761,7 @@ multilib_src_configure() {
 
 		# -DBUILD_opencv_world="yes"
 
-		-DOPENCV_PLUGIN_VERSION=".$(ver_rs 1-2 '')"
+		-DOPENCV_PLUGIN_VERSION=".$(ver_rs 1-2 '' "$(ver_cut 1-2)")"
 		-DOPENCV_PLUGIN_ARCH=".${ARCH}"
 
 		-DDNN_PLUGIN_LIST="all"
@@ -1353,8 +1352,7 @@ multilib_src_install() {
 		cmake_src_install
 	fi
 
-	for plugin in "${ED}/usr/$(get_libdir)/libopencv_"*".$(ver_rs 1-2 '').${ARCH}"* ; do
+	for plugin in "${ED}/usr/$(get_libdir)/libopencv_"*".$(ver_rs 1-2 '' "$(ver_cut 1-2)").${ARCH}"* ; do
 		patchelf --set-soname "$(basename "${plugin}" ".$(get_libname)")" "${plugin}"
 	done
-
 }
