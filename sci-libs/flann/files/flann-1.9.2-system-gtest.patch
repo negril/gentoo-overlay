@@ -1,12 +1,31 @@
-From 4001b11f20ccfc291a355c52a090fa16e2f5a5f1 Mon Sep 17 00:00:00 2001
+From 97aaa19c371349ed4f9efda7b8d34fa4204c1cc0 Mon Sep 17 00:00:00 2001
 From: Paul Zander <negril.nx+gentoo@gmail.com>
 Date: Mon, 6 Jan 2025 16:13:09 +0100
 Subject: [PATCH] system gtest
 
 Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
 
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a97b49b..0c433b5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -115,14 +115,6 @@ if (USE_MPI AND HDF5_IS_PARALLEL)
+ endif()
+ 
+ 
+-if (BUILD_TESTS)
+-# find_package(GTest)
+-# if (NOT GTEST_FOUND)
+-# 	message(WARNING "gtest library not found, some tests will not be run")
+-# endif()
+-endif()
+-
+-
+ if (USE_OPENMP)
+     find_package(OpenMP)
+     if(OPENMP_FOUND)
 diff --git a/cmake/flann_utils.cmake b/cmake/flann_utils.cmake
-index e02a6ff..544f87a 100644
+index e02a6ff..1320aad 100644
 --- a/cmake/flann_utils.cmake
 +++ b/cmake/flann_utils.cmake
 @@ -41,6 +41,13 @@ macro(find_hdf5)
@@ -33,4 +52,5 @@ index e02a6ff..544f87a 100644
  
  macro(flann_add_gtest exe src)
 -- 
-2.47.1
+2.48.0
+
