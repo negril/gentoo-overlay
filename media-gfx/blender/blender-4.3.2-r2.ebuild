@@ -37,7 +37,7 @@ HOMEPAGE="https://www.blender.org"
 BLENDER_BRANCH="$(ver_cut 1-2)"
 
 if [[ "${PV}" == *9999* ]]; then
-	EGIT_LFS="yes"
+	EGIT_LFS=yes
 	inherit git-r3
 	EGIT_REPO_URI="https://projects.blender.org/blender/blender.git"
 	EGIT_SUBMODULES=( '*' '-lib/*' )
@@ -72,7 +72,7 @@ SLOT="${BLENDER_BRANCH}"
 # potentially mirror cpu_flags_x86 + REQUIRED_USE
 IUSE="
 	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
-	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
+	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip jack
 	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +opengl +openmp +openpgl
 	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
@@ -90,7 +90,6 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 	fluid? ( tbb )
 	gnome? ( wayland )
 	hip? ( cycles )
-	hiprt? ( hip )
 	nanovdb? ( openvdb )
 	openvdb? ( tbb openexr )
 	optix? ( cuda )
@@ -137,9 +136,6 @@ RDEPEND="${PYTHON_DEPS}
 	gnome? ( gui-libs/libdecor )
 	hip? (
 		>=dev-util/hip-5.7:=
-		hiprt? (
-			>=dev-libs/hiprt-2.5:=
-		)
 	)
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
@@ -272,7 +268,7 @@ blender_get_version() {
 	# NOTE maps x0y to x.y
 	# TODO this can potentially break for x > 9 and y > 9
 	BV="$(grep "define BLENDER_VERSION " source/blender/blenkernel/BKE_blender_version.h | cut -d ' ' -f 3)"
-	status="$(pipestatus -v)" || die "fails to detect BLENDER_VERSION, (PIPESTATUS: ${status})"
+	status=$(pipestatus -v) || die "fails to detect BLENDER_VERSION, (PIPESTATUS: ${status})"
 	BV="$(printf "%d.%d" "${BV:0: -2}" "${BV: -2}")"
 
 	if [[ "${PV}" != 9999* && "${BLENDER_BRANCH}" != "${BV}" ]]; then
@@ -281,7 +277,7 @@ blender_get_version() {
 	fi
 
 	BVC="$(grep "define BLENDER_VERSION_CYCLE " source/blender/blenkernel/BKE_blender_version.h | cut -d ' ' -f 3)"
-	status="$(pipestatus -v)" || die "fails to detect BLENDER_VERSION_CYCLE, (PIPESTATUS: ${status})"
+	status=$(pipestatus -v) || die "fails to detect BLENDER_VERSION_CYCLE, (PIPESTATUS: ${status})"
 }
 
 pkg_pretend() {
@@ -406,11 +402,6 @@ src_prepare() {
 	fi
 
 	rm "${WORKDIR}/blender-assets/publish/LICENSE" || die
-
-	# TODO HUH?
-	if use vulkan; then
-		sed -e "s/extern_vulkan_memory_allocator/extern_vulkan_memory_allocator\nSPIRV-Tools-opt\nSPIRV-Tools\nSPIRV-Tools-link\nglslang\nSPIRV\nSPVRemapper/" -i source/blender/gpu/CMakeLists.txt || die
-	fi
 }
 
 src_configure() {
@@ -438,80 +429,78 @@ src_configure() {
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
 		-DPYTHON_VERSION="${EPYTHON/python/}"
-		-DWITH_ALEMBIC="$(usex alembic)"
+		-DWITH_ALEMBIC=$(usex alembic)
 		-DWITH_BOOST="yes"
-		-DWITH_BULLET="$(usex bullet)"
-		-DWITH_CODEC_FFMPEG="$(usex ffmpeg)"
-		-DWITH_CODEC_SNDFILE="$(usex sndfile)"
+		-DWITH_BULLET=$(usex bullet)
+		-DWITH_CODEC_FFMPEG=$(usex ffmpeg)
+		-DWITH_CODEC_SNDFILE=$(usex sndfile)
 
-		-DWITH_CYCLES="$(usex cycles)"
+		-DWITH_CYCLES=$(usex cycles)
 
-		-DWITH_CYCLES_DEVICE_CUDA="$(usex cuda)"
-		-DWITH_CYCLES_CUDA_BINARIES="$(usex cuda "$(usex cycles-bin-kernels)")"
-		-DWITH_CYCLES_DEVICE_OPTIX="$(usex optix)"
+		-DWITH_CYCLES_DEVICE_CUDA=$(usex cuda)
+		-DWITH_CYCLES_CUDA_BINARIES="$(usex cuda $(usex cycles-bin-kernels))"
+		-DWITH_CYCLES_DEVICE_OPTIX=$(usex optix)
 
 		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
-		-DWITH_CYCLES_HIP_BINARIES="$(usex hip "$(usex cycles-bin-kernels)")"
+		-DWITH_CYCLES_HIP_BINARIES=$(usex hip $(usex cycles-bin-kernels))
 
 		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
-		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi "$(usex cycles-bin-kernels)")"
-
-		-DWITH_CYCLES_DEVICE_HIPRT="$(usex hiprt)"
+		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi $(usex cycles-bin-kernels))"
 
 		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
 		-DWITH_CYCLES_EMBREE="$(usex embree)"
-		-DWITH_CYCLES_OSL="$(usex osl)"
-		-DWITH_CYCLES_PATH_GUIDING="$(usex openpgl)"
+		-DWITH_CYCLES_OSL=$(usex osl)
+		-DWITH_CYCLES_PATH_GUIDING=$(usex openpgl)
 		-DWITH_CYCLES_STANDALONE="no"
 		-DWITH_CYCLES_STANDALONE_GUI="no"
 
-		-DWITH_DOC_MANPAGE="$(usex man)"
+		-DWITH_DOC_MANPAGE=$(usex man)
 		-DWITH_DRACO="no" # TODO: Package Draco
-		-DWITH_FFTW3="$(usex fftw)"
-		-DWITH_GHOST_WAYLAND="$(usex wayland)"
+		-DWITH_FFTW3=$(usex fftw)
+		-DWITH_GHOST_WAYLAND=$(usex wayland)
 		-DWITH_GHOST_WAYLAND_DYNLOAD="no"
-		-DWITH_GHOST_X11="$(usex X)"
-		-DWITH_GMP="$(usex gmp)"
-		-DWITH_GTESTS="$(usex test)"
+		-DWITH_GHOST_X11=$(usex X)
+		-DWITH_GMP=$(usex gmp)
+		-DWITH_GTESTS=$(usex test)
 		-DWITH_HARFBUZZ="$(usex truetype)"
-		-DWITH_HARU="$(usex pdf)"
+		-DWITH_HARU=$(usex pdf)
 		-DWITH_HEADLESS="$(usex !X "$(use !wayland)")"
 		-DWITH_HYDRA="no" # TODO: Package Hydra
-		-DWITH_IMAGE_OPENEXR="$(usex openexr)"
-		-DWITH_IMAGE_OPENJPEG="$(usex jpeg2k)"
-		-DWITH_IMAGE_WEBP="$(usex webp)"
-		-DWITH_INPUT_NDOF="$(usex ndof)"
-		-DWITH_INTERNATIONAL="$(usex nls)"
-		-DWITH_JACK="$(usex jack)"
+		-DWITH_IMAGE_OPENEXR=$(usex openexr)
+		-DWITH_IMAGE_OPENJPEG=$(usex jpeg2k)
+		-DWITH_IMAGE_WEBP=$(usex webp)
+		-DWITH_INPUT_NDOF=$(usex ndof)
+		-DWITH_INTERNATIONAL=$(usex nls)
+		-DWITH_JACK=$(usex jack)
 		-DWITH_MATERIALX="no" # TODO: Package MaterialX
-		-DWITH_MEM_JEMALLOC="$(usex jemalloc)"
-		-DWITH_MEM_VALGRIND="$(usex valgrind)"
-		-DWITH_MOD_FLUID="$(usex fluid)"
-		-DWITH_MOD_OCEANSIM="$(usex fftw)"
-		-DWITH_NANOVDB="$(usex nanovdb)"
-		-DWITH_OPENAL="$(usex openal)"
-		-DWITH_OPENCOLLADA="$(usex collada)"
-		-DWITH_OPENCOLORIO="$(usex color-management)"
-		-DWITH_OPENGL_BACKEND="$(usex opengl)"
-		-DWITH_OPENIMAGEDENOISE="$(usex oidn)"
-		-DWITH_OPENMP="$(usex openmp)"
-		-DWITH_OPENSUBDIV="$(usex opensubdiv)"
-		-DWITH_OPENVDB="$(usex openvdb)"
-		-DWITH_OPENVDB_BLOSC="$(usex openvdb)"
-		-DWITH_POTRACE="$(usex potrace)"
-		-DWITH_PUGIXML="$(usex pugixml)"
-		-DWITH_PULSEAUDIO="$(usex pulseaudio)"
+		-DWITH_MEM_JEMALLOC=$(usex jemalloc)
+		-DWITH_MEM_VALGRIND=$(usex valgrind)
+		-DWITH_MOD_FLUID=$(usex fluid)
+		-DWITH_MOD_OCEANSIM=$(usex fftw)
+		-DWITH_NANOVDB=$(usex nanovdb)
+		-DWITH_OPENAL=$(usex openal)
+		-DWITH_OPENCOLLADA=$(usex collada)
+		-DWITH_OPENCOLORIO=$(usex color-management)
+		-DWITH_OPENGL_BACKEND=$(usex opengl)
+		-DWITH_OPENIMAGEDENOISE=$(usex oidn)
+		-DWITH_OPENMP=$(usex openmp)
+		-DWITH_OPENSUBDIV=$(usex opensubdiv)
+		-DWITH_OPENVDB=$(usex openvdb)
+		-DWITH_OPENVDB_BLOSC=$(usex openvdb)
+		-DWITH_POTRACE=$(usex potrace)
+		-DWITH_PUGIXML=$(usex pugixml)
+		-DWITH_PULSEAUDIO=$(usex pulseaudio)
 		-DWITH_PYTHON_INSTALL="no"
 		-DWITH_PYTHON_INSTALL_NUMPY="no"
 		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
 		-DWITH_RENDERDOC="$(usex renderdoc)"
-		-DWITH_SDL="$(usex sdl)"
+		-DWITH_SDL=$(usex sdl)
 		-DWITH_STATIC_LIBS="no"
 		-DWITH_STRICT_BUILD_OPTIONS="yes"
 		-DWITH_SYSTEM_EIGEN3="yes"
 		-DWITH_SYSTEM_FREETYPE="yes"
 		-DWITH_SYSTEM_LZO="yes"
-		-DWITH_TBB="$(usex tbb)"
+		-DWITH_TBB=$(usex tbb)
 		-DWITH_USD="no" # TODO: Package USD
 		-DWITH_XR_OPENXR="no"
 		-DWITH_UNITY_BUILD="no"
@@ -527,7 +516,7 @@ src_configure() {
 	# requires dev-vcs/git
 	if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]]; then
 		mycmakeargs+=(
-			# -DWITH_BUILDINFO="no"
+			# -DWITH_BUILDINFO=no
 			-DWITH_EXPERIMENTAL_FEATURES="$(usex experimental)"
 		)
 	else
@@ -567,25 +556,6 @@ src_configure() {
 
 			-DCYCLES_HIP_BINARIES_ARCH="$(get_amdgpu_flags)"
 		)
-		unset hiprt_pn hiprt_pv
-		if use hiprt; then
-			# # TODO pkgconfig file
-			# local hiprt_pn hiprt_pv
-			# hiprt_pn="dev-libs/hiprt"
-			# hiprt_pv="$(best_version "${hiprt_pn}")"
-			# if [[ -z "${hiprt_version}" ]]; then
-			# 	die "could not find hiprt"
-			# fi
-			# hiprt_pv="$(ver_cut 1-2 "${hiprt_pv/#${hiprt_pn}-/}")"
-			# hiprt_pv="$(ver_rs 1-2 ' ' "${hiprt_pv}")"
-			# hiprt_pv="$(eval printf "%02d%03d" "${hiprt_pv}")"
-			mycmakeargs+=(
-				# -DHIPRT_ROOT_DIR="${ESYSROOT}/usr/include/hiprt/${hiprt_pv}/"
-				-DHIPRT_ROOT_DIR="$(hipconfig -p)"
-				-DHIPRT_COMPILER_PARALLEL_JOBS="$(makeopts_jobs)"
-			)
-			# unset hiprt_pn hiprt_pv
-		fi
 	fi
 
 	if use optix; then
@@ -611,14 +581,14 @@ src_configure() {
 	if tc-is-gcc; then
 		# We disable these to respect the user's choice of linker.
 		mycmakeargs+=(
-			-DWITH_LINKER_GOLD="no"
+			-DWITH_LINKER_GOLD=no
 		)
 	fi
 
 	if tc-is-clang || use osl; then
 		mycmakeargs+=(
-			-DWITH_CLANG="yes"
-			-DWITH_LLVM="yes"
+			-DWITH_CLANG=yes
+			-DWITH_LLVM=yes
 		)
 	fi
 
@@ -655,7 +625,7 @@ src_configure() {
 			fi
 		else
 			mycmakeargs+=(
-				-DWITH_GPU_RENDER_TESTS="no"
+				-DWITH_GPU_RENDER_TESTS=no
 			)
 		fi
 	fi
@@ -688,57 +658,6 @@ src_test() {
 	fi
 
 	local -x CMAKE_SKIP_TESTS=(
-		"^draw$"
-		"^gpu$"
-
-		"^script_load_modules$"
-		"^script_pyapi_bpy_driver_secure_eval$"
-
-		"^blendfile_versioning_5_over_8$"
-		"^blendfile_versioning_7_over_8$"
-
-		"^cycles_motion_blur_"
-		"^cycles_volume_"
-
-		"^cycles_image_colorspace_cpu$"
-		"^compositor_color_cpu$"
-
-		"^cycles_light_linking_cuda"
-
-		# WITH_COMPOSITOR_REALTIME_TESTS
-		"^compositor_distort_realtime$"
-		"^compositor_filter_realtime$"
-		"^compositor_multiple_node_setups_realtime$"
-
-		# WITH_GPU_RENDER_TESTS
-		"^eevee_next_displacement_opengl$"
-		"^eevee_next_hair_opengl$"
-		"^eevee_next_light_linking_opengl$"
-		"^eevee_next_motion_blur_opengl$"
-		"^eevee_next_volume_opengl$"
-
-		"^workbench_bsdf_opengl$"
-		"^workbench_hair_opengl$"
-		"^workbench_light_linking_opengl$"
-		"^workbench_light_opengl$"
-		"^workbench_motion_blur_opengl$"
-		"^workbench_volume_opengl$"
-
-		WITH_UI_TESTS
-		"^ui_test_undo.text_editor_edit_mode_mix$"
-		"^ui_test_undo.text_editor_simple$"
-		"^ui_test_undo.view3d_edit_mode_multi_window$"
-		"^ui_test_undo.view3d_font_edit_mode_simple$"
-		"^ui_test_undo.view3d_mesh_edit_separate$"
-		"^ui_test_undo.view3d_mesh_particle_edit_mode_simple$"
-		"^ui_test_undo.view3d_multi_mode_multi_window$"
-		"^ui_test_undo.view3d_multi_mode_select$"
-		"^ui_test_undo.view3d_sculpt_dyntopo_and_edit$"
-		"^ui_test_undo.view3d_sculpt_dyntopo_simple$"
-		"^ui_test_undo.view3d_sculpt_with_memfile_step$"
-		"^ui_test_undo.view3d_simple$"
-		"^ui_test_undo.view3d_texture_paint_complex$"
-		"^ui_test_undo.view3d_texture_paint_simple$"
 	)
 
 	if ! has_version "media-libs/openusd"; then

@@ -36,6 +36,9 @@
 		<flag name="hip">
 			Build cycles renderer with AMD HIP support.
 		</flag>
+		<flag name="hiprt">
+			Build cycles renderer with AMD HIPRT support.
+		</flag>
 		<flag name="cycles">
 			Enable the Cycles raytracing render engine.
 		</flag>
@@ -44,14 +47,11 @@
 			This makes it so that the user doesn't have to wait for the kernels to compile when they are used for the first time in Blender.
 			If this option is not on, they will be built as needed at runtime.
 		</flag>
-		<flag name="dds">
-			Adds DDS textures support to Blender.
-		</flag>
 		<flag name="embree">
 			Use embree to accelerate certain areas of the Cycles render engine.
 		</flag>
 		<flag name="experimental">
-			Build Experimental Blender Modules
+			Enable experimental features
 		</flag>
 		<flag name="fluid">
 			Adds fluid simulation support via the built-in Mantaflow library.
