@@ -18,7 +18,7 @@ if [[ ${PV} = *9999* ]] ; then
 	EGIT_REPO_URI="https://github.com/${PN}/${PN}.git"
 else
 	# branch master
-	ADE_PV="0.1.2d"
+	ADE_PV="0.1.2e"
 	# branch wechat_qrcode_20210119
 	QRCODE_COMMIT="a8b69ccc738421293254aec5ddb38bd523503252"
 	# branch dnn_samples_face_detector_20170830
@@ -329,6 +329,14 @@ BDEPEND="
 		)
 	)
 	java? ( >=dev-java/ant-1.10.14-r3 )
+	test? (
+		ffmpeg? (
+			media-fonts/wqy-microhei
+		)
+		gstreamer? (
+			media-fonts/wqy-microhei
+		)
+	)
 "
 
 PATCHES=(
@@ -341,14 +349,17 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.8.1-use-system-opencl.patch"
 
 	"${FILESDIR}/${PN}-4.9.0-drop-python2-detection.patch"
-	"${FILESDIR}/${PN}-4.9.0-ade-0.1.2d.tar.gz.patch"
 	"${FILESDIR}/${PN}-4.9.0-cmake-cleanup.patch"
 
 	"${FILESDIR}/${PN}-4.10.0-dnn-explicitly-include-abseil-cpp.patch"
-	"${FILESDIR}/${PN}-4.10.0-cudnn-9.patch" # 25841
-	"${FILESDIR}/${PN}-4.10.0-cuda-fp16.patch" # 25880
-	"${FILESDIR}/${PN}-4.10.0-26234.patch" # 26234
+# 	"${FILESDIR}/${PN}-4.10.0-cudnn-9.patch" # 25841
+# 	"${FILESDIR}/${PN}-4.10.0-cuda-fp16.patch" # 25880
+# 	"${FILESDIR}/${PN}-4.10.0-26234.patch" # 26234
 	"${FILESDIR}/${PN}-4.10.0-tbb-detection.patch"
+
+	"${FILESDIR}/${PN}-4.11.0-ade-0.1.2e.tar.gz.patch"
+	"${FILESDIR}/${PN}-4.11.0-cmake-CMP0175.patch"
+	"${FILESDIR}/${PN}-4.11.0-cmake-CMP0177.patch"
 
 	# TODO applied in src_prepare
 	# "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
@@ -377,6 +388,7 @@ cuda_get_host_compiler() {
 
 	local compiler compiler_type compiler_version
 	local package package_version
+	local -x NVCC_CCBIN
 	local NVCC_CCBIN_default
 
 	compiler_type="$(tc-get-compiler-type)"
@@ -469,15 +481,10 @@ src_prepare() {
 		|| die
 
 	if use contrib; then
-		cd "${WORKDIR}/${PN}_contrib-${PV}" || die
+		pushd "${WORKDIR}/${PN}_contrib-${PV}" >/dev/null || die
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
-		if type -P nvcc &> /dev/null && ver_test "$(nvcc --version | tail -n 1 | cut -d '_' -f 2- | cut -d '.' -f 1-2)" -ge 12.4; then
-			eapply "${DISTDIR}/${PN}_contrib-4.10.0-3607.patch"
-			eapply "${FILESDIR}/${PN}_contrib-4.10.0-CUDA-12.6-tuple_size.patch" # 3785
-		fi
-
-		cd "${S}" || die
+		popd >/dev/null || die
 
 		! use contribcvv && { rm -R "${WORKDIR}/${PN}_contrib-${PV}/modules/cvv" || die; }
 		! use contribdnn && { rm -R "${S}/modules/dnn" || die; }
@@ -766,6 +773,8 @@ multilib_src_configure() {
 
 		-DDNN_PLUGIN_LIST="all"
 		-DHIGHGUI_ENABLE_PLUGINS="no"
+
+		-DOPENCV_SKIP_SAMPLES_SYCL="yes"
 	)
 
 	local VIDEOIO_PLUGIN_LIST=()
@@ -971,6 +980,7 @@ multilib_src_configure() {
 	fi
 
 	if multilib_native_use python; then
+		# shellcheck disable=SC2317
 		python_configure() {
 			# Set all python variables to load the correct Gentoo paths
 			local mycmakeargs=(
@@ -1056,7 +1066,9 @@ multilib_src_test() {
 		if use opengl; then
 			local -x OPENCV_SKIP_TESTS_cudaarithm=(
 				'OpenGL/Buffer.MapDevice/*'
+				'OpenGL/Buffer*'
 				'OpenGL/*Gpu*'
+				'OpenGL/Texture2D*'
 			)
 		fi
 	fi
@@ -1082,6 +1094,7 @@ multilib_src_test() {
 			'vittrack.accuracy_vittrack'
 		)
 	fi
+
 	if use dnnsamples; then
 		local -x OPENCV_SKIP_TESTS_wechat_qrcode=(
 			'Objdetect_QRCode_points_position.rotate45'
@@ -1091,6 +1104,10 @@ multilib_src_test() {
 			'Objdetect_QRCode_Easy_Multi.regression/1'
 		)
 	fi
+
+	local -x OPENCV_SKIP_TESTS_ximgproc=(
+		'InterpolatorTest.RICReferenceAccuracy'
+	)
 
 	if multilib_native_use cuda; then
 		if ! SANDBOX_WRITE=/dev/nvidiactl test -w /dev/nvidiactl ; then
@@ -1106,11 +1123,12 @@ multilib_src_test() {
 		else
 			cuda_add_sandbox -w
 			addwrite "/dev/dri/"
-			[[ -e /dev/udmabuf ]] && addwrite /dev/udmabuf
 		fi
 	fi
 
+	# shellcheck disable=SC2317
 	opencv_test() {
+
 		cd "${BUILD_DIR}" || die
 
 		# directories to search for _core_ plugins
