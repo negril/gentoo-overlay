@@ -1,0 +1,30 @@
+From 973c4a9c285e6d70ec44c7f5d44fbfbb7349ec95 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Wed, 9 Apr 2025 13:45:52 +0200
+Subject: [PATCH] system gtest
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 11c1b04..1f74e1b 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -1,3 +1,15 @@
++find_package(GTest)
++if(GTest_FOUND)
++    enable_testing()
++    set(TEST_LIBRARIES GTest::GTest GTest::gtest_main)
++
++    add_custom_target(tests ALL)
++    add_subdirectory(perftest)
++    add_subdirectory(unittest)
++
++    return()
++endif()
++
+ find_package(GTestSrc)
+ 
+ IF(GTESTSRC_FOUND)
+-- 
+2.49.0
+

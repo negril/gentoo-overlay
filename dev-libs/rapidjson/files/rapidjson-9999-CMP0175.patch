@@ -1,0 +1,24 @@
+From c7c2cf16d2f8e00aa2d450493ad70728936a2115 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Wed, 9 Apr 2025 13:47:13 +0200
+Subject: [PATCH] CMP0175
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d82c897..15a3aef 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -161,8 +161,7 @@ if(RAPIDJSON_BUILD_DOC)
+     add_subdirectory(doc)
+ endif()
+ 
+-add_custom_target(travis_doc)
+-add_custom_command(TARGET travis_doc
++add_custom_target(travis_doc
+     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/travis-doxygen.sh)
+ 
+ if(RAPIDJSON_BUILD_EXAMPLES)
+-- 
+2.49.0
+
