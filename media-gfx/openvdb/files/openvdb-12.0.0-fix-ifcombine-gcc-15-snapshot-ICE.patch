@@ -1,0 +1,47 @@
+From b6e0f3a56e0bb4347d8fd6c3775e7029798b905b Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 10 Jan 2025 18:19:38 +0100
+Subject: [PATCH] fix ifcombine gcc 15 snapshot ICE
+
+during GIMPLE pass: ifcombine
+/var/tmp/paludis/media-gfx-openvdb-12.0.0/work/openvdb-12.0.0/openvdb/openvdb/../openvdb/tools/FastSweeping.h:1312:10:
+internal compiler error: Segmentation fault
+ 1312 |     void operator()(const LeafRange& r) const
+      |          ^~~~~~~~
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/nanovdb/nanovdb/unittest/CMakeLists.txt b/nanovdb/nanovdb/unittest/CMakeLists.txt
+index 5a59181..05d5648 100644
+--- a/nanovdb/nanovdb/unittest/CMakeLists.txt
++++ b/nanovdb/nanovdb/unittest/CMakeLists.txt
+@@ -39,6 +39,13 @@ add_executable(nanovdb_test_nanovdb "TestNanoVDB.cc")
+ target_link_libraries(nanovdb_test_nanovdb PRIVATE nanovdb GTest::gtest GTest::gtest_main)
+ add_test(nanovdb_unit_test nanovdb_test_nanovdb)
+ 
++set_target_properties(
++  nanovdb_test_nanovdb
++
++  PROPERTIES
++    COMPILE_FLAGS -fdisable-tree-ifcombine LINK_FLAGS -fdisable-tree-ifcombine
++)
++
+ # -----------------------------------------------------------------------------
+ 
+ if(NANOVDB_USE_CUDA)
+diff --git a/openvdb/openvdb/unittest/CMakeLists.txt b/openvdb/openvdb/unittest/CMakeLists.txt
+index b1e04eb..83ea2a9 100644
+--- a/openvdb/openvdb/unittest/CMakeLists.txt
++++ b/openvdb/openvdb/unittest/CMakeLists.txt
+@@ -195,6 +195,8 @@ endif()
+ 
+ add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
+ 
++set_target_properties( vdb_test PROPERTIES COMPILE_FLAGS -fdisable-tree-ifcombine LINK_FLAGS -fdisable-tree-ifcombine )
++
+ # Blosc and ZLib are hidden dependencies for the core library
+ # (not exposed in headers), so we need to manually link them in
+ # here to provide header access for the relevant unit tests
+-- 
+2.47.1
+

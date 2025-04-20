@@ -1,0 +1,2073 @@
+https://github.com/AcademySoftwareFoundation/openvdb/pull/1971.patch
+From f0733676a2d0062986977704954b41a06e1a586c Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Wed, 20 Nov 2024 11:42:38 -0800
+Subject: [PATCH 01/19] added read/write support of OFF files to vdb_tool
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/README.md          |  9 +--
+ openvdb_cmd/vdb_tool/include/Geometry.h | 93 ++++++++++++++++++++++---
+ openvdb_cmd/vdb_tool/include/Tool.h     | 12 ++--
+ openvdb_cmd/vdb_tool/src/unittest.cpp   | 65 +++++++++++------
+ 4 files changed, 135 insertions(+), 44 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/README.md b/openvdb_cmd/vdb_tool/README.md
+index f64ebb6bea..0b34177cd1 100644
+--- a/openvdb_cmd/vdb_tool/README.md
++++ b/openvdb_cmd/vdb_tool/README.md
+@@ -10,8 +10,8 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
+ | **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
+ | **config** | Load a configuration file and add the actions for processing |
+ | **default** | Set default values used by all subsequent actions |
+-| **read** | Read mesh, points and level sets as obj, ply, abc, stl, pts, vdb or nvdb files |
+-| **write** | Write a polygon mesh, points or level set as a obj, ply, stl, abc or vdb file |
++| **read** | Read mesh, points and level sets as obj, ply, abc, stl, off, pts, vdb or nvdb files |
++| **write** | Write a polygon mesh, points or level set as a obj, ply, stl, off, abc or vdb file |
+ | **vdb2points** | Extracts points from a VDB grid |
+ | **mesh2ls** | Convert a polygon mesh to a narrow-band level set |
+ | **points2ls** | Convert points into a narrow-band level set |
+@@ -59,9 +59,10 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
+ | Extension | Actions | Description |
+ |-------|-------|-------|
+ | vdb | read and write | OpenVDB sparse volume files with float, Vec3f and points |
+-| obj | read and write | ASCII OBJ mesh files with triangle, quad or points |
+-| ply | read and write | Binary and ASCII PLY mesh files with triangle, quad or points |
++| obj | read and write | ASCII OBJ mesh files with triangles, quads or points |
++| ply | read and write | Binary and ASCII PLY mesh files with triangles, quads or points |
+ | stl | read and write | Binary STL mesh files with triangles |
++| off | read and write | ASCI OFF mesh files with triangles, quads or points |
+ | pts | read | ASCII PTS points files with one or more point clouds |
+ | abc | optional read and write | Alembic binary mesh files |
+ | nvdb| optional read and write | NanoVDB file with voxels or points |
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index 2d6472dcde..8ce2d4f9b0 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -104,17 +104,20 @@ class Geometry
+     // Reads all the vertices in the file and treats them as Geometry
+     void write(const std::string &fileName) const;
+     void writeOBJ(const std::string &fileName) const;
++    void writeOFF(const std::string &fileName) const;
+     void writePLY(const std::string &fileName) const;
+     void writeSTL(const std::string &fileName) const;
+     void writeGEO(const std::string &fileName) const;
+     void writeABC(const std::string &fileName) const;
+ 
+     void writeOBJ(std::ostream &os) const;
++    void writeOFF(std::ostream &os) const;
+     void writePLY(std::ostream &os) const;
+     void writeSTL(std::ostream &os) const;
+ 
+     void read(const std::string &fileName);
+     void readOBJ(const std::string &fileName);
++    void readOFF(const std::string &fileName);
+     void readPLY(const std::string &fileName);
+     void readSTL(const std::string &fileName);
+     void readPTS(const std::string &fileName);
+@@ -125,6 +128,7 @@ class Geometry
+     void readNVDB(const std::string &fileName);
+ 
+     void readOBJ(std::istream &is);
++    void readOFF(std::istream &is);
+     void readPLY(std::istream &is);
+ 
+     size_t vtxCount() const { return mVtx.size(); }
+@@ -229,7 +233,7 @@ const math::BBox<Vec3s>& Geometry::bbox() const
+ 
+ void Geometry::write(const std::string &fileName) const
+ {
+-    switch (findFileExt(fileName, {"geo", "obj", "ply", "stl", "abc"})) {
++    switch (findFileExt(fileName, {"geo", "obj", "ply", "stl", "abc", "off"})) {
+     case 1:
+         this->writeGEO(fileName);
+         break;
+@@ -245,6 +249,9 @@ void Geometry::write(const std::string &fileName) const
+     case 5:
+         this->writeABC(fileName);
+         break;
++    case 6:
++        this->writeOFF(fileName);
++        break;
+     default:
+         throw std::invalid_argument("Geometry file \"" + fileName + "\" has an invalid extension");
+     }
+@@ -323,17 +330,32 @@ void Geometry::writeOBJ(const std::string &fileName) const
+ void Geometry::writeOBJ(std::ostream &os) const
+ {
+     os << "# Created by vdb_tool\n";
+-    for (auto &v : mVtx) {
+-        os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
+-    }
+-    for (auto &t : mTri) {
+-        os << "f " << t[0]+1 << " " << t[1]+1 << " " << t[2]+1 << "\n";// obj is 1-based
+-    }
+-    for (auto &q : mQuad) {
+-        os << "f " << q[0]+1 << " " << q[1]+1 << " " << q[2]+1 << " " << q[3]+1 << "\n";// obj is 1-based
+-    }
++    for (auto &v : mVtx) os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
++    for (auto &t : mTri) os << "f " << t[0]+1 << " " << t[1]+1 << " " << t[2]+1 << "\n";// obj is 1-based
++    for (auto &q : mQuad) os << "f " << q[0]+1 << " " << q[1]+1 << " " << q[2]+1 << " " << q[3]+1 << "\n";// obj is 1-based
+ }// Geometry::writeOBJ
+ 
++void Geometry::writeOFF(const std::string &fileName) const
++{
++    if (fileName=="stdout.off") {
++        this->writeOFF(std::cout);
++    } else {
++        std::ofstream outfile(fileName);
++        if (!outfile.is_open()) throw std::invalid_argument("Error writing to off file \""+fileName+"\"");
++        this->writeOFF(outfile);;
++    }
++}// Geometry::writeOFF
++
++void Geometry::writeOFF(std::ostream &os) const
++{
++    os << "OFF\n";
++    os << "# Created by vdb_tool\n";
++    os << mVtx.size() << " " << (mTri.size() + mQuad.size()) << " " << 0 << "\n";
++    for (auto &v : mVtx) os << v[0] << " " << v[1] << " " << v[2] << "\n";
++    for (auto &t : mTri) os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
++    for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
++}// Geometry::writeOFF
++
+ void Geometry::writeSTL(const std::string &fileName) const
+ {
+     if (fileName == "stdout.stl") {
+@@ -381,7 +403,7 @@ void Geometry::writeGEO(const std::string &fileName) const
+ 
+ void Geometry::read(const std::string &fileName)
+ {
+-    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo"})) {
++    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off"})) {
+     case 1:
+         this->readOBJ(fileName);
+         break;
+@@ -406,6 +428,9 @@ void Geometry::read(const std::string &fileName)
+     case 8:
+         this->readGEO(fileName);
+         break;
++    case 9:
++        this->readOFF(fileName);
++        break;
+     default:
+ #if VDB_TOOL_USE_PDAL
+         pdal::StageFactory factory;
+@@ -519,6 +544,52 @@ void Geometry::readPDAL(const std::string &fileName)
+     mBBox = BBoxT(); //invalidate BBox
+ }// Geometry::readPDAL
+ 
++void Geometry::readOFF(const std::string &fileName)
++{
++    if (fileName == "stdin.off") {
++        this->readOFF(std::cin);
++    } else {
++        std::ifstream infile(fileName);
++        if (!infile.is_open()) throw std::invalid_argument("Error opening Geometry file \""+fileName+"\"");
++        this->readOFF(infile);
++    }
++}// Geometry::readOFF
++
++void Geometry::readOFF(std::istream &is)
++{
++    std::string line;
++    std::getline(is, line);
++    if (line!="OFF") throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
++    int vtxCount=0, faceCount=0, edgeCount=0;
++    while (vtxCount==0 && std::getline(is, line)) {
++        if (line[0]=='#') continue;
++        std::istringstream iss(line);
++        iss >> vtxCount >> faceCount >> edgeCount;
++    }
++    Vec3f p;
++    for (int i=0; i<vtxCount && std::getline(is, line); ++i) {
++        std::istringstream iss(line);
++        iss >> p[0] >> p[1] >> p[2];
++        mVtx.push_back(p);
++    }
++    int f[4];
++    for (int i=0; i<faceCount && std::getline(is, line); ++i) {
++        std::istringstream iss(line);
++        int n=0;
++        iss >> n;
++        if (n==3) {
++            iss >> f[0] >> f[1] >> f[2];
++            mTri.emplace_back(f[0],f[1],f[2]);
++        } else if(n==4) {
++            iss >> f[0] >> f[1] >> f[2] >> f[3];
++            mQuad.emplace_back(f[0],f[1],f[2],f[3]);
++        } else {
++            throw std::invalid_argument("Geometry::readOFF: " + std::to_string(n) + "-gons are not supported");
++        }
++    }
++    mBBox = BBoxT();//invalidate BBox
++}// Geometry::readOFF
++
+ void Geometry::readPLY(const std::string &fileName)
+ {
+     if (fileName == "stdin.ply") {
+diff --git a/openvdb_cmd/vdb_tool/include/Tool.h b/openvdb_cmd/vdb_tool/include/Tool.h
+index 5e4cae6899..24e947f79b 100644
+--- a/openvdb_cmd/vdb_tool/include/Tool.h
++++ b/openvdb_cmd/vdb_tool/include/Tool.h
+@@ -369,14 +369,14 @@ void Tool::init()
+ 
+   mParser.addAction(
+       "read", "i", "Read one or more geometry or VDB files from disk or STDIN.",
+-    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
++    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|off|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
+      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
+      {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
+      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
+ 
+   mParser.addAction(
+       "write", "o", "Write list of geometry, VDB or config files to disk or STDOUT",
+-    {{"files", "", "{file|stdout}.{obj|ply|stl|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
++    {{"files", "", "{file|stdout}.{obj|ply|stl|off|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
+      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
+      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
+      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
+@@ -925,8 +925,8 @@ std::string Tool::examples() const
+ {
+     const int w = 16;
+     std::stringstream ss;
+-    ss << std::left << std::setw(w) << "Surface points:" << mCmdName << " -read points.[obj/ply/stl/pts] -points2ls d=256 r=2.0 w=3 -dilate r=2 -gauss i=1 w=1 -erode r=2 -ls2m a=0.25 -write output.[ply/obj/stl]\n";
+-    ss << std::left << std::setw(w) << "Convert mesh:  " << mCmdName << " -read mesh.[ply/obj] -mesh2ls d=256 -write output.vdb config.txt\n";
++    ss << std::left << std::setw(w) << "Surface points:" << mCmdName << " -read points.[obj/ply/stl/off/pts] -points2ls d=256 r=2.0 w=3 -dilate r=2 -gauss i=1 w=1 -erode r=2 -ls2m a=0.25 -write output.[ply/obj/stl]\n";
++    ss << std::left << std::setw(w) << "Convert mesh:  " << mCmdName << " -read mesh.[ply/obj/off] -mesh2ls d=256 -write output.vdb config.txt\n";
+     ss << std::left << std::setw(w) << "Config example:" << mCmdName << " -config config.txt\n";
+     return ss.str();
+ }
+@@ -963,7 +963,7 @@ void Tool::read()
+ {
+   OPENVDB_ASSERT(mParser.getAction().name == "read");
+   for (auto &fileName : mParser.getVec<std::string>("files")) {
+-    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,stl", "vdb", "nvdb"})) {
++    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl", "vdb", "nvdb"})) {
+     case 1:
+       this->readGeo(fileName);
+       break;
+@@ -1135,7 +1135,7 @@ void Tool::write()
+ {
+   OPENVDB_ASSERT(mParser.getAction().name == "write");
+   for (std::string &fileName : mParser.getVec<std::string>("files")) {
+-    switch (findFileExt(fileName, {"geo,obj,ply,stl,abc", "vdb", "nvdb", "txt"})) {
++    switch (findFileExt(fileName, {"geo,obj,ply,stl,off,abc", "vdb", "nvdb", "txt"})) {
+     case 1:
+       this->writeGeo(fileName);
+       break;
+diff --git a/openvdb_cmd/vdb_tool/src/unittest.cpp b/openvdb_cmd/vdb_tool/src/unittest.cpp
+index 71fc4c9ade..0510e17412 100644
+--- a/openvdb_cmd/vdb_tool/src/unittest.cpp
++++ b/openvdb_cmd/vdb_tool/src/unittest.cpp
+@@ -371,18 +371,18 @@ TEST_F(Test_vdb_tool, Geometry)
+     EXPECT_EQ(4, geo2.vtxCount());
+     EXPECT_EQ(2, geo2.triCount());
+     EXPECT_EQ(1, geo2.quadCount());
+-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.bbox().min());
+-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.bbox().max());
++    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.bbox().min());
++    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.bbox().max());
+ 
+-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.vtx()[0]);
+-    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo.vtx()[1]);
+-    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo.vtx()[2]);
+-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.vtx()[3]);
++    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.vtx()[0]);
++    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo2.vtx()[1]);
++    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo2.vtx()[2]);
++    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
+ 
+-    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo.tri()[0]);
+-    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo.tri()[1]);
++    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo2.tri()[0]);
++    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo2.tri()[1]);
+ 
+-    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo.quad()[0]);
++    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo2.quad()[0]);
+   }
+   {// write to file
+     std::ofstream os("data/test.geo", std::ios_base::binary);
+@@ -395,18 +395,38 @@ TEST_F(Test_vdb_tool, Geometry)
+     EXPECT_EQ(4, geo2.vtxCount());
+     EXPECT_EQ(2, geo2.triCount());
+     EXPECT_EQ(1, geo2.quadCount());
+-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.bbox().min());
+-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.bbox().max());
++    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.bbox().min());
++    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.bbox().max());
+ 
+-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.vtx()[0]);
+-    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo.vtx()[1]);
+-    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo.vtx()[2]);
+-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.vtx()[3]);
++    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.vtx()[0]);
++    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo2.vtx()[1]);
++    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo2.vtx()[2]);
++    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
+ 
+-    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo.tri()[0]);
+-    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo.tri()[1]);
++    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo2.tri()[0]);
++    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo2.tri()[1]);
+ 
+-    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo.quad()[0]);
++    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo2.quad()[0]);
++  }
++  {// test readOFF and writeOFF
++    geo.write("data/test.off");
++    openvdb::vdb_tool::Geometry geo2;
++    EXPECT_TRUE(geo2.read("data/test.off"));
++    EXPECT_EQ(4, geo2.vtxCount());
++    EXPECT_EQ(2, geo2.triCount());
++    EXPECT_EQ(1, geo2.quadCount());
++    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.bbox().min());
++    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.bbox().max());
++
++    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.vtx()[0]);
++    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo2.vtx()[1]);
++    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo2.vtx()[2]);
++    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
++
++    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo2.tri()[0]);
++    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo2.tri()[1]);
++
++    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo2.quad()[0]);
+   }
+   #ifdef VDB_TOOL_USE_PDAL
+   {// read from PDAL-supported ASCII format file
+@@ -425,11 +445,10 @@ TEST_F(Test_vdb_tool, Geometry)
+     geo2.read("data/test.txt");
+     EXPECT_EQ(4, geo2.vtxCount());
+ 
+-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.vtx()[0]);
+-    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo.vtx()[1]);
+-    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo.vtx()[2]);
+-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.vtx()[3]);
+-
++    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.vtx()[0]);
++    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo2.vtx()[1]);
++    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo2.vtx()[2]);
++    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
+   }
+   #endif
+ }// Geometry
+
+From 06bb33eaa51edf992e58fe297c9c92c96d6febfd Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Wed, 20 Nov 2024 11:50:09 -0800
+Subject: [PATCH 02/19] added pendingchanges/vdb_tool.txt
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ pendingchanges/vdb_tool.txt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 pendingchanges/vdb_tool.txt
+
+diff --git a/pendingchanges/vdb_tool.txt b/pendingchanges/vdb_tool.txt
+new file mode 100644
+index 0000000000..c68dc25834
+--- /dev/null
++++ b/pendingchanges/vdb_tool.txt
+@@ -0,0 +1 @@
++added read and write support for OFF (Object File Format) files to vdb_tool
+\ No newline at end of file
+
+From 02ddc8835cf014fa94942d88b8f6d32e7c633768 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Wed, 20 Nov 2024 22:22:30 -0800
+Subject: [PATCH 03/19] added patch from Jonathan S
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ ci/build.sh                             |  1 +
+ openvdb_cmd/vdb_tool/CMakeLists.txt     |  1 +
+ openvdb_cmd/vdb_tool/include/Geometry.h |  2 +-
+ openvdb_cmd/vdb_tool/include/Tool.h     | 38 ++++++++++++-------------
+ openvdb_cmd/vdb_tool/src/unittest.cpp   | 22 +++++++-------
+ 5 files changed, 33 insertions(+), 31 deletions(-)
+
+diff --git a/ci/build.sh b/ci/build.sh
+index b3b318d093..02f4d4c9dd 100755
+--- a/ci/build.sh
++++ b/ci/build.sh
+@@ -189,6 +189,7 @@ cmake \
+     -DOPENVDB_BUILD_VDB_PRINT=ON \
+     -DOPENVDB_BUILD_VDB_LOD=ON \
+     -DOPENVDB_BUILD_VDB_TOOL=ON \
++    -DBUILD_TEST=ON \
+     -DOPENVDB_TOOL_USE_NANO=OFF \
+     -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
+     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \
+diff --git a/openvdb_cmd/vdb_tool/CMakeLists.txt b/openvdb_cmd/vdb_tool/CMakeLists.txt
+index da1ade24ca..9ed79ff1ea 100644
+--- a/openvdb_cmd/vdb_tool/CMakeLists.txt
++++ b/openvdb_cmd/vdb_tool/CMakeLists.txt
+@@ -191,4 +191,5 @@ if(BUILD_TEST)
+   add_executable(vdb_tool_test src/unittest.cpp)
+   target_include_directories(vdb_tool_test PRIVATE vdb_tool_common)
+   target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
++  add_test(vdb_tool_unit_test vdb_tool_test)
+ endif()
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index 8ce2d4f9b0..620aeac3ef 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -33,7 +33,7 @@
+ 
+ #ifdef VDB_TOOL_USE_NANO
+ #include <nanovdb/NanoVDB.h>
+-#include <nanovdb/util/IO.h>
++#include <nanovdb/io/IO.h>
+ #endif
+ 
+ #ifdef VDB_TOOL_USE_ABC
+diff --git a/openvdb_cmd/vdb_tool/include/Tool.h b/openvdb_cmd/vdb_tool/include/Tool.h
+index 24e947f79b..b24e71696e 100644
+--- a/openvdb_cmd/vdb_tool/include/Tool.h
++++ b/openvdb_cmd/vdb_tool/include/Tool.h
+@@ -53,9 +53,9 @@
+ 
+ #ifdef VDB_TOOL_USE_NANO
+ #include <nanovdb/NanoVDB.h>
+-#include <nanovdb/util/IO.h>
+-#include <nanovdb/util/CreateNanoGrid.h>
+-#include <nanovdb/util/NanoToOpenVDB.h>
++#include <nanovdb/io/IO.h>
++#include <nanovdb/tools/CreateNanoGrid.h>
++#include <nanovdb/tools/NanoToOpenVDB.h>
+ #endif
+ 
+ #ifdef VDB_TOOL_USE_EXR
+@@ -1062,7 +1062,7 @@ void Tool::readNVDB(const std::string &fileName)
+   const size_t count = mGrid.size();
+   if (grids.size()) {
+     for (const auto& gridHandle : grids) {
+-      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::nanoToOpenVDB(gridHandle));
++      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::tools::nanoToOpenVDB(gridHandle));
+     }
+   } else if (mParser.verbose>0) {
+     std::cerr << "readVDB: no vdb grids in \"" << fileName << "\"";
+@@ -1262,26 +1262,26 @@ void Tool::writeNVDB(const std::string &fileName)
+       throw std::invalid_argument("writeNVDB: unsupported bits \""+bits+"\"");
+     }
+ 
+-    nanovdb::StatsMode sMode = nanovdb::StatsMode::Default;
++    nanovdb::tools::StatsMode sMode = nanovdb::tools::StatsMode::Default;
+     if (stats == "none") {
+-      sMode = nanovdb::StatsMode::Disable;
++      sMode = nanovdb::tools::StatsMode::Disable;
+     } else if (stats == "bbox") {
+-      sMode = nanovdb::StatsMode::BBox;
++      sMode = nanovdb::tools::StatsMode::BBox;
+     } else if (stats == "extrema") {
+-      sMode = nanovdb::StatsMode::MinMax;
++      sMode = nanovdb::tools::StatsMode::MinMax;
+     } else if (stats == "all") {
+-      sMode = nanovdb::StatsMode::All;
++      sMode = nanovdb::tools::StatsMode::All;
+     } else if (stats != "") {
+       throw std::invalid_argument("writeNVDB: unsupported stats \""+stats+"\"");
+     }
+ 
+-    nanovdb::ChecksumMode cMode = nanovdb::ChecksumMode::Default;
++    nanovdb::CheckMode cMode = nanovdb::CheckMode::Default;
+     if (checksum == "none") {
+-      cMode = nanovdb::ChecksumMode::Disable;
++      cMode = nanovdb::CheckMode::Disable;
+     } else if (checksum == "partial") {
+-      cMode = nanovdb::ChecksumMode::Partial;
++      cMode = nanovdb::CheckMode::Partial;
+     } else if (checksum == "full") {
+-      cMode = nanovdb::ChecksumMode::Full;
++      cMode = nanovdb::CheckMode::Full;
+     } else if (checksum != "") {
+       throw std::invalid_argument("writeNVDB: unsupported checksum \""+checksum+"\"");
+     }
+@@ -1302,21 +1302,21 @@ void Tool::writeNVDB(const std::string &fileName)
+         using SrcGridT = openvdb::FloatGrid;
+         switch (qMode){
+         case nanovdb::GridType::Fp4:
+-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
++          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
+         case nanovdb::GridType::Fp8:
+-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
++          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
+         case nanovdb::GridType::Fp16:
+-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
++          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
+         case nanovdb::GridType::FpN:
+           if (absolute) {
+-            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::AbsDiff(tolerance));
++            return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::tools::AbsDiff(tolerance));
+           } else {
+-            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::RelDiff(tolerance));
++            return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::tools::RelDiff(tolerance));
+           }
+         default: break;// 32 bit float grids are handled below
+         }// end of switch
+       }
+-      return nanovdb::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
++      return nanovdb::tools::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
+     };// openToNano
+ 
+     if (fileName=="stdout.nvdb") {
+diff --git a/openvdb_cmd/vdb_tool/src/unittest.cpp b/openvdb_cmd/vdb_tool/src/unittest.cpp
+index 0510e17412..9ca0f9cbca 100644
+--- a/openvdb_cmd/vdb_tool/src/unittest.cpp
++++ b/openvdb_cmd/vdb_tool/src/unittest.cpp
+@@ -411,7 +411,7 @@ TEST_F(Test_vdb_tool, Geometry)
+   {// test readOFF and writeOFF
+     geo.write("data/test.off");
+     openvdb::vdb_tool::Geometry geo2;
+-    EXPECT_TRUE(geo2.read("data/test.off"));
++    geo2.read("data/test.off");
+     EXPECT_EQ(4, geo2.vtxCount());
+     EXPECT_EQ(2, geo2.triCount());
+     EXPECT_EQ(1, geo2.quadCount());
+@@ -820,7 +820,7 @@ TEST_F(Test_vdb_tool, ToolParser)
+     float beta = 0.0f, beta_sum = 0.0f;
+     std::string path, base, ext;
+ 
+-    Parser p({{"alpha", "64"}, {"beta", "4.56"}});
++    Parser p({{"alpha", "64", "", ""}, {"beta", "4.56", "", ""}});
+     p.addAction("process_a", "a", "docs",
+               {{"alpha", "", "", ""},{"beta", "", "", ""}},
+                [&](){p.setDefaults();},
+@@ -843,7 +843,7 @@ TEST_F(Test_vdb_tool, ToolParser)
+     p.finalize();
+ 
+     auto args = getArgs("vdb_tool -quiet -process_a alpha=128 -for v=0.1,0.4,0.1 -b alpha={$#v:++} beta={$v} -end");
+-    p.parse(args.size(), args.data());
++    p.parse(int(args.size()), args.data());
+     EXPECT_EQ(0, alpha);
+     EXPECT_EQ(0.0f, beta);
+     EXPECT_EQ(0, alpha_sum);
+@@ -855,7 +855,7 @@ TEST_F(Test_vdb_tool, ToolParser)
+     EXPECT_EQ(0.1f + 0.2f + 0.3f, beta_sum);// derived from loop
+ 
+     args = getArgs("vdb_tool -quiet -each file=path1/base1.ext1,path2/base2.ext2 -c alpha={$file:path} beta={$file:name} gamma={$file:ext} -end");
+-    p.parse(args.size(), args.data());
++    p.parse(int(args.size()), args.data());
+     p.run();
+     EXPECT_EQ(path, "path1,path2");
+     EXPECT_EQ(base, "base1,base2");
+@@ -875,7 +875,7 @@ TEST_F(Test_vdb_tool, ToolBasic)
+ 
+     EXPECT_NO_THROW({
+       auto args = getArgs("vdb_tool -quiet -sphere r=1.1 -ls2mesh -write data/sphere.ply data/config.txt");
+-      Tool vdb_tool(args.size(), args.data());
++      Tool vdb_tool(int(args.size()), args.data());
+       vdb_tool.run();
+     });
+ 
+@@ -896,7 +896,7 @@ TEST_F(Test_vdb_tool, Counter)
+ 
+     EXPECT_NO_THROW({
+       auto args = getArgs("vdb_tool -quiet -eval {1:@G} -sphere r=1.1 -ls2mesh -write data/sphere_{$G}.ply data/config_{$G:++}.txt");
+-      Tool vdb_tool(args.size(), args.data());
++      Tool vdb_tool(int(args.size()), args.data());
+       vdb_tool.run();
+     });
+ 
+@@ -919,7 +919,7 @@ TEST_F(Test_vdb_tool, ToolForLoop)
+     // test single for-loop
+     EXPECT_NO_THROW({
+       auto args = getArgs("vdb_tool -quiet -for i=0,3 -sphere r=1.{$i} dim=128 name=sphere_{$i} -ls2mesh -write data/sphere_{$#i:++}.ply -end");
+-      Tool vdb_tool(args.size(), args.data());
++      Tool vdb_tool(int(args.size()), args.data());
+       vdb_tool.run();
+     });
+ 
+@@ -928,7 +928,7 @@ TEST_F(Test_vdb_tool, ToolForLoop)
+     // test two nested for-loops
+     EXPECT_NO_THROW({
+       auto args = getArgs("vdb_tool -quiet -for v=0.1,0.3,0.1 -each s=sphere_1,sphere_3 -read ./data/{$s}.ply -mesh2ls voxel={$v} -end -end -write data/test.vdb");
+-      Tool vdb_tool(args.size(), args.data());
++      Tool vdb_tool(int(args.size()), args.data());
+       vdb_tool.run();
+     });
+ 
+@@ -948,7 +948,7 @@ TEST_F(Test_vdb_tool, ToolError)
+ 
+     EXPECT_THROW({
+       auto args = getArgs("vdb_tool -sphere bla=3 -ls2mesh -write data/sphere.ply data/config.txt -quiet");
+-      Tool vdb_tool(args.size(), args.data());
++      Tool vdb_tool(int(args.size()), args.data());
+       vdb_tool.run();
+     }, std::invalid_argument);
+ 
+@@ -971,7 +971,7 @@ TEST_F(Test_vdb_tool, ToolKeep)
+ 
+     EXPECT_NO_THROW({
+       auto args = getArgs("vdb_tool -quiet -default keep=1 -sphere r=2 -ls2mesh vdb=0 -write vdb=0 geo=0 data/sphere.vdb data/sphere.ply data/config.txt");
+-      Tool vdb_tool(args.size(), args.data());
++      Tool vdb_tool(int(args.size()), args.data());
+       vdb_tool.run();
+     });
+ 
+@@ -994,7 +994,7 @@ TEST_F(Test_vdb_tool, ToolConfig)
+ 
+     EXPECT_NO_THROW({
+       auto args = getArgs("vdb_tool -quiet -config data/config.txt");
+-      Tool vdb_tool(args.size(), args.data());
++      Tool vdb_tool(int(args.size()), args.data());
+       vdb_tool.run();
+     });
+ 
+
+From 9d0a58f34118e5c2f44f9fc5c5f0cbbb8f175a08 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Thu, 21 Nov 2024 21:02:40 -0800
+Subject: [PATCH 04/19] minor cleanup
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ ci/build.sh                         | 2 +-
+ openvdb_cmd/vdb_tool/CMakeLists.txt | 4 ++--
+ openvdb_cmd/vdb_tool/README.md      | 6 +++---
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/ci/build.sh b/ci/build.sh
+index 02f4d4c9dd..110455c881 100755
+--- a/ci/build.sh
++++ b/ci/build.sh
+@@ -189,7 +189,7 @@ cmake \
+     -DOPENVDB_BUILD_VDB_PRINT=ON \
+     -DOPENVDB_BUILD_VDB_LOD=ON \
+     -DOPENVDB_BUILD_VDB_TOOL=ON \
+-    -DBUILD_TEST=ON \
++    -DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON \
+     -DOPENVDB_TOOL_USE_NANO=OFF \
+     -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
+     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \
+diff --git a/openvdb_cmd/vdb_tool/CMakeLists.txt b/openvdb_cmd/vdb_tool/CMakeLists.txt
+index 9ed79ff1ea..c0a2d64277 100644
+--- a/openvdb_cmd/vdb_tool/CMakeLists.txt
++++ b/openvdb_cmd/vdb_tool/CMakeLists.txt
+@@ -26,7 +26,7 @@ list(APPEND CMAKE_MODULE_PATH ${OPENVDB_CMAKE_PATH})
+ add_library(vdb_tool_common INTERFACE)
+ 
+ # Optional components
+-option(BUILD_TEST "Build unit tests" OFF)
++option(OPENVDB_BUILD_VDB_TOOL_UNITTESTS "Build unit tests" OFF)
+ 
+ option(OPENVDB_TOOL_USE_NANO "Compile with NanoVDB support" OFF)
+ option(OPENVDB_TOOL_NANO_USE_ZIP "Compile NanoVDB with zip compression support. Requires OPENVDB_TOOL_USE_NANO=ON to have effect" ON)
+@@ -185,7 +185,7 @@ install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
+ 
+ 
+ # unit test
+-if(BUILD_TEST)
++if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
+   find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} CONFIG REQUIRED)
+ 
+   add_executable(vdb_tool_test src/unittest.cpp)
+diff --git a/openvdb_cmd/vdb_tool/README.md b/openvdb_cmd/vdb_tool/README.md
+index 0b34177cd1..23bb29066f 100644
+--- a/openvdb_cmd/vdb_tool/README.md
++++ b/openvdb_cmd/vdb_tool/README.md
+@@ -74,7 +74,7 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
+ 
+ # Terminology
+ 
+-We introduce terms: **actions**, **options**, **expressions**, and **instructions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Expressions are strings of code with one or more low-level instructions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3". See section on the "Stack-based string expressions" below for more details.
++We introduce the following terms: **actions**, **options**, **expressions**, and **instructions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Expressions are strings of code with one or more low-level instructions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3". See section on the "Stack-based string expressions" below for more details.
+ 
+ Note that **actions** always start with one or more "-" and (except for file names) its associated **options** always contain a "=" and an optional number of leading characters used for identification, e.g. "-erode r=2" is identical to "-erode radius=2.0", but "-erode rr=2" will produce an error since "rr" does not match the first two characters of any option associated with the action "erode".
+ 
+@@ -89,7 +89,7 @@ This tool supports its own light-weight stack-oriented programming language that
+ This tool is using CMake for build on Linux and Windows.
+ The only mandatory dependency of is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic. To enable them use the `-DUSE_<name>=ON` flags. See the CMakeLists.txt for details.
+ 
+-The included unit test are using Gtest. Add `-DBUILD_TEST=ON` to the cmake command line to build it.
++The included unit test are using Gtest. Add `-DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON` to the cmake command line to build it.
+ 
+ ## Building OpenVDB
+ 
+@@ -103,7 +103,7 @@ To generate the makefile, navigate to the cloned directory of vdb_tool, then fol
+ ```bash
+ mkdir build
+ cd build
+-cmake -DOPENVDB_CMAKE_PATH=/usr/local/lib/cmake/OpenVDB -DUSE_ALL=ON -DBUILD_TEST=ON ..
++cmake -DOPENVDB_CMAKE_PATH=/usr/local/lib/cmake/OpenVDB -DUSE_ALL=ON -DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON ..
+ ```
+ Update the OpenVDB cmake path above as needed.
+ 
+
+From cefa98f8f5aa22c082f4eb38b64d82f61a1158f5 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Thu, 21 Nov 2024 23:40:30 -0800
+Subject: [PATCH 05/19] addressed review comments
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/include/Geometry.h | 35 ++++++++++++++++---------
+ 1 file changed, 23 insertions(+), 12 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index 620aeac3ef..ab67236044 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -557,34 +557,45 @@ void Geometry::readOFF(const std::string &fileName)
+ 
+ void Geometry::readOFF(std::istream &is)
+ {
++    // read header
+     std::string line;
+-    std::getline(is, line);
+-    if (line!="OFF") throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
+-    int vtxCount=0, faceCount=0, edgeCount=0;
+-    while (vtxCount==0 && std::getline(is, line)) {
+-        if (line[0]=='#') continue;
++    if (!std::getline(is, line) || line != "OFF") {
++        throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
++    }
++
++    // read vertex and face counts
++    size_t vtxCount=0, faceCount=0, edgeCount=0, nGon=0;
++    while (vtxCount == 0 && std::getline(is, line)) {
++        if (line.empty() || line[0] == '#') continue;
+         std::istringstream iss(line);
+         iss >> vtxCount >> faceCount >> edgeCount;
+     }
++
++    // read vertices
+     Vec3f p;
+-    for (int i=0; i<vtxCount && std::getline(is, line); ++i) {
++    vtxCount += mVtx.size();
++    while (mVtx.size() < vtxCount && std::getline(is, line)) {
++        if (line.empty() || line[0] == '#') continue;
+         std::istringstream iss(line);
+         iss >> p[0] >> p[1] >> p[2];
+         mVtx.push_back(p);
+     }
++
++    // read faces
+     int f[4];
+-    for (int i=0; i<faceCount && std::getline(is, line); ++i) {
++    faceCount += mTri.size() + mQuad.size();
++    while (mTri.size() + mQuad.size() < faceCount && std::getline(is, line)) {
++        if (line.empty() || line[0] == '#') continue;
+         std::istringstream iss(line);
+-        int n=0;
+-        iss >> n;
+-        if (n==3) {
++        iss >> nGon;
++        if (nGon == 3) {
+             iss >> f[0] >> f[1] >> f[2];
+             mTri.emplace_back(f[0],f[1],f[2]);
+-        } else if(n==4) {
++        } else if (nGon == 4) {
+             iss >> f[0] >> f[1] >> f[2] >> f[3];
+             mQuad.emplace_back(f[0],f[1],f[2],f[3]);
+         } else {
+-            throw std::invalid_argument("Geometry::readOFF: " + std::to_string(n) + "-gons are not supported");
++            throw std::invalid_argument("Geometry::readOFF: " + std::to_string(nGon) + "-gons are not supported");
+         }
+     }
+     mBBox = BBoxT();//invalidate BBox
+
+From 932e65a8a454e93c175e76df595c5dc81f1adda5 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Sat, 23 Nov 2024 16:30:20 -0800
+Subject: [PATCH 06/19] before major improvements to readPLY
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/include/Geometry.h | 99 +++++++++++++++++++++----
+ 1 file changed, 84 insertions(+), 15 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index ab67236044..1415546aed 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -66,6 +66,8 @@ OPENVDB_USE_VERSION_NAMESPACE
+ namespace OPENVDB_VERSION_NAME {
+ namespace vdb_tool {
+ 
++#define MY_CLEAN_VERSION
++
+ /// @brief Class that encapsulates (explicit) geometry, i.e. vertices/points,
+ ///        triangles and quads. It is used to represent points and polygon meshes
+ class Geometry
+@@ -265,7 +267,7 @@ void Geometry::writePLY(const std::string &fileName) const
+     } else {
+         std::ofstream outfile(fileName, std::ios_base::binary);
+         if (!outfile.is_open()) throw std::invalid_argument("Error writing to ply file \""+fileName+"\"");
+-        this->writePLY(outfile);;
++        this->writePLY(outfile);
+     }
+ }// Geometry::writePLY
+ 
+@@ -323,7 +325,7 @@ void Geometry::writeOBJ(const std::string &fileName) const
+     } else {
+         std::ofstream outfile(fileName);
+         if (!outfile.is_open()) throw std::invalid_argument("Error writing to obj file \""+fileName+"\"");
+-        this->writeOBJ(outfile);;
++        this->writeOBJ(outfile);
+     }
+ }// Geometry::writeOBJ
+ 
+@@ -342,7 +344,7 @@ void Geometry::writeOFF(const std::string &fileName) const
+     } else {
+         std::ofstream outfile(fileName);
+         if (!outfile.is_open()) throw std::invalid_argument("Error writing to off file \""+fileName+"\"");
+-        this->writeOFF(outfile);;
++        this->writeOFF(outfile);
+     }
+ }// Geometry::writeOFF
+ 
+@@ -364,7 +366,7 @@ void Geometry::writeSTL(const std::string &fileName) const
+     } else {
+         std::ofstream outfile(fileName, std::ios::out | std::ios_base::binary);
+         if (!outfile.is_open()) throw std::invalid_argument("Error writing to stl file \""+fileName+"\"");
+-        this->writeSTL(outfile);;
++        this->writeSTL(outfile);
+     }
+ }// Geometry::writeSTL
+ 
+@@ -627,9 +629,7 @@ void Geometry::readPLY(std::istream &is)
+     auto tokens = tokenize_line();
+     auto test = [&tokens](int i, std::vector<std::string> str) {
+         if (i >= static_cast<int>(tokens.size())) return false;
+-        for (auto &s : str) {
+-            if (tokens[i] == s) return true;
+-        }
++        for (auto &s : str) if (tokens[i] == s) return true;
+         return false;
+     };
+     auto error = [&tokens](const std::string &msg){
+@@ -638,6 +638,14 @@ void Geometry::readPLY(std::istream &is)
+         std::cerr << "\"\n";
+         throw std::invalid_argument(msg);
+     };
++    auto sizeOf = [&tokens, test, error](int i){
++        if ( test(i, {"float", "float32", "int", "int32"}) ) return 4;
++        if ( test(i, {"double", "float64"}) ) return 8;
++        if ( test(i, {"int16", "uint16"}) )   return 2;
++        if ( test(i, {"uchar", "int8"}) )     return 1;
++        error("vdb_tool::readPLY: unsupported type");
++        return 0;
++    };
+ 
+     if (!test(0, {"ply"})) error("vdb_tool::readPLY: not a ply file");
+     int format = -1;// 0 is ascii, 1 is little endian and 2 is big endian
+@@ -655,18 +663,20 @@ void Geometry::readPLY(std::istream &is)
+     }
+     const bool reverseBytes = format && format != (isLittleEndian() ? 1 : 2);
+     // header: https://www.mathworks.com/help/vision/ug/the-ply-format.html
+-    size_t vtxCount = 0, polyCount = 0;
+-    struct Skip {int count, bytes;} vtx_skip[2]={{0,0},{0,0}}, ply_skip[2]={{0,0},{0,0}};
++    size_t vtxCount = 0, polyCount = 0, sizeOfVertex = 0, vertexStride=0;
++    struct Triplet {int offset, id, size; } xyz[3];// byte offset, id, size
++    struct Skip {int count, bytes;} vtx_skip[2]={{0,0},{0,0}}, ply_skip[2]={{0,0},{0,0}};// head, {x,y,z}, tail
+     tokens = tokenize_line();
+     bool run = true;
+     while(run) {
+         if ( test(0, {"element"}) ) {
+             if ( test(1, {"vertex"}) ) {
+                 vtxCount = std::stoll(tokens[2]);
++                int offset = 0, count = 0;
+                 int n = 0;
+                 const std::string axis[3] = {"x", "y", "z"};
+                 while(true) {
+-                    const int m = n>0 ? 1 : 0;
++                    const int m = n>0 ? 1 : 0;// indicates before and after vertices
+                     tokens = tokenize_line();
+                     if ( test(0, {"end_header"}) ) {
+                         run = false;
+@@ -674,14 +684,35 @@ void Geometry::readPLY(std::istream &is)
+                     } else if ( test(0, {"element"}) ) {
+                         break;
+                     } else if ( test(0, {"property"}) ) {
++#ifdef MY_CLEAN_VERSION
++                        Triplet t{offset, count++, sizeOf(1)};
++                        for (int i=0; i<3; ++i) if (test(2, {axis[i]})) xyz[i] = t;
++                        vertexStride = (offset += t.size);
++                    }
++                }
++                for (int i=0; i<3; ++i) if (xyz[i].size!=4 && xyz[i].size!=8) error("vdb_tool::readPLY: missing "+axis[i]+
++                                                                                    " vertex coordinates or unsupported size "+std::to_string(xyz[i].size));
++#else
+                         if ( test(1, {"float", "float32"}) ) {
+-                            if ( test(2, {"x", "y", "z"}) ) {// nx,ny.nz
++                            if ( test(2, {"x", "y", "z"}) ) {// vertex coordinates
++                                if (sizeOfVertex == sizeof(double)) error("vdb_tool::readPLY: mixed float and double precision of vertices is not allowed");
++                                sizeOfVertex = sizeof(float);
+                                 if (n>2 || !test(2, {axis[n++]}) ) error("vdb_tool::readPLY: expected x or y or z");
+                             } else {// e.g. nx, ny, nz, intensity, s, t etc
+                                 if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex float property interlaced with coordinates");
+                                 vtx_skip[m].count += 1;
+                                 vtx_skip[m].bytes += static_cast<int>(sizeof(float));
+                             }
++                        } else if ( test(1, {"double", "float64"}) ) {
++                            if ( test(2, {"x", "y", "z"}) ) {// vertex coordinates
++                                if (sizeOfVertex == sizeof(float)) error("vdb_tool::readPLY: mixed float and double precision of vertices is not allowed");
++                                sizeOfVertex = sizeof(double);
++                                if (n>2 || !test(2, {axis[n++]}) ) error("vdb_tool::readPLY: expected x or y or z");
++                            } else {// e.g. nx, ny, nz, intensity, s, t etc
++                                if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex float property interlaced with coordinates");
++                                vtx_skip[m].count += 1;
++                                vtx_skip[m].bytes += static_cast<int>(sizeof(double));
++                            }
+                         } else if ( test(1, {"int16", "uint16"}) ) {// e.g. material_index etc
+                             if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int16 property interlaced with coordinates is not supported");
+                             vtx_skip[m].count += 1;
+@@ -700,6 +731,7 @@ void Geometry::readPLY(std::istream &is)
+                     }
+                 }
+                 if (n!=3) error("vdb_tool::readPLY: missing vertex coordinates");
++#endif
+             } else if ( test(1, {"face"}) ) {
+                 polyCount = std::stoll(tokens[2]);
+                 int n = 0;
+@@ -747,19 +779,56 @@ void Geometry::readPLY(std::istream &is)
+     // read vertex coordinates
+     mVtx.resize(vtxCount);
+     if (format) {// binary
+-        if (vtx_skip[0].count == 0 && vtx_skip[1].count == 0) {//faster
++#ifdef MY_CLEAN_VERSION
++        if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vertexStride==12) {
+             is.read((char *)(mVtx.data()), vtxCount * 3 * sizeof(float));
+         } else {
+-            const size_t bSize = vtx_skip[0].bytes + 3*sizeof(float) + vtx_skip[1].bytes;
++            char *buffer = static_cast<char*>(std::malloc(vtxCount*vertexStride)), *p=buffer;// uninitialized
++            if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
++            is.read(buffer, vtxCount*vertexStride);
++            for (Vec3f &vtx : mVtx) {
++                for (int i=0; i<3; ++i) {
++                    float* v = (float*)(p + xyz[i].offset);
++                    vtx[i] = (xyz[i].size == 4) ?  *v : float(*(double*)(v));
++                }
++                p += vertexStride;
++            }
++            std::free(buffer);
++        }
++#else
++        if (vtx_skip[0].count == 0 && vtx_skip[1].count == 0) {//faster
++            if (sizeOfVertex == sizeof(float)) {
++                is.read((char *)(mVtx.data()), vtxCount * 3 * sizeof(float));
++            } else if (sizeOfVertex == sizeof(double)) {
++                double *buffer = new double[vtxCount * 3], *ptr = buffer;
++                if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate double buffer");
++                is.read((char *)(buffer), vtxCount * 3 * sizeof(double));
++                for (size_t i=0; i<vtxCount; ++i) {
++                    mVtx[i][0] = float(*ptr++);
++                    mVtx[i][1] = float(*ptr++);
++                    mVtx[i][2] = float(*ptr++);
++                }
++                std::cout << "Geometry::readPLY: Warning, vertex coordinates in binary ply file were stored in double but got converted to float\n";
++                delete [] buffer;
++            } else throw std::invalid_argument("Geometry::readPLY: expected float or double precision vertex coordinates");
++        } else {
++            const size_t bSize = vtx_skip[0].bytes + 3*sizeOfVertex + vtx_skip[1].bytes;
+             char *buffer = static_cast<char*>(std::malloc(vtxCount*bSize));// uninitialized
+             if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
+             is.read(buffer, vtxCount*bSize);
+             for (size_t i=0; i<vtxCount; ++i) {
+-                const float *p = reinterpret_cast<const float*>(buffer + i*bSize + vtx_skip[0].bytes);
+-                mVtx[i] = Vec3f(p);
++                if (sizeOfVertex == sizeof(float)) {
++                    const float *p = reinterpret_cast<const float*>(buffer + i*bSize + vtx_skip[0].bytes);
++                    mVtx[i] = Vec3f(p);
++                } else if (sizeOfVertex == sizeof(double)) {
++                    const double *p = reinterpret_cast<const double*>(buffer + i*bSize + vtx_skip[0].bytes);
++                    mVtx[i] = Vec3f(float(p[0]), float(p[1]), float(p[2]));
++                } else throw std::invalid_argument("Geometry::readPLY: expected float or double precision vertex coordinates");
+             }
++            std::cout << "Geometry::readPLY: Warning, vertex coordinates in binary ply file were stored in double but got converted to float\n";
+             std::free(buffer);
+         }
++#endif
+         if (reverseBytes) {
+             auto flipBytes = [](float v)->float{
+                float tmp;
+
+From 9aba3d135be5c2aeee973391c5ba65693f73c092 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Sun, 24 Nov 2024 00:10:06 -0800
+Subject: [PATCH 07/19] cleanup
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/include/Geometry.h | 196 ++++++------------------
+ openvdb_cmd/vdb_tool/include/Util.h     |  28 ++++
+ openvdb_cmd/vdb_tool/src/unittest.cpp   |  46 ++++++
+ 3 files changed, 120 insertions(+), 150 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index 1415546aed..c1f4e4e4f1 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -647,7 +647,10 @@ void Geometry::readPLY(std::istream &is)
+         return 0;
+     };
+ 
++    // check header
+     if (!test(0, {"ply"})) error("vdb_tool::readPLY: not a ply file");
++
++    // check file format
+     int format = -1;// 0 is ascii, 1 is little endian and 2 is big endian
+     tokens = tokenize_line();
+     if (!(test(0, {"format"}) && test(2, {"1.0"})) ) {
+@@ -663,20 +666,18 @@ void Geometry::readPLY(std::istream &is)
+     }
+     const bool reverseBytes = format && format != (isLittleEndian() ? 1 : 2);
+     // header: https://www.mathworks.com/help/vision/ug/the-ply-format.html
+-    size_t vtxCount = 0, polyCount = 0, sizeOfVertex = 0, vertexStride=0;
+-    struct Triplet {int offset, id, size; } xyz[3];// byte offset, id, size
+-    struct Skip {int count, bytes;} vtx_skip[2]={{0,0},{0,0}}, ply_skip[2]={{0,0},{0,0}};// head, {x,y,z}, tail
++    size_t vtxCount = 0, faceCount = 0;
++    int vtxStride=0, vtxProps=0;// byte size of all vtx properties, number of vertex properties
++    struct Triplet {int offset, id, size;} xyz[3];// byte offset, id#, byte size
++    struct Skip {int count, bytes;} faceSkip[2]={{0,0},{0,0}};// head, {faces}, tail
+     tokens = tokenize_line();
+     bool run = true;
+     while(run) {
+         if ( test(0, {"element"}) ) {
+             if ( test(1, {"vertex"}) ) {
+                 vtxCount = std::stoll(tokens[2]);
+-                int offset = 0, count = 0;
+-                int n = 0;
+                 const std::string axis[3] = {"x", "y", "z"};
+                 while(true) {
+-                    const int m = n>0 ? 1 : 0;// indicates before and after vertices
+                     tokens = tokenize_line();
+                     if ( test(0, {"end_header"}) ) {
+                         run = false;
+@@ -684,56 +685,15 @@ void Geometry::readPLY(std::istream &is)
+                     } else if ( test(0, {"element"}) ) {
+                         break;
+                     } else if ( test(0, {"property"}) ) {
+-#ifdef MY_CLEAN_VERSION
+-                        Triplet t{offset, count++, sizeOf(1)};
++                        Triplet t{vtxStride, vtxProps++, sizeOf(1)};
+                         for (int i=0; i<3; ++i) if (test(2, {axis[i]})) xyz[i] = t;
+-                        vertexStride = (offset += t.size);
++                        vtxStride += t.size;
+                     }
+                 }
+                 for (int i=0; i<3; ++i) if (xyz[i].size!=4 && xyz[i].size!=8) error("vdb_tool::readPLY: missing "+axis[i]+
+                                                                                     " vertex coordinates or unsupported size "+std::to_string(xyz[i].size));
+-#else
+-                        if ( test(1, {"float", "float32"}) ) {
+-                            if ( test(2, {"x", "y", "z"}) ) {// vertex coordinates
+-                                if (sizeOfVertex == sizeof(double)) error("vdb_tool::readPLY: mixed float and double precision of vertices is not allowed");
+-                                sizeOfVertex = sizeof(float);
+-                                if (n>2 || !test(2, {axis[n++]}) ) error("vdb_tool::readPLY: expected x or y or z");
+-                            } else {// e.g. nx, ny, nz, intensity, s, t etc
+-                                if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex float property interlaced with coordinates");
+-                                vtx_skip[m].count += 1;
+-                                vtx_skip[m].bytes += static_cast<int>(sizeof(float));
+-                            }
+-                        } else if ( test(1, {"double", "float64"}) ) {
+-                            if ( test(2, {"x", "y", "z"}) ) {// vertex coordinates
+-                                if (sizeOfVertex == sizeof(float)) error("vdb_tool::readPLY: mixed float and double precision of vertices is not allowed");
+-                                sizeOfVertex = sizeof(double);
+-                                if (n>2 || !test(2, {axis[n++]}) ) error("vdb_tool::readPLY: expected x or y or z");
+-                            } else {// e.g. nx, ny, nz, intensity, s, t etc
+-                                if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex float property interlaced with coordinates");
+-                                vtx_skip[m].count += 1;
+-                                vtx_skip[m].bytes += static_cast<int>(sizeof(double));
+-                            }
+-                        } else if ( test(1, {"int16", "uint16"}) ) {// e.g. material_index etc
+-                            if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int16 property interlaced with coordinates is not supported");
+-                            vtx_skip[m].count += 1;
+-                            vtx_skip[m].bytes += static_cast<int>(sizeof(int16_t));
+-                        } else if ( test(1, {"int", "int32"}) ) {// e.g. material_index etc
+-                            if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int32 property interlaced with coordinates is not supported");
+-                            vtx_skip[m].count += 1;
+-                            vtx_skip[m].bytes += static_cast<int>(sizeof(int32_t));
+-                        } else if ( test(1, {"uchar", "int8"}) ) {// eg red, green, blue, alpha
+-                            if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int8 property interlaced with coordinates is not supported");
+-                            vtx_skip[m].count += 1;
+-                            vtx_skip[m].bytes += static_cast<int>(sizeof(unsigned char));
+-                        } else {
+-                            error("vdb_tool::readPLY: invalid vertex property");
+-                        }
+-                    }
+-                }
+-                if (n!=3) error("vdb_tool::readPLY: missing vertex coordinates");
+-#endif
+             } else if ( test(1, {"face"}) ) {
+-                polyCount = std::stoll(tokens[2]);
++                faceCount = std::stoll(tokens[2]);
+                 int n = 0;
+                 while (true) {
+                     tokens = tokenize_line();
+@@ -743,14 +703,14 @@ void Geometry::readPLY(std::istream &is)
+                     } else if (test(0, {"element"}) ) {
+                         break;
+                     } else if (test(0, {"property"}) ) {
+-                        if (test(1, {"list"}) &&
+-                            test(2, {"uchar", "uint8"}) &&
+-                            test(3, {"int", "uint", "int32"}) &&
++                        if (test(1, {"list"}) &&// list of vertex ID belonging to a polygon
++                            test(2, {"uchar", "uint8"}) &&// size of polygon, e.g. 3 or 4
++                            test(3, {"int", "uint", "int32"}) &&// type of vertex id
+                             test(4, {"vertex_index", "vertex_indices"}) ) {
+                             n = 1;
+                         } else if ( test(1, {"uchar", "uint8"}) ) {
+-                            ply_skip[n].count += 1;
+-                            ply_skip[n].bytes += 1;
++                            faceSkip[n].count += 1;
++                            faceSkip[n].bytes += 1;
+                         } else {
+                             error("vdb_tool::readPLY: invalid face properties");
+                         }
+@@ -779,133 +739,69 @@ void Geometry::readPLY(std::istream &is)
+     // read vertex coordinates
+     mVtx.resize(vtxCount);
+     if (format) {// binary
+-#ifdef MY_CLEAN_VERSION
+-        if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vertexStride==12) {
++        if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vtxStride==12) {// most common case
+             is.read((char *)(mVtx.data()), vtxCount * 3 * sizeof(float));
++            if (reverseBytes) for (Vec3f &v : mVtx) swapBytes(&v[0], 3);
+         } else {
+-            char *buffer = static_cast<char*>(std::malloc(vtxCount*vertexStride)), *p=buffer;// uninitialized
++            char *buffer = static_cast<char*>(std::malloc(vtxCount*vtxStride)), *p = buffer;// uninitialized
+             if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
+-            is.read(buffer, vtxCount*vertexStride);
++            is.read(buffer, vtxCount*vtxStride);
+             for (Vec3f &vtx : mVtx) {
+                 for (int i=0; i<3; ++i) {
+-                    float* v = (float*)(p + xyz[i].offset);
+-                    vtx[i] = (xyz[i].size == 4) ?  *v : float(*(double*)(v));
+-                }
+-                p += vertexStride;
+-            }
+-            std::free(buffer);
+-        }
+-#else
+-        if (vtx_skip[0].count == 0 && vtx_skip[1].count == 0) {//faster
+-            if (sizeOfVertex == sizeof(float)) {
+-                is.read((char *)(mVtx.data()), vtxCount * 3 * sizeof(float));
+-            } else if (sizeOfVertex == sizeof(double)) {
+-                double *buffer = new double[vtxCount * 3], *ptr = buffer;
+-                if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate double buffer");
+-                is.read((char *)(buffer), vtxCount * 3 * sizeof(double));
+-                for (size_t i=0; i<vtxCount; ++i) {
+-                    mVtx[i][0] = float(*ptr++);
+-                    mVtx[i][1] = float(*ptr++);
+-                    mVtx[i][2] = float(*ptr++);
++                    if (xyz[i].size == 4) {
++                        float v = *(float*)(p + xyz[i].offset);
++                        vtx[i] = reverseBytes ? swapBytes(v) : v;
++                    } else {
++                        double v = *(double*)(p + xyz[i].offset);
++                        vtx[i] = float(reverseBytes ? swapBytes(v) : v);
++                    }
+                 }
+-                std::cout << "Geometry::readPLY: Warning, vertex coordinates in binary ply file were stored in double but got converted to float\n";
+-                delete [] buffer;
+-            } else throw std::invalid_argument("Geometry::readPLY: expected float or double precision vertex coordinates");
+-        } else {
+-            const size_t bSize = vtx_skip[0].bytes + 3*sizeOfVertex + vtx_skip[1].bytes;
+-            char *buffer = static_cast<char*>(std::malloc(vtxCount*bSize));// uninitialized
+-            if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
+-            is.read(buffer, vtxCount*bSize);
+-            for (size_t i=0; i<vtxCount; ++i) {
+-                if (sizeOfVertex == sizeof(float)) {
+-                    const float *p = reinterpret_cast<const float*>(buffer + i*bSize + vtx_skip[0].bytes);
+-                    mVtx[i] = Vec3f(p);
+-                } else if (sizeOfVertex == sizeof(double)) {
+-                    const double *p = reinterpret_cast<const double*>(buffer + i*bSize + vtx_skip[0].bytes);
+-                    mVtx[i] = Vec3f(float(p[0]), float(p[1]), float(p[2]));
+-                } else throw std::invalid_argument("Geometry::readPLY: expected float or double precision vertex coordinates");
++                p += vtxStride;
+             }
+-            std::cout << "Geometry::readPLY: Warning, vertex coordinates in binary ply file were stored in double but got converted to float\n";
+             std::free(buffer);
+         }
+-#endif
+-        if (reverseBytes) {
+-            auto flipBytes = [](float v)->float{
+-               float tmp;
+-               char *p = (char*)&v, *q = (char*)&tmp;
+-               q[0] = p[3];
+-               q[1] = p[2];
+-               q[2] = p[1];
+-               q[3] = p[0];
+-               return tmp;
+-            };// flipBytes in float
+-            for (size_t i = 0; i < mVtx.size(); ++i) {
+-                auto &p = mVtx[i];
+-                p[0] = flipBytes(p[0]);
+-                p[1] = flipBytes(p[1]);
+-                p[2] = flipBytes(p[2]);
+-            }
+-        }
+-    } else {// ascii
++        
++    } else {// ascii vertices
+         for (auto &v : mVtx) {
+             tokens = tokenize_line();
+-            if (static_cast<int>(tokens.size()) != vtx_skip[0].count + 3 + vtx_skip[1].count) {
+-                error("vdb_tool::readPLY: error reading ascii vertex coordinates");
+-            }
+-            for (int i = 0; i<3; ++i) {
+-                v[i] = std::stof(tokens[i + vtx_skip[0].count]);
+-            }
++            if (int(tokens.size()) != vtxProps) error("vdb_tool::readPLY: error reading ascii vertex coordinates");
++            for (int i = 0; i<3; ++i) v[i] = std::stof(tokens[xyz[0].id]);
+         }// loop over vertices
+     }
+ 
+     // read polygon vertex lists
+     uint32_t vtx[4];
+     if (format) {// binary
+-        auto flipBytes = [&](int n){
+-            uint32_t tmp;
+-            char *q = (char*)&tmp;
+-            for (int i=0; i<n; ++i) {
+-                char *p = (char*)(vtx+i);
+-                q[0] = p[3];
+-                q[1] = p[2];
+-                q[2] = p[1];
+-                q[3] = p[0];
+-                vtx[i] = tmp;
+-            }
+-        };// flipBytes in uint32_t
+-        char *buffer = static_cast<char*>(std::malloc(ply_skip[0].bytes + 1));// uninitialized
++        char *buffer = static_cast<char*>(std::malloc(faceSkip[0].bytes + 1));// uninitialized
+         if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
+-        for (size_t i=0; i<polyCount; ++i) {
+-            is.read(buffer, ply_skip[0].bytes + 1);
+-            const unsigned int n = (unsigned int)buffer[ply_skip[0].bytes];
++        for (size_t i=0; i<faceCount; ++i) {
++            is.read(buffer, faceSkip[0].bytes + 1);// polygon size is encoded as a single char
++            const unsigned int n = (unsigned int)buffer[faceSkip[0].bytes];// char -> unsigned int
+             switch (n) {
+             case 3:
+-                is.read((char *)(&vtx), 3*sizeof(uint32_t));
+-                if (reverseBytes) flipBytes(3);
++                is.read((char*)vtx, 3*sizeof(uint32_t));
++                if (reverseBytes) swapBytes(vtx, 3);
+                 mTri.emplace_back(vtx);
+                 break;
+             case 4:
+-                is.read((char *)(&vtx), 4*sizeof(uint32_t));
+-                if (reverseBytes) flipBytes(4);
++                is.read((char*)vtx, 4*sizeof(uint32_t));
++                if (reverseBytes) swapBytes(vtx, 4);
+                 mQuad.emplace_back(vtx);
+                 break;
+             default:
+                 throw std::invalid_argument("Geometry::readPLY: binary " + std::to_string(n) + "-gons are not supported");
+                 break;
+             }
+-            is.ignore(ply_skip[1].bytes);
++            is.ignore(faceSkip[1].bytes);
+         }// loop over polygons
+         std::free(buffer);
+-    } else {// ascii format
+-        for (size_t i=0; i<polyCount; ++i) {
++    } else {// ascii format faces
++        for (size_t i=0; i<faceCount; ++i) {
+             tokens = tokenize_line();
+-            const int n = std::stoi(tokens[ply_skip[0].count]);
+-            if (n!=3 && n!=4) {
+-                throw std::invalid_argument("Geometry::readPLY: ascii " + std::to_string(n)+"-gons are not supported");
+-            }
+-            for (int i = 0; i<n; ++i) {
+-                vtx[i] = static_cast<uint32_t>(std::stoll(tokens[i + 1 + ply_skip[0].count]));
+-            }
++            const std::string polySize = tokens[faceSkip[0].count];
++            const int n = std::stoi(polySize);
++            if (n!=3 && n!=4) throw std::invalid_argument("Geometry::readPLY: ascii " + polySize + "-gons are not supported");
++            for (int i = 0, j=1+faceSkip[0].count; i<n; ++i, ++j) vtx[i] = static_cast<uint32_t>(std::stoll(tokens[j]));
+             if (n==3) {
+                 mTri.emplace_back(vtx);
+             } else {
+diff --git a/openvdb_cmd/vdb_tool/include/Util.h b/openvdb_cmd/vdb_tool/include/Util.h
+index 96c324711c..2d7c34fa99 100644
+--- a/openvdb_cmd/vdb_tool/include/Util.h
++++ b/openvdb_cmd/vdb_tool/include/Util.h
+@@ -377,6 +377,34 @@ inline bool isLittleEndian()
+     return (*(char *)&tmp == 1);
+ }
+ 
++/// @brief invert endianess of a type
++/// @tparam T Template type to be inverted
++/// @param val value to be inverted
++/// @return value with reverse bytes
++template <typename T>
++inline T swapBytes(T val)
++{
++    T tmp;
++    char *src=(char*)&val, *dst=(char*)(&tmp) + sizeof(T) - 1, *end=src + sizeof(T);
++    while (src != end) *dst-- = *src++;
++    return tmp;
++}
++
++/// @brief invert endianess of an array of values of a specific type
++/// @tparam T Template type to be inverted
++/// @param val pointer to array with values to be inverted
++/// @param n number of elements in the array
++template <typename T>
++inline void swapBytes(T *val, int n)
++{
++    T tmp, *stop = val + n;
++    while(val < stop) {
++        char *src=(char*)val, *dst=(char*)(&tmp) + sizeof(T) - 1, *end=src + sizeof(T);
++        while (src != end) *dst-- = *src++;
++        *val++ = tmp;
++    }
++}
++
+ /// @brief return a pseudo random uuid string.
+ ///
+ /// @details this function approximates a uuid version 4, variant 1 as detailed
+diff --git a/openvdb_cmd/vdb_tool/src/unittest.cpp b/openvdb_cmd/vdb_tool/src/unittest.cpp
+index 9ca0f9cbca..3d59fbd9d4 100644
+--- a/openvdb_cmd/vdb_tool/src/unittest.cpp
++++ b/openvdb_cmd/vdb_tool/src/unittest.cpp
+@@ -301,6 +301,52 @@ TEST_F(Test_vdb_tool, Util)
+       }
+       EXPECT_EQ(size, tmp.size());
+     }
++  
++    {//swapBytes
++      const int i = 4, j = openvdb::vdb_tool::swapBytes(i);
++      EXPECT_NE(i, j);
++      EXPECT_EQ(i, openvdb::vdb_tool::swapBytes(j));
++
++      const float a = 4, b = openvdb::vdb_tool::swapBytes(a);
++      EXPECT_NE(a, b);
++      EXPECT_EQ(a, openvdb::vdb_tool::swapBytes(b));
++
++      const double x = 4, y = openvdb::vdb_tool::swapBytes(x);
++      EXPECT_NE(x, y);
++      EXPECT_EQ(x, openvdb::vdb_tool::swapBytes(y));
++
++      int vec_i[3]={3,4,5}, vec_j[3];
++      for (int n=0; n<3; ++n) {
++        vec_j[n] = openvdb::vdb_tool::swapBytes(vec_i[n]);
++        EXPECT_NE(vec_i[n], vec_j[n]);
++      }
++      openvdb::vdb_tool::swapBytes(vec_j, 3);
++      for (int n=0; n<3; ++n) EXPECT_EQ(vec_i[n], vec_j[n]);
++
++      float vec_a[3]={3,4,5}, vec_b[3];
++      for (int n=0; n<3; ++n) {
++        vec_b[n] = openvdb::vdb_tool::swapBytes(vec_a[n]);
++        EXPECT_NE(vec_a[n], vec_b[n]);
++      }
++      openvdb::vdb_tool::swapBytes(vec_b, 3);
++      for (int n=0; n<3; ++n) EXPECT_EQ(vec_a[n], vec_b[n]);
++
++      double vec_x[3]={3,4,5}, vec_y[3];
++      for (int n=0; n<3; ++n) {
++        vec_y[n] = openvdb::vdb_tool::swapBytes(vec_x[n]);
++        EXPECT_NE(vec_x[n], vec_y[n]);
++      }
++      openvdb::vdb_tool::swapBytes(vec_y, 3);
++      for (int n=0; n<3; ++n) EXPECT_EQ(vec_x[n], vec_y[n]);
++    }
++    {// weird pointer behaviour
++      float vec[4], *p = vec;
++      EXPECT_EQ(vec, p);// of course
++      EXPECT_EQ((char*)(vec),  (char*)p);// sure
++      EXPECT_EQ((char*)(&vec), (char*)p);// wait, what?!
++      EXPECT_NE((char*)(vec),  (char*)(&p));// yep
++      EXPECT_NE((char*)(&p),   (char*)p);// of course
++    }
+ }// Util
+ 
+ TEST_F(Test_vdb_tool, getArgs)
+
+From 6760b288ff517221de5fdcbde89578a656629937 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Sun, 24 Nov 2024 00:18:28 -0800
+Subject: [PATCH 08/19] removed whitespace
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/include/Geometry.h | 2 +-
+ openvdb_cmd/vdb_tool/src/unittest.cpp   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index c1f4e4e4f1..779dd8eaa5 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -760,7 +760,7 @@ void Geometry::readPLY(std::istream &is)
+             }
+             std::free(buffer);
+         }
+-        
++
+     } else {// ascii vertices
+         for (auto &v : mVtx) {
+             tokens = tokenize_line();
+diff --git a/openvdb_cmd/vdb_tool/src/unittest.cpp b/openvdb_cmd/vdb_tool/src/unittest.cpp
+index 3d59fbd9d4..0ddd6fb2cf 100644
+--- a/openvdb_cmd/vdb_tool/src/unittest.cpp
++++ b/openvdb_cmd/vdb_tool/src/unittest.cpp
+@@ -301,7 +301,7 @@ TEST_F(Test_vdb_tool, Util)
+       }
+       EXPECT_EQ(size, tmp.size());
+     }
+-  
++
+     {//swapBytes
+       const int i = 4, j = openvdb::vdb_tool::swapBytes(i);
+       EXPECT_NE(i, j);
+
+From bbac3956734653d4d4f49197b7870a99f860762c Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Sun, 24 Nov 2024 11:19:59 -0800
+Subject: [PATCH 09/19] added nanovdb::vdb_tool::swapBytes
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/include/Util.h | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/include/Util.h b/openvdb_cmd/vdb_tool/include/Util.h
+index 2d7c34fa99..9d084fb22e 100644
+--- a/openvdb_cmd/vdb_tool/include/Util.h
++++ b/openvdb_cmd/vdb_tool/include/Util.h
+@@ -385,8 +385,7 @@ template <typename T>
+ inline T swapBytes(T val)
+ {
+     T tmp;
+-    char *src=(char*)&val, *dst=(char*)(&tmp) + sizeof(T) - 1, *end=src + sizeof(T);
+-    while (src != end) *dst-- = *src++;
++    for (char *src=(char*)&val, *dst=(char*)(&tmp)+sizeof(T)-1, *end=src+sizeof(T);src!=end; *dst-- = *src++);
+     return tmp;
+ }
+ 
+@@ -397,11 +396,9 @@ inline T swapBytes(T val)
+ template <typename T>
+ inline void swapBytes(T *val, int n)
+ {
+-    T tmp, *stop = val + n;
+-    while(val < stop) {
+-        char *src=(char*)val, *dst=(char*)(&tmp) + sizeof(T) - 1, *end=src + sizeof(T);
+-        while (src != end) *dst-- = *src++;
+-        *val++ = tmp;
++    for (T tmp, *last = val + n; val < last; ++val) {
++        for (char *src=(char*)val, *dst=(char*)(&tmp)+sizeof(T)-1, *end=src+sizeof(T); src!=end; *dst-- = *src++);
++        *val = tmp;
+     }
+ }
+ 
+
+From 49c9a8b5c597ed700dfe2dd0ff86b0e63f5ba28f Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Sun, 24 Nov 2024 12:06:09 -0800
+Subject: [PATCH 10/19] added more documentation
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/include/Geometry.h | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index 779dd8eaa5..5ad0c96cd1 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -288,7 +288,7 @@ void Geometry::writePLY(std::ostream &os) const
+     os << "property list uchar int vertex_index\n";
+     os << "end_header\n";
+     static_assert(sizeof(Vec3s) == 3 * sizeof(float), "Unexpected sizeof(Vec3s)");
+-    os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));
++    os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
+     if (mTri.size()>0) {
+         const size_t size = sizeof(char) + 3*sizeof(uint32_t);
+         char *buffer = static_cast<char*>(std::malloc(mTri.size()*size)), *p = buffer;// uninitialized
+@@ -353,8 +353,8 @@ void Geometry::writeOFF(std::ostream &os) const
+     os << "OFF\n";
+     os << "# Created by vdb_tool\n";
+     os << mVtx.size() << " " << (mTri.size() + mQuad.size()) << " " << 0 << "\n";
+-    for (auto &v : mVtx) os << v[0] << " " << v[1] << " " << v[2] << "\n";
+-    for (auto &t : mTri) os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
++    for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
++    for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
+     for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
+ }// Geometry::writeOFF
+ 
+@@ -670,6 +670,8 @@ void Geometry::readPLY(std::istream &is)
+     int vtxStride=0, vtxProps=0;// byte size of all vtx properties, number of vertex properties
+     struct Triplet {int offset, id, size;} xyz[3];// byte offset, id#, byte size
+     struct Skip {int count, bytes;} faceSkip[2]={{0,0},{0,0}};// head, {faces}, tail
++
++    // parse header with vertex, face and property information
+     tokens = tokenize_line();
+     bool run = true;
+     while(run) {
+@@ -694,7 +696,7 @@ void Geometry::readPLY(std::istream &is)
+                                                                                     " vertex coordinates or unsupported size "+std::to_string(xyz[i].size));
+             } else if ( test(1, {"face"}) ) {
+                 faceCount = std::stoll(tokens[2]);
+-                int n = 0;
++                int n = 0;// 0 is head and 1 is tail
+                 while (true) {
+                     tokens = tokenize_line();
+                     if ( test(0, {"end_header"}) ) {
+@@ -702,13 +704,13 @@ void Geometry::readPLY(std::istream &is)
+                         break;
+                     } else if (test(0, {"element"}) ) {
+                         break;
+-                    } else if (test(0, {"property"}) ) {
++                    } else if (test(0, {"property"}) ) {// eg: "property list uchar int vertex_indices"
+                         if (test(1, {"list"}) &&// list of vertex ID belonging to a polygon
+                             test(2, {"uchar", "uint8"}) &&// size of polygon, e.g. 3 or 4
+                             test(3, {"int", "uint", "int32"}) &&// type of vertex id
+                             test(4, {"vertex_index", "vertex_indices"}) ) {
+-                            n = 1;
+-                        } else if ( test(1, {"uchar", "uint8"}) ) {
++                            n = 1;// change from head to tail
++                        } else if ( test(1, {"uchar", "uint8"}) ) {// eg: "property uchar intensity"
+                             faceSkip[n].count += 1;
+                             faceSkip[n].bytes += 1;
+                         } else {
+@@ -729,7 +731,7 @@ void Geometry::readPLY(std::istream &is)
+             } else {
+                 error("vdb_tool::readPLY: invalid element");
+             }
+-        } else if ( test(0, {"comment", "obj_info"}) ) {
++        } else if ( test(0, {"comment", "obj_info"}) ) {// eq: "obj_info 3D colored patch boundaries" and "comment author: Paraform"
+             tokens = tokenize_line();
+         } else {
+             error("vdb_tool::readPLY: unexpected entry in header");
+
+From ba0bce1a2a644960ede7f327e63c2dc482a0a925 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Sun, 24 Nov 2024 22:54:35 -0800
+Subject: [PATCH 11/19] patch by Jonathan S to fix CI
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ .github/workflows/ax.yml                | 4 ++++
+ .github/workflows/build.yml             | 4 ++++
+ .github/workflows/houdini.yml           | 4 ++++
+ openvdb_cmd/vdb_tool/include/Geometry.h | 2 +-
+ 4 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/.github/workflows/ax.yml b/.github/workflows/ax.yml
+index 83ac4500e7..015d2d797f 100644
+--- a/.github/workflows/ax.yml
++++ b/.github/workflows/ax.yml
+@@ -76,6 +76,10 @@ jobs:
+       - name: nanobind
+         #if: contains(matrix.config.image, '2023') == false
+         run: ./ci/install_nanobind.sh 2.0.0
++      - name: install_gtest
++        run: |
++          sudo apt-get update
++          sudo apt-get -q install -y libgtest-dev
+       - name: timestamp
+         id: timestamp
+         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index 3e7798e8fb..2bda68101e 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -89,6 +89,10 @@ jobs:
+     - name: glfw
+       if: contains(matrix.config.image, '2023') == true
+       run: ./ci/install_glfw.sh 3.3.10
++    - name: install_gtest
++      run: |
++        sudo apt-get update
++        sudo apt-get -q install -y libgtest-dev
+     - name: timestamp
+       id: timestamp
+       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/houdini.yml b/.github/workflows/houdini.yml
+index 68348e3351..5b9c512fc1 100644
+--- a/.github/workflows/houdini.yml
++++ b/.github/workflows/houdini.yml
+@@ -93,6 +93,10 @@ jobs:
+       run: ./ci/install_glfw.sh 3.3.10
+     - name: cppunit
+       run: ./ci/install_cppunit.sh 1.15.1
++    - name: install_gtest
++      run: |
++        sudo apt-get update
++        sudo apt-get -q install -y libgtest-dev
+     - name: timestamp
+       id: timestamp
+       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index 5ad0c96cd1..92a2d17a08 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -638,7 +638,7 @@ void Geometry::readPLY(std::istream &is)
+         std::cerr << "\"\n";
+         throw std::invalid_argument(msg);
+     };
+-    auto sizeOf = [&tokens, test, error](int i){
++    auto sizeOf = [test, error](int i){
+         if ( test(i, {"float", "float32", "int", "int32"}) ) return 4;
+         if ( test(i, {"double", "float64"}) ) return 8;
+         if ( test(i, {"int16", "uint16"}) )   return 2;
+
+From 272673b1545a249c4347f8a04c17140592aeecd1 Mon Sep 17 00:00:00 2001
+From: Jonathan Swartz <jonathan@jswartz.info>
+Date: Tue, 26 Nov 2024 08:44:35 +1300
+Subject: [PATCH 12/19] Fix gtest install for rpm. not deb
+
+Signed-off-by: Jonathan Swartz <jonathan@jswartz.info>
+---
+ .github/workflows/ax.yml      | 3 +--
+ .github/workflows/build.yml   | 3 +--
+ .github/workflows/houdini.yml | 3 +--
+ .github/workflows/nanovdb.yml | 3 +--
+ 4 files changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/.github/workflows/ax.yml b/.github/workflows/ax.yml
+index 015d2d797f..5ec2b59733 100644
+--- a/.github/workflows/ax.yml
++++ b/.github/workflows/ax.yml
+@@ -78,8 +78,7 @@ jobs:
+         run: ./ci/install_nanobind.sh 2.0.0
+       - name: install_gtest
+         run: |
+-          sudo apt-get update
+-          sudo apt-get -q install -y libgtest-dev
++          sudo yum install -y gtest-devel
+       - name: timestamp
+         id: timestamp
+         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index 2bda68101e..a36dbb8f6c 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -91,8 +91,7 @@ jobs:
+       run: ./ci/install_glfw.sh 3.3.10
+     - name: install_gtest
+       run: |
+-        sudo apt-get update
+-        sudo apt-get -q install -y libgtest-dev
++        sudo yum install -y gtest-devel
+     - name: timestamp
+       id: timestamp
+       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/houdini.yml b/.github/workflows/houdini.yml
+index 5b9c512fc1..79ceb063eb 100644
+--- a/.github/workflows/houdini.yml
++++ b/.github/workflows/houdini.yml
+@@ -95,8 +95,7 @@ jobs:
+       run: ./ci/install_cppunit.sh 1.15.1
+     - name: install_gtest
+       run: |
+-        sudo apt-get update
+-        sudo apt-get -q install -y libgtest-dev
++        sudo yum install -y gtest-devel
+     - name: timestamp
+       id: timestamp
+       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/nanovdb.yml b/.github/workflows/nanovdb.yml
+index 43b2c233d9..0b19fc7023 100644
+--- a/.github/workflows/nanovdb.yml
++++ b/.github/workflows/nanovdb.yml
+@@ -174,8 +174,7 @@ jobs:
+       - uses: actions/checkout@v3
+       - name: install_gtest
+         run: |
+-          sudo apt-get update
+-          sudo apt-get -q install -y libgtest-dev
++          sudo yum install -y gtest-devel
+       - name: build_and_test
+         run: |
+           cd nanovdb/nanovdb
+
+From 11dc8305dd4b383a395135a01d5ae17cfdcd4324 Mon Sep 17 00:00:00 2001
+From: Jonathan Swartz <jonathan@jswartz.info>
+Date: Tue, 26 Nov 2024 09:08:44 +1300
+Subject: [PATCH 13/19] Building gtest from source; newer version required than
+ available on distro
+
+Signed-off-by: Jonathan Swartz <jonathan@jswartz.info>
+---
+ .github/workflows/ax.yml      |  3 +--
+ .github/workflows/build.yml   |  3 +--
+ .github/workflows/houdini.yml |  3 +--
+ .github/workflows/nanovdb.yml |  5 +++--
+ ci/install_gtest.sh           | 16 ++++++++++++++++
+ 5 files changed, 22 insertions(+), 8 deletions(-)
+ create mode 100644 ci/install_gtest.sh
+
+diff --git a/.github/workflows/ax.yml b/.github/workflows/ax.yml
+index 5ec2b59733..be512fbc2c 100644
+--- a/.github/workflows/ax.yml
++++ b/.github/workflows/ax.yml
+@@ -77,8 +77,7 @@ jobs:
+         #if: contains(matrix.config.image, '2023') == false
+         run: ./ci/install_nanobind.sh 2.0.0
+       - name: install_gtest
+-        run: |
+-          sudo yum install -y gtest-devel
++        run: ./ci/install_gtest.sh 1.15.2
+       - name: timestamp
+         id: timestamp
+         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index a36dbb8f6c..6d479e57a5 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -90,8 +90,7 @@ jobs:
+       if: contains(matrix.config.image, '2023') == true
+       run: ./ci/install_glfw.sh 3.3.10
+     - name: install_gtest
+-      run: |
+-        sudo yum install -y gtest-devel
++      run: ./ci/install_gtest.sh 1.15.2
+     - name: timestamp
+       id: timestamp
+       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/houdini.yml b/.github/workflows/houdini.yml
+index 79ceb063eb..28efc703b8 100644
+--- a/.github/workflows/houdini.yml
++++ b/.github/workflows/houdini.yml
+@@ -94,8 +94,7 @@ jobs:
+     - name: cppunit
+       run: ./ci/install_cppunit.sh 1.15.1
+     - name: install_gtest
+-      run: |
+-        sudo yum install -y gtest-devel
++      run: ./ci/install_gtest.sh 1.15.2
+     - name: timestamp
+       id: timestamp
+       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/nanovdb.yml b/.github/workflows/nanovdb.yml
+index 0b19fc7023..0efc4580a8 100644
+--- a/.github/workflows/nanovdb.yml
++++ b/.github/workflows/nanovdb.yml
+@@ -170,11 +170,12 @@ jobs:
+       github.event.inputs.type == 'all' ||
+       github.event.inputs.type == 'linux'
+     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
++    container:
++      image: aswf/ci-openvdb:2024
+     steps:
+       - uses: actions/checkout@v3
+       - name: install_gtest
+-        run: |
+-          sudo yum install -y gtest-devel
++        run: ./ci/install_gtest.sh 1.15.2
+       - name: build_and_test
+         run: |
+           cd nanovdb/nanovdb
+diff --git a/ci/install_gtest.sh b/ci/install_gtest.sh
+new file mode 100644
+index 0000000000..71d7fbd7bb
+--- /dev/null
++++ b/ci/install_gtest.sh
+@@ -0,0 +1,16 @@
++#!/usr/bin/env bash
++
++set -ex
++
++GTEST_VERSION="$1"
++
++
++git clone https://github.com/google/googletest.git -b v${GTEST_VERSION}
++cd googletest
++mkdir build
++cd build
++cmake ..
++
++make -j$(nproc)
++
++sudo make install
+
+From d59f40d6710f56ed2082d3b230e733c995e963f2 Mon Sep 17 00:00:00 2001
+From: Jonathan Swartz <jonathan@jswartz.info>
+Date: Tue, 26 Nov 2024 09:15:10 +1300
+Subject: [PATCH 14/19] permissions fix
+
+Signed-off-by: Jonathan Swartz <jonathan@jswartz.info>
+---
+ ci/install_gtest.sh | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ mode change 100644 => 100755 ci/install_gtest.sh
+
+diff --git a/ci/install_gtest.sh b/ci/install_gtest.sh
+old mode 100644
+new mode 100755
+
+From 51373adf61ccde1169ecae5d0a2fc7cf1ccaf82e Mon Sep 17 00:00:00 2001
+From: Jonathan Swartz <jonathan@jswartz.info>
+Date: Tue, 26 Nov 2024 09:43:08 +1300
+Subject: [PATCH 15/19] Attempting to fix doxygen node version issue Missing
+ iomanip include in TestNanoVDB
+
+Signed-off-by: Jonathan Swartz <jonathan@jswartz.info>
+---
+ .github/workflows/docs.yml              | 3 ---
+ nanovdb/nanovdb/unittest/TestNanoVDB.cc | 1 +
+ 2 files changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/.github/workflows/docs.yml b/.github/workflows/docs.yml
+index 1fff84b892..ac8ace0b79 100644
+--- a/.github/workflows/docs.yml
++++ b/.github/workflows/docs.yml
+@@ -42,9 +42,6 @@ jobs:
+       # need to re-write the python docs to use sphinx
+       image: aswf/ci-openvdb:2022
+     steps:
+-    - name: Enable Node 16
+-      run: |
+-        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
+     - uses: actions/checkout@v3
+     - name: install_doxygen
+       run: ./ci/install_doxygen.sh 1_8_11
+diff --git a/nanovdb/nanovdb/unittest/TestNanoVDB.cc b/nanovdb/nanovdb/unittest/TestNanoVDB.cc
+index 7eacd07915..33e120c063 100644
+--- a/nanovdb/nanovdb/unittest/TestNanoVDB.cc
++++ b/nanovdb/nanovdb/unittest/TestNanoVDB.cc
+@@ -4,6 +4,7 @@
+ // Uncomment to temporarily disable testing of PNanoVDB
+ //#define DISABLE_PNANOVDB
+ 
++#include <iomanip>
+ #include <iostream>
+ #include <cstdlib>
+ #include <sstream> // for std::stringstream
+
+From 76d79d832d2a310b5a75d2449b361c5efed65eeb Mon Sep 17 00:00:00 2001
+From: Jonathan Swartz <jonathan@jswartz.info>
+Date: Tue, 26 Nov 2024 09:59:41 +1300
+Subject: [PATCH 16/19] Bump container versions attempt to fix doxygen test
+
+Signed-off-by: Jonathan Swartz <jonathan@jswartz.info>
+---
+ .github/workflows/docs.yml | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/.github/workflows/docs.yml b/.github/workflows/docs.yml
+index ac8ace0b79..df08f1f94f 100644
+--- a/.github/workflows/docs.yml
++++ b/.github/workflows/docs.yml
+@@ -40,9 +40,9 @@ jobs:
+     container:
+       # @note We can't update this as epydoc doesn't support python3. We'll
+       # need to re-write the python docs to use sphinx
+-      image: aswf/ci-openvdb:2022
++      image: aswf/ci-openvdb:2024
+     steps:
+-    - uses: actions/checkout@v3
++    - uses: actions/checkout@v4
+     - name: install_doxygen
+       run: ./ci/install_doxygen.sh 1_8_11
+     - name: nanobind
+
+From bf292f5eccb61a91cdda88b4822141ed0babc17b Mon Sep 17 00:00:00 2001
+From: Jonathan Swartz <jonathan@jswartz.info>
+Date: Tue, 26 Nov 2024 10:14:21 +1300
+Subject: [PATCH 17/19] install_latex fix
+
+Signed-off-by: Jonathan Swartz <jonathan@jswartz.info>
+---
+ .github/workflows/docs.yml | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/.github/workflows/docs.yml b/.github/workflows/docs.yml
+index df08f1f94f..617ae20a12 100644
+--- a/.github/workflows/docs.yml
++++ b/.github/workflows/docs.yml
+@@ -52,10 +52,6 @@ jobs:
+     #   run: pip install epydoc
+     - name: install_latex
+       run: |
+-        # Fix error: Cannot prepare internal mirrorlist: No URLs in mirrorlist. CentOS 8 reached EOL means need to replace the official mirror to vault.centos.org
+-        # Comment out mirrorlist and replace #baseurl=...mirror.centos.org with baseurl=...vault.centos.org in files starting with CentOS- in /etc/yum.repos.d folder
+-        sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+-        sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+         yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
+     - name: build
+       run: >
+
+From f4545b1e5785cd33ef497c2f56e693a118ca4139 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Mon, 25 Nov 2024 17:23:43 -0800
+Subject: [PATCH 18/19] added ascii option to Geometry::writePLY
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/include/Geometry.h | 75 +++++++++++--------------
+ 1 file changed, 34 insertions(+), 41 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index 92a2d17a08..feecec3c71 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -107,14 +107,14 @@ class Geometry
+     void write(const std::string &fileName) const;
+     void writeOBJ(const std::string &fileName) const;
+     void writeOFF(const std::string &fileName) const;
+-    void writePLY(const std::string &fileName) const;
++    void writePLY(const std::string &fileName, bool binary = true) const;
+     void writeSTL(const std::string &fileName) const;
+     void writeGEO(const std::string &fileName) const;
+     void writeABC(const std::string &fileName) const;
+ 
+     void writeOBJ(std::ostream &os) const;
+     void writeOFF(std::ostream &os) const;
+-    void writePLY(std::ostream &os) const;
++    void writePLY(std::ostream &os, bool binary = true) const;
+     void writeSTL(std::ostream &os) const;
+ 
+     void read(const std::string &fileName);
+@@ -259,25 +259,25 @@ void Geometry::write(const std::string &fileName) const
+     }
+ }// Geometry::write
+ 
+-void Geometry::writePLY(const std::string &fileName) const
++void Geometry::writePLY(const std::string &fileName, bool binary) const
+ {
+     if (fileName == "stdout.ply") {
+         //if (isatty(fileno(stdout))) throw std::invalid_argument("writePLY: stdout is not connected to the terminal!");
+-        this->writePLY(std::cout);
++        this->writePLY(std::cout, binary);
+     } else {
+         std::ofstream outfile(fileName, std::ios_base::binary);
+         if (!outfile.is_open()) throw std::invalid_argument("Error writing to ply file \""+fileName+"\"");
+-        this->writePLY(outfile);
++        this->writePLY(outfile, binary);
+     }
+ }// Geometry::writePLY
+ 
+-void Geometry::writePLY(std::ostream &os) const
++void Geometry::writePLY(std::ostream &os, bool binary) const
+ {
+-    os << "ply\n";
+-    if (isLittleEndian()) {
+-        os << "format binary_little_endian 1.0\n";
++    os << "ply\nformat ";
++    if (binary) {
++        os << "binary_" << (isLittleEndian() ? "little" : "big") << "_endian 1.0\n";
+     } else {
+-        os << "format binary_big_endian 1.0\n";
++        os << "ascii 1.0\n";
+     }
+     os << "comment created by vdb_tool" << std::endl;
+     os << "element vertex " << mVtx.size() << std::endl;
+@@ -288,32 +288,26 @@ void Geometry::writePLY(std::ostream &os) const
+     os << "property list uchar int vertex_index\n";
+     os << "end_header\n";
+     static_assert(sizeof(Vec3s) == 3 * sizeof(float), "Unexpected sizeof(Vec3s)");
+-    os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
+-    if (mTri.size()>0) {
+-        const size_t size = sizeof(char) + 3*sizeof(uint32_t);
+-        char *buffer = static_cast<char*>(std::malloc(mTri.size()*size)), *p = buffer;// uninitialized
+-        if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
+-        static_assert(sizeof(Vec3I) == 3 * sizeof(uint32_t), "Unexpected sizeof(Vec3I)");
+-        for (const Vec3I *t = mTri.data(), *e = t + mTri.size(); t!=e; ++t) {
+-            *p = 3;
+-            std::memcpy(p + 1, t, 3*sizeof(uint32_t));
+-            p += size;
+-        }
+-        os.write(buffer, mTri.size()*size);
+-        std::free(buffer);
+-    }
+-    if (mQuad.size()>0) {
+-        const size_t size = sizeof(char) + 4*sizeof(uint32_t);
+-        char *buffer = static_cast<char*>(std::malloc(mQuad.size()*size)), *p = buffer;// uninitialized
+-        if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
+-        static_assert(sizeof(Vec4I) == 4 * sizeof(uint32_t), "Unexpected sizeof(Vec4I)");
+-        for (const Vec4I *q = mQuad.data(), *e = q + mQuad.size(); q!=e; ++q) {
+-            *p = 4;
+-            std::memcpy(p + 1, q, 4*sizeof(uint32_t));
+-            p += size;
+-        }
+-        os.write(buffer, mQuad.size()*size);
+-        std::free(buffer);
++    if (binary) {
++        os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
++        auto writeFaces = [&](auto &faces, int n) {
++            if (faces.size()==0) return;
++            const size_t size = sizeof(char) + n*sizeof(uint32_t);
++            char *buffer = static_cast<char*>(std::malloc(faces.size()*size)), *p = buffer;// uninitialized
++            if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
++            for (const auto *f = faces.data(), *e = f + faces.size(); f!=e; ++f, p+= size) {
++                *p = n;
++                std::memcpy(p + 1, f, n*sizeof(uint32_t));
++            }
++            os.write(buffer, faces.size()*size);
++            std::free(buffer);
++        };
++        writeFaces(mTri,  3);
++        writeFaces(mQuad, 4);
++    } else {// ascii
++        for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
++        for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
++        for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
+     }
+ }// Geometry::writePLY
+ 
+@@ -331,9 +325,9 @@ void Geometry::writeOBJ(const std::string &fileName) const
+ 
+ void Geometry::writeOBJ(std::ostream &os) const
+ {
+-    os << "# Created by vdb_tool\n";
+-    for (auto &v : mVtx) os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
+-    for (auto &t : mTri) os << "f " << t[0]+1 << " " << t[1]+1 << " " << t[2]+1 << "\n";// obj is 1-based
++    os << "# obj file created by vdb_tool\n";
++    for (auto &v : mVtx)  os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
++    for (auto &t : mTri)  os << "f " << t[0]+1 << " " << t[1]+1 << " " << t[2]+1 << "\n";// obj is 1-based
+     for (auto &q : mQuad) os << "f " << q[0]+1 << " " << q[1]+1 << " " << q[2]+1 << " " << q[3]+1 << "\n";// obj is 1-based
+ }// Geometry::writeOBJ
+ 
+@@ -350,8 +344,7 @@ void Geometry::writeOFF(const std::string &fileName) const
+ 
+ void Geometry::writeOFF(std::ostream &os) const
+ {
+-    os << "OFF\n";
+-    os << "# Created by vdb_tool\n";
++    os << "OFF\n# Created by vdb_tool\n";
+     os << mVtx.size() << " " << (mTri.size() + mQuad.size()) << " " << 0 << "\n";
+     for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
+     for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
+
+From 29530a50bc5eca5327e3bd81d62541b919b14075 Mon Sep 17 00:00:00 2001
+From: Ken Museth <ken.museth@gmail.com>
+Date: Mon, 25 Nov 2024 20:22:53 -0800
+Subject: [PATCH 19/19] fixing issue introduced in the previous commit
+
+Signed-off-by: Ken Museth <ken.museth@gmail.com>
+---
+ openvdb_cmd/vdb_tool/include/Geometry.h | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/openvdb_cmd/vdb_tool/include/Geometry.h b/openvdb_cmd/vdb_tool/include/Geometry.h
+index feecec3c71..ebd497b3bb 100644
+--- a/openvdb_cmd/vdb_tool/include/Geometry.h
++++ b/openvdb_cmd/vdb_tool/include/Geometry.h
+@@ -290,20 +290,20 @@ void Geometry::writePLY(std::ostream &os, bool binary) const
+     static_assert(sizeof(Vec3s) == 3 * sizeof(float), "Unexpected sizeof(Vec3s)");
+     if (binary) {
+         os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
+-        auto writeFaces = [&](auto &faces, int n) {
+-            if (faces.size()==0) return;
+-            const size_t size = sizeof(char) + n*sizeof(uint32_t);
+-            char *buffer = static_cast<char*>(std::malloc(faces.size()*size)), *p = buffer;// uninitialized
++        auto writeFaces = [](std::ostream &os, const uint32_t *faces, size_t count, uint8_t n) {
++            if (count==0) return;
++            const int size = 1 + 4*n;
++            char *buffer = (char*)std::malloc(count*size), *p = buffer;// uninitialized
+             if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
+-            for (const auto *f = faces.data(), *e = f + faces.size(); f!=e; ++f, p+= size) {
+-                *p = n;
+-                std::memcpy(p + 1, f, n*sizeof(uint32_t));
++            for (const uint32_t *f = faces, *e = f + n*count; f!=e; f+=n, p += size) {
++                *p = (char)n;
++                std::memcpy(p + 1, f, 4*n);
+             }
+-            os.write(buffer, faces.size()*size);
++            os.write(buffer, count*size);
+             std::free(buffer);
+         };
+-        writeFaces(mTri,  3);
+-        writeFaces(mQuad, 4);
++        writeFaces(os, (const uint32_t*)mTri.data(),  mTri.size(),  3);
++        writeFaces(os, (const uint32_t*)mQuad.data(), mQuad.size(), 4);
+     } else {// ascii
+         for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
+         for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";

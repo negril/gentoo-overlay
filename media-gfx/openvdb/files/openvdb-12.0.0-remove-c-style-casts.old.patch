@@ -1,0 +1,62 @@
+From de3bea34a7267db057dadc0f5cb167bbafcb3505 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 11 Jan 2025 17:22:43 +0100
+Subject: [PATCH] remove c-style casts
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/nanovdb/nanovdb/PNanoVDB.h b/nanovdb/nanovdb/PNanoVDB.h
+index 3e7b306..372dd5a 100644
+--- a/nanovdb/nanovdb/PNanoVDB.h
++++ b/nanovdb/nanovdb/PNanoVDB.h
+@@ -321,6 +321,7 @@ void pnanovdb_buf_write_uint64(pnanovdb_buf_t buf, uint byte_offset, uvec2 value
+ #define PNANOVDB_NATIVE_64
+ #ifndef __CUDACC_RTC__
+ #include <stdint.h>
++#include <bit>
+ #endif
+ #if !defined(PNANOVDB_MEMCPY_CUSTOM)
+ #ifndef __CUDACC_RTC__
+@@ -343,26 +344,26 @@ typedef struct pnanovdb_vec3_t
+ {
+     float x, y, z;
+ }pnanovdb_vec3_t;
+-PNANOVDB_FORCE_INLINE pnanovdb_int32_t pnanovdb_uint32_as_int32(pnanovdb_uint32_t v) { return (pnanovdb_int32_t)v; }
+-PNANOVDB_FORCE_INLINE pnanovdb_int64_t pnanovdb_uint64_as_int64(pnanovdb_uint64_t v) { return (pnanovdb_int64_t)v; }
+-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_int64_as_uint64(pnanovdb_int64_t v) { return (pnanovdb_uint64_t)v; }
+-PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_int32_as_uint32(pnanovdb_int32_t v) { return (pnanovdb_uint32_t)v; }
++PNANOVDB_FORCE_INLINE pnanovdb_int32_t pnanovdb_uint32_as_int32(pnanovdb_uint32_t v) { return std::bit_cast<pnanovdb_int32_t>(v); }
++PNANOVDB_FORCE_INLINE pnanovdb_int64_t pnanovdb_uint64_as_int64(pnanovdb_uint64_t v) { return std::bit_cast<pnanovdb_int64_t>(v); }
++PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_int64_as_uint64(pnanovdb_int64_t v) { return std::bit_cast<pnanovdb_uint64_t>(v); }
++PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_int32_as_uint32(pnanovdb_int32_t v) { return std::bit_cast<pnanovdb_uint32_t>(v); }
+ PNANOVDB_FORCE_INLINE float pnanovdb_uint32_as_float(pnanovdb_uint32_t v) { float vf; pnanovdb_memcpy(&vf, &v, sizeof(vf)); return vf; }
+-PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_float_as_uint32(float v) { return *((pnanovdb_uint32_t*)(&v)); }
++PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_float_as_uint32(float v) { return std::bit_cast<pnanovdb_uint32_t>(v); }
+ PNANOVDB_FORCE_INLINE double pnanovdb_uint64_as_double(pnanovdb_uint64_t v) { double vf; pnanovdb_memcpy(&vf, &v, sizeof(vf)); return vf; }
+-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_double_as_uint64(double v) { return *((pnanovdb_uint64_t*)(&v)); }
+-PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_uint64_low(pnanovdb_uint64_t v) { return (pnanovdb_uint32_t)v; }
+-PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_uint64_high(pnanovdb_uint64_t v) { return (pnanovdb_uint32_t)(v >> 32u); }
+-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_uint32_as_uint64(pnanovdb_uint32_t x, pnanovdb_uint32_t y) { return ((pnanovdb_uint64_t)x) | (((pnanovdb_uint64_t)y) << 32u); }
+-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_uint32_as_uint64_low(pnanovdb_uint32_t x) { return ((pnanovdb_uint64_t)x); }
++PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_double_as_uint64(double v) { return std::bit_cast<pnanovdb_uint64_t>(v); }
++PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_uint64_low(pnanovdb_uint64_t v) { return std::bit_cast<pnanovdb_uint32_t>(v); }
++PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_uint64_high(pnanovdb_uint64_t v) { return std::bit_cast<pnanovdb_uint32_t>(v >> 32u); }
++PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_uint32_as_uint64(pnanovdb_uint32_t x, pnanovdb_uint32_t y) { return std::bit_cast<pnanovdb_uint64_t>(x) | (std::bit_cast<pnanovdb_uint64_t>(y) << 32u); }
++PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_uint32_as_uint64_low(pnanovdb_uint32_t x) { return std::bit_cast<pnanovdb_uint64_t>(x); }
+ PNANOVDB_FORCE_INLINE pnanovdb_int32_t pnanovdb_uint64_is_equal(pnanovdb_uint64_t a, pnanovdb_uint64_t b) { return a == b; }
+ PNANOVDB_FORCE_INLINE pnanovdb_int32_t pnanovdb_int64_is_zero(pnanovdb_int64_t a) { return a == 0; }
+ #ifdef PNANOVDB_CMATH
+ PNANOVDB_FORCE_INLINE float pnanovdb_floor(float v) { return floorf(v); }
+ #endif
+-PNANOVDB_FORCE_INLINE pnanovdb_int32_t pnanovdb_float_to_int32(float v) { return (pnanovdb_int32_t)v; }
+-PNANOVDB_FORCE_INLINE float pnanovdb_int32_to_float(pnanovdb_int32_t v) { return (float)v; }
+-PNANOVDB_FORCE_INLINE float pnanovdb_uint32_to_float(pnanovdb_uint32_t v) { return (float)v; }
++PNANOVDB_FORCE_INLINE pnanovdb_int32_t pnanovdb_float_to_int32(float v) { return std::bit_cast<pnanovdb_int32_t>(v); }
++PNANOVDB_FORCE_INLINE float pnanovdb_int32_to_float(pnanovdb_int32_t v) { return std::bit_cast<float>(v); }
++PNANOVDB_FORCE_INLINE float pnanovdb_uint32_to_float(pnanovdb_uint32_t v) { return std::bit_cast<float>(v); }
+ PNANOVDB_FORCE_INLINE float pnanovdb_min(float a, float b) { return a < b ? a : b; }
+ PNANOVDB_FORCE_INLINE float pnanovdb_max(float a, float b) { return a > b ? a : b; }
+ #elif defined(PNANOVDB_HLSL)
+-- 
+2.47.1
+
