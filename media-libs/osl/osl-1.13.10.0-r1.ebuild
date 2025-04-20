@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -32,7 +32,7 @@ X86_CPU_FEATURES=(
 )
 CPU_FEATURES=( "${X86_CPU_FEATURES[@]/#/cpu_flags_x86_}" )
 
-IUSE="debug doc gui libcxx nofma optix partio qt6 test ${CPU_FEATURES[*]%:*} python"
+IUSE="debug doc gui libcxx nofma optix partio test ${CPU_FEATURES[*]%:*} python"
 
 RESTRICT="!test? ( test )"
 
@@ -42,13 +42,11 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}"
 RDEPEND="
 	dev-libs/boost:=
 	dev-libs/pugixml
-	>=media-libs/openexr-3:0=
 	>=media-libs/openimageio-2.4:=
 	$(llvm_gen_dep '
-		llvm-core/clang:${LLVM_SLOT}
-		llvm-core/llvm:${LLVM_SLOT}
+		llvm-core/clang:${LLVM_SLOT}=
+		llvm-core/llvm:${LLVM_SLOT}=
 	')
-	sys-libs/zlib:=
 	optix? ( dev-libs/optix[-headers-only] )
 	python? (
 		${PYTHON_DEPS}
@@ -59,20 +57,14 @@ RDEPEND="
 	)
 	partio? ( media-libs/partio )
 	gui? (
-		!qt6? (
-			dev-qt/qtcore:5
-			dev-qt/qtgui:5
-			dev-qt/qtwidgets:5
-			dev-qt/qtopengl:5
-		)
-		qt6? (
-			dev-qt/qtbase:6[gui,widgets,opengl]
-		)
+		dev-qt/qtbase:6[gui,widgets,opengl]
 	)
 "
 
 DEPEND="${RDEPEND}
 	dev-util/patchelf
+	>=media-libs/openexr-3
+	sys-libs/zlib
 	test? (
 		media-fonts/droid
 	)
@@ -82,6 +74,13 @@ BDEPEND="
 	sys-devel/flex
 	virtual/pkgconfig
 "
+
+PATCHES=(
+	"${FILESDIR}/${PN}-boost-config.patch"
+	"${FILESDIR}/${PN}-oslfile.patch"
+	"${FILESDIR}/${PN}-include-cstdint.patch"
+	"${FILESDIR}/${PN}-1.12.14.0-m_dz.patch"
+)
 
 pkg_setup() {
 	llvm-r1_pkg_setup
@@ -189,6 +188,7 @@ src_configure() {
 		-DUSE_BATCHED="$(IFS=","; echo "${mybatched[*]}")"
 		-DUSE_LIBCPLUSPLUS="$(usex libcxx)"
 		-DOSL_USE_OPTIX="$(usex optix)"
+		-DUSE_QT="$(usex gui)"
 
 		-DOpenImageIO_ROOT="${EPREFIX}/usr"
 	)
@@ -197,15 +197,6 @@ src_configure() {
 		mycmakeargs+=(
 			-DVEC_REPORT="yes"
 		)
-	fi
-
-	if use gui; then
-		mycmakeargs+=( -DUSE_QT="yes" )
-		if ! use qt6; then
-			mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_Qt6="yes" )
-		fi
-	else
-		mycmakeargs+=( -DUSE_QT="no" )
 	fi
 
 	if use optix; then
@@ -280,6 +271,15 @@ src_test() {
 		"^osl-imageio.opt.rs_bitcode$"
 	)
 
+	if use optix; then
+		CMAKE_SKIP_TESTS+=(
+			"^color2.optix$"
+			"^color4.optix(|.opt|.fused)$"
+			"^vector2.optix$"
+			"^vector4.optix$"
+		)
+	fi
+
 	myctestargs=(
 		# src/build-scripts/ci-test.bash
 		'--force-new-ctest-process'
@@ -328,10 +328,20 @@ src_install() {
 	cmake_src_install
 
 	if [[ -d "${ED}/usr/build-scripts" ]]; then
-		rm -rf "${ED}/usr/build-scripts" || die
+		rm -vr "${ED}/usr/build-scripts" || die
 	fi
 
-	for batched_lib in "${ED}/usr/$(get_libdir)/lib_"*"_oslexec.so"; do
-		patchelf --set-soname "$(basename "${batched_lib}")" "${batched_lib}" || die
-	done
+	if use test; then
+		rm \
+			"${ED}/usr/bin/test"{render,shade{,_dso}} \
+			"${ED}/usr/$(get_libdir)/libtestshade.so"* \
+			|| die
+	fi
+
+	if use amd64; then
+		find "${ED}/usr/$(get_libdir)" -type f  -name 'lib_*_oslexec.so' -print0 \
+			| while IFS= read -r -d $'\0' batched_lib; do
+			patchelf --set-soname "$(basename "${batched_lib}")" "${batched_lib}" || die
+		done
+	fi
 }

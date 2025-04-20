@@ -38,7 +38,6 @@ RESTRICT="!test? ( test )"
 
 REQUIRED_USE="${PYTHON_REQUIRED_USE}"
 
-# TODO optix
 RDEPEND="
 	dev-libs/boost:=
 	dev-libs/pugixml
@@ -47,7 +46,6 @@ RDEPEND="
 		llvm-core/clang:${LLVM_SLOT}=
 		llvm-core/llvm:${LLVM_SLOT}=
 	')
-	optix? ( dev-libs/optix[-headers-only] )
 	python? (
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
@@ -67,6 +65,7 @@ DEPEND="${RDEPEND}
 	sys-libs/zlib
 	test? (
 		media-fonts/droid
+		optix? ( dev-libs/optix )
 	)
 "
 BDEPEND="
@@ -88,7 +87,7 @@ pkg_setup() {
 }
 
 src_prepare() {
-	if use optix; then
+	if use test && use optix; then
 		cuda_src_prepare
 		cuda_add_sandbox -w
 	fi
@@ -186,7 +185,6 @@ src_configure() {
 		-DUSE_SIMD="$(IFS=","; echo "${mysimd[*]}")"
 		-DUSE_BATCHED="$(IFS=","; echo "${mybatched[*]}")"
 		-DUSE_LIBCPLUSPLUS="$(usex libcxx)"
-		-DOSL_USE_OPTIX="$(usex optix)"
 		-DUSE_QT="$(usex gui)"
 
 		-DOpenImageIO_ROOT="${EPREFIX}/usr"
@@ -195,20 +193,6 @@ src_configure() {
 	if use debug; then
 		mycmakeargs+=(
 			-DVEC_REPORT="yes"
-		)
-	fi
-
-	if use optix; then
-		mycmakeargs+=(
-			-DOptiX_FIND_QUIETLY="no"
-			-DCUDA_FIND_QUIETLY="no"
-
-			-DOPTIXHOME="${EPREFIX}/opt/optix"
-			-DCUDA_TOOLKIT_ROOT_DIR="${EPREFIX}/opt/cuda"
-
-			-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
-			-DOSL_EXTRA_NVCC_ARGS="--compiler-bindir;$(cuda_gccdir)"
-			-DCUDA_VERBOSE_BUILD="yes"
 		)
 	fi
 
@@ -224,6 +208,24 @@ src_configure() {
 			"-DPYTHON_SITE_DIR=$(python_get_sitedir)"
 		)
 	fi
+
+	if use test; then
+		if use optix; then
+			mycmakeargs+=(
+				-DOSL_USE_OPTIX="yes"
+				-DOptiX_FIND_QUIETLY="no"
+				-DCUDA_FIND_QUIETLY="no"
+
+				-DOPTIXHOME="${EPREFIX}/opt/optix"
+				-DCUDA_TOOLKIT_ROOT_DIR="${EPREFIX}/opt/cuda"
+
+				-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
+				-DOSL_EXTRA_NVCC_ARGS="--compiler-bindir;$(cuda_gccdir)"
+				-DCUDA_VERBOSE_BUILD="yes"
+			)
+		fi
+	fi
+
 
 	cmake_src_configure
 }
@@ -295,7 +297,7 @@ src_test() {
 		PYTHONPATH="${BUILD_DIR}/lib/python/site-packages"
 	fi
 
-	cmake_src_test
+	cmake_src_test -j1
 
 	einfo ""
 	einfo "testing render tests in isolation"
@@ -320,7 +322,7 @@ src_test() {
 		-R "^render"
 	)
 
-	cmake_src_test
+	cmake_src_test -j1
 }
 
 src_install() {
