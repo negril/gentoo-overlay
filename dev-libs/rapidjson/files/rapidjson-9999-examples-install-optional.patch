@@ -1,0 +1,30 @@
+From daf3c62c936fad3727b95532b2da04ba5ec865f9 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Wed, 9 Apr 2025 13:59:19 +0200
+Subject: [PATCH 2/2] examples install optional
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7d6f35d..858fc0f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -203,6 +203,7 @@ install(DIRECTORY include/rapidjson
+     DESTINATION "${INCLUDE_INSTALL_DIR}"
+     COMPONENT dev)
+ 
++if(RAPIDJSON_BUILD_EXAMPLES)
+ install(DIRECTORY example/
+     DESTINATION "${DOC_INSTALL_DIR}/examples"
+     COMPONENT examples
+@@ -211,6 +212,7 @@ install(DIRECTORY example/
+     PATTERN "CMakeFiles" EXCLUDE
+     PATTERN "Makefile" EXCLUDE
+     PATTERN "cmake_install.cmake" EXCLUDE)
++endif()
+ 
+ # Provide config and version files to be used by other applications
+ # ===============================
+-- 
+2.49.0
+
