@@ -31,7 +31,7 @@ LICENSE="NVIDIA-CUDA"
 SLOT="${PV}" # SLOTTED
 
 KEYWORDS="-* ~amd64 ~arm64 ~amd64-linux ~arm64-linux"
-IUSE="clang debugger examples profiler rdma sanitizer"
+IUSE="clang debugger examples nsight profiler rdma sanitizer"
 # IUSE=" +static-libs"
 RESTRICT="bindist mirror strip test"
 
@@ -55,7 +55,13 @@ RDEPEND="
 		media-libs/freeglut
 		media-libs/glu
 	)
-	rdma? ( sys-cluster/rdma-core )
+	nsight? (
+		dev-util/nsight-compute
+		dev-util/nsight-systems
+	)
+	rdma? (
+		sys-cluster/rdma-core
+	)
 "
 BDEPEND="
 	$(python_gen_any_dep '
