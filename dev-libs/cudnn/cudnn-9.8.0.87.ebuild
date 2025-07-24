@@ -97,7 +97,7 @@ src_install() {
 
 		# Add include and lib symlinks
 		dosym -r "${CUDNN_PATH}/targets/${narch}-linux/include" "${CUDNN_PATH}/include"
-		dosym -r "${CUDNN_PATH}/targets/${narch}-linux/lib" "${CUDNN_PATH}/lib64"
+		dosym -r "${CUDNN_PATH}/targets/${narch}-linux/lib" "${CUDNN_PATH}/$(get_libdir)"
 
 		find "${ED}/${CUDNN_PATH}" -empty -delete || die
 	fi
