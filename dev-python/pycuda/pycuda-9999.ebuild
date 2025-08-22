@@ -9,15 +9,12 @@ PYTHON_COMPAT=( python3_{10..13} )
 inherit cuda distutils-r1
 
 DESCRIPTION="Python wrapper for NVIDIA CUDA"
-HOMEPAGE="
-	https://mathema.tician.de/software/pycuda/
-	https://pypi.org/project/pycuda/
-	https://github.com/inducer/pycuda
-"
+HOMEPAGE="https://mathema.tician.de/software/pycuda/ https://pypi.org/project/pycuda/ https://github.com/inducer/pycuda"
 
 if [[ "${PV}" == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/inducer/pycuda.git"
+	EGIT_SUBMODULES=( '*' )
 else
 	inherit pypi
 	KEYWORDS="~amd64"
@@ -40,7 +37,8 @@ RDEPEND="
 "
 DEPEND="${RDEPEND}"
 
-# We need write acccess /dev/nvidia0 and /dev/nvidiactl and the portage user is (usually) not in the video group
+# We need write acccess /dev/nvidia0 and /dev/nvidiactl and the portage
+# user is (usually) not in the video group
 PROPERTIES="test_privileged"
 RESTRICT="!test? ( test )" # test"
 
@@ -126,7 +124,7 @@ python_test() {
 		"test/test_gpuarray.py::TestGPUArray::test_big_array_scan"
 	)
 
-	local -x NVCC_CCBIN="$(cuda_gccdir)"
+# 	local -x NVCC_CCBIN="$(cuda_gccdir)"
 # 	local -x NVCC_APPEND_FLAGS="-arch=sm_89"
 # 	local -x NVCC_APPEND_FLAGS="--compiler-bindir=/usr/x86_64-pc-linux-gnu/gcc-bin/15"
 # 	local -x PYCUDA_DEFAULT_NVCC_FLAGS="--compiler-bindir=/usr/lib/ccache/bin/x86_64-pc-linux-gnu-g++-15" # -Ofc max
