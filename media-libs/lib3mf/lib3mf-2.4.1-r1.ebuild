@@ -14,7 +14,7 @@ SRC_URI="
 LICENSE="BSD"
 SLOT="0/2"
 KEYWORDS="amd64 ~arm64 ~ppc64 x86"
-IUSE="+system-act test"
+IUSE="test"
 RESTRICT="!test? ( test )"
 
 RDEPEND="
@@ -31,6 +31,7 @@ BDEPEND="
 		dev-debug/valgrind
 	)
 "
+
 PATCHES=(
 	"${FILESDIR}"/${PN}-2.3.2-remove-std-and-opt-flags.patch
 	"${FILESDIR}"/${PN}-2.2.0-include-cstdint.patch
@@ -43,6 +44,7 @@ src_prepare() {
 
 	# DO NOT WANT!
 	rm -r SDK || die
+	rm -r AutomaticComponentToolkit || die
 
 	cmake_src_prepare
 }
