@@ -8,5 +8,6 @@
 	<use>
 		<flag name="cuda_targets_11">Install for use with <pkg>dev-util/nvidia-cuda-toolkit</pkg>:11</flag>
 		<flag name="cuda_targets_12">Install for use with <pkg>dev-util/nvidia-cuda-toolkit</pkg>:12</flag>
+		<flag name="cuda_targets_13">Install for use with <pkg>dev-util/nvidia-cuda-toolkit</pkg>:13</flag>
 	</use>
 </pkgmetadata>
