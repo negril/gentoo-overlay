@@ -35,10 +35,10 @@ RESTRICT="mirror test"
 
 RDEPEND="
 	cuda_targets_11? (
-		<dev-util/nvidia-cuda-toolkit-12
+		=dev-util/nvidia-cuda-toolkit-11*
 	)
 	cuda_targets_12? (
-		>=dev-util/nvidia-cuda-toolkit-12
+		=dev-util/nvidia-cuda-toolkit-12*
 	)
 "
 

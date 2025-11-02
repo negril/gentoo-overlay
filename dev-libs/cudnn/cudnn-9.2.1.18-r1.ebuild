@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -35,10 +35,10 @@ RESTRICT="mirror"
 
 # RDEPEND="
 # 	cuda_targets_11? (
-# 		<dev-util/nvidia-cuda-toolkit-11
+# 		=dev-util/nvidia-cuda-toolkit-11*
 # 	)
 # 	cuda_targets_12? (
-# 		>dev-util/nvidia-cuda-toolkit-12
+# 		=dev-util/nvidia-cuda-toolkit-12*
 # 	)
 # "
 
