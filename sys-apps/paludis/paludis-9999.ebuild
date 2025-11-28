@@ -1,14 +1,14 @@
-# Copyright 2023 Gentoo Authors
+# Copyright 2023-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{8..12} )
+PYTHON_COMPAT=( python3_{11..14} )
 
-USE_RUBY="$(echo ruby{30..32})"
+USE_RUBY="$(echo ruby{33..34})"
 RUBY_OPTIONAL="yes"
 
-inherit bash-completion-r1 cmake python-r1
+inherit cmake python-r1 shell-completion
 
 # ruby is stupid...
 _S="$S"
@@ -36,7 +36,7 @@ fi
 LICENSE="GPL-2 vim"
 SLOT="0/eapi8"
 
-IUSE="bash-completion doc pbins pink python ruby search-index test vim-syntax +xml zsh-completion"
+IUSE="doc pbins pink python ruby search-index test vim-syntax +xml"
 
 COMMON_DEPEND="
 	>=app-shells/bash-5.0:*
@@ -73,7 +73,10 @@ BDEPEND="
 	doc? (
 		app-text/doxygen
 		python? ( dev-python/sphinx[${PYTHON_USEDEP}] )
-		ruby? ( dev-ruby/syntax$(ruby_samelib) dev-ruby/rdoc$(ruby_samelib) )
+		ruby? (
+			dev-ruby/syntax$(ruby_samelib)
+			dev-ruby/rdoc$(ruby_samelib)
+		)
 	)
 	${COMMON_DEPEND}
 	test? (
@@ -115,11 +118,6 @@ pkg_setup() {
 	use ruby && ruby-ng_pkg_setup
 }
 
-# src_unpack() {
-# 	git-r3_fetch
-# 	git-r3_checkout
-# }
-
 src_prepare() {
 	# TODO FIXME
 	if [[ $(use ruby) ]]; then
@@ -151,6 +149,8 @@ src_configure() {
 		-DPALUDIS_CLIENTS=all
 		-DCONFIG_FRAMEWORK=eselect
 
+		-DPython3_EXECUTABLE="${PYTHON}"
+
 		# GNUInstallDirs
 		# -DCMAKE_INSTALL_DOCDIR="${EPREFIX}/usr/share/doc/${PF}"
 	)
@@ -167,29 +167,25 @@ src_configure() {
 src_install() {
 	cmake_src_install
 
-	use bash-completion && dobashcomp bash-completion/cave
-
-	use zsh-completion && {
-		insinto /usr/share/zsh/site-functions
-		doins zsh-completion/_cave
-	}
+	dobashcomp bash-completion/cave
+	dozshcomp zsh-completion/_cave
 }
 
 src_test() {
 	# known broken tests
-	skip_tests=(
+	CMAKE_SKIP_TESTS=(
 		"best_version"
 		"banned_dolib_rep"
 		"prefix"
 		"env_unset"
 	)
-	cmake_src_test -E ".*($(IFS=\| ; echo "${skip_tests[*]}")).*"
+	cmake_src_test
 }
 
 pkg_postinst() {
 	local pm
-	if [[ -f ${ROOT}/etc/env.d/50package-manager ]] ; then
-		pm=$( source "${ROOT}"/etc/env.d/50package-manager ; echo "${PACKAGE_MANAGER}" )
+	if [[ -f "${EROOT}/etc/env.d/50package-manager" ]] ; then
+		pm="$(source "${EROOT}/etc/env.d/50package-manager" 2>/dev/null; echo "${PACKAGE_MANAGER}")"
 	fi
 
 	if [[ ${pm} != paludis ]] ; then
@@ -197,4 +193,8 @@ pkg_postinst() {
 		elog "you should consider running:"
 		elog "    eselect package-manager set paludis"
 	fi
+}
+
+pkg_postrm() {
+	eselect package-manager update
 }
