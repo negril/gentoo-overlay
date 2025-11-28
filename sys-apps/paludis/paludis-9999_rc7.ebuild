@@ -1,14 +1,14 @@
-# Copyright 2023 Gentoo Authors
+# Copyright 2023-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
 
-PYTHON_COMPAT=( python3_{8..12} )
+PYTHON_COMPAT=( python3_{8..14} )
 
-USE_RUBY="$(echo ruby{30..32})"
+USE_RUBY="$(echo ruby{30..34})"
 RUBY_OPTIONAL="yes"
 
-inherit bash-completion-r1 cmake python-r1
+inherit bash-completion-r1 python-r1
 
 # ruby is stupid...
 _S="$S"
@@ -93,7 +93,9 @@ RDEPEND="
 	${DEPEND}
 "
 
-PDEPEND="app-eselect/eselect-package-manager"
+PDEPEND="
+	app-eselect/eselect-package-manager
+"
 
 REQUIRED_USE="
 	python? ( ${PYTHON_REQUIRED_USE} )
@@ -127,7 +129,7 @@ src_prepare() {
 		sed -i -e "1s/ruby/&${RUBY_VER/./}/" ruby/demos/*.rb || die
 	fi
 
-	cmake_src_prepare
+	default
 }
 
 src_configure() {
@@ -160,11 +162,13 @@ src_configure() {
 	# 	mycmakeargs+=( -DPYTHON_VERSIONS="$(echo "${MULTIBUILD_VARIANTS[@]//_/.}" | tr ' ' ';')")
 	# }
 
-	cmake_src_configure
+	BUILD_DIR="${S}_build"
+	CMAKE_USE_DIR="${S}"
+	cmake -G Ninja -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}" -S "${CMAKE_USE_DIR}" -B "${BUILD_DIR}" "${mycmakeargs[@]}" || die
 }
 
 src_install() {
-	cmake_src_install
+	DESTDIR="${D}" cmake --install "${BUILD_DIR}" || die
 
 	[[ $(use bash-completion) ]] && dobashcomp bash-completion/cave
 
@@ -182,16 +186,16 @@ src_test() {
 		"prefix"
 		"env_unset"
 	)
-	cmake_src_test -E ".*($(IFS=\| ; echo "${skip_tests[*]}")).*"
+	ctest --test-dir "${BUILD_DIR}" -E ".*($(IFS=\| ; echo "${skip_tests[*]}")).*"
 }
 
 pkg_postinst() {
 	local pm
-	if [[ -f ${ROOT}/etc/env.d/50package-manager ]] ; then
-		pm=$( source "${ROOT}"/etc/env.d/50package-manager ; echo "${PACKAGE_MANAGER}" )
+	if [[ -f "${ROOT}/etc/env.d/50package-manager" ]] ; then
+		pm=${ source "${ROOT}/etc/env.d/50package-manager"; echo "${PACKAGE_MANAGER}"; }
 	fi
 
-	if [[ ${pm} != paludis ]] ; then
+	if [[ ${pm} != "paludis" ]] ; then
 		elog "If you are using paludis or cave as your primary package manager,"
 		elog "you should consider running:"
 		elog "    eselect package-manager set paludis"
