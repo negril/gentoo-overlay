@@ -53,6 +53,16 @@ EPYTEST_PLUGINS=(
 
 distutils_enable_tests pytest
 
+src_unpack() {
+	if [[ "${PV}" == *9999* ]]; then
+		git-r3_src_unpack
+
+		git -C "${S}" submodule update --init
+	else
+		default
+	fi
+}
+
 src_prepare() {
 	cuda_sanitize
 
@@ -127,9 +137,6 @@ python_test() {
 	)
 
 	local -x NVCC_CCBIN="$(cuda_gccdir)"
-# 	local -x NVCC_APPEND_FLAGS="-arch=sm_89"
-# 	local -x NVCC_APPEND_FLAGS="--compiler-bindir=/usr/x86_64-pc-linux-gnu/gcc-bin/15"
-# 	local -x PYCUDA_DEFAULT_NVCC_FLAGS="--compiler-bindir=/usr/lib/ccache/bin/x86_64-pc-linux-gnu-g++-15" # -Ofc max
 	# set this to avoid failing relative path lookup when using ccache
 	local -x CUDA_ROOT="${CUDA_PATH:-/opt/cuda}"
 
