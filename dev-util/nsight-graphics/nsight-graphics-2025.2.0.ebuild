@@ -15,7 +15,9 @@ MY_PN_SHORT="gfx"
 PV_BUILD="25073"
 
 SRC_URI="
-	https://developer.nvidia.com/downloads/assets/tools/secure/${PN}/${MY_PV}/linux/NVIDIA_Nsight_Graphics_${PV}.${PV_BUILD}.run
+	amd64? (
+		https://developer.nvidia.com/downloads/assets/tools/secure/${PN}/${MY_PV}/linux/NVIDIA_Nsight_Graphics_${PV}.${PV_BUILD}.run
+	)
 	mirror+https://developer.download.nvidia.com/images/nvidia-nsight-${MY_PN}-icon-gbp-shaded-128.png
 		-> nvidia-nsight-${MY_PN}-icon-gbp-shaded-128.20231126.png
 "
@@ -24,7 +26,7 @@ S="${WORKDIR}/pkg"
 
 LICENSE="NVIDIA-r2"
 SLOT="$(ver_cut 1-2)"
-KEYWORDS="~amd64"
+KEYWORDS="-* ~amd64"
 
 RESTRICT="bindist mirror strip test"
 
