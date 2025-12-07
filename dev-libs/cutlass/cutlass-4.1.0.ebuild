@@ -15,8 +15,7 @@ if [[ "${PV}" == *9999* ]]; then
 	EGIT_REPO_URI="https://github.com/NVIDIA/${PN}"
 else
 	SRC_URI="
-		https://github.com/NVIDIA/${PN}/archive/refs/tags/v${PV}.tar.gz
-			-> ${P}.tar.gz
+		https://github.com/NVIDIA/${PN}/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
 	"
 	KEYWORDS="~amd64"
 fi
@@ -32,8 +31,14 @@ CPU_FEATURES=( "${X86_CPU_FEATURES[@]/#/cpu_flags_x86_}" )
 IUSE="clang-cuda cublas cudnn doc dot examples +headers-only jumbo-build performance profiler test tools ${CPU_FEATURES[*]%:*}"
 
 REQUIRED_USE="
-	profiler? ( !headers-only )
-	test? ( tools )
+	headers-only? (
+		!examples
+		!profiler
+		!test
+	)
+	test? (
+		tools
+	)
 "
 
 RESTRICT="!test? ( test )"
@@ -58,23 +63,6 @@ pkg_setup() {
 	if use test || use tools; then
 		python-any-r1_pkg_setup
 	fi
-}
-
-src_prepare() {
-	cmake_src_prepare
-
-	sed \
-		-e '/-std=/s/17/20/g' \
-		-i \
-			CMakeLists.txt \
-			python/cutlass/backend/compiler.py \
-			python/cutlass/emit/pytorch.py \
-			python/docs/_modules/cutlass/emit/pytorch.html \
-			test/unit/nvrtc/thread/nvrtc_contraction.cu \
-			test/unit/nvrtc/thread/testbed.h \
-			media/docs/cpp/ide_setup.md \
-		|| die
-
 }
 
 src_configure() {
@@ -269,11 +257,11 @@ src_configure() {
 		filter-mfpmath i386
 
 		mycmakeargs+=(
-			-DCMAKE_CUDA_HOST_COMPILER="${CHOST}-clang++" # nvcc/clang++
+			-DCMAKE_CUDA_HOST_COMPILER="${CHOST}-clang++"
 		)
 	else
 		mycmakeargs+=(
-			-DCMAKE_CUDA_HOST_COMPILER="$(cuda_gccdir)" # nvcc/clang++
+			-DCMAKE_CUDA_HOST_COMPILER="$(cuda_gccdir)"
 		)
 	fi
 
@@ -306,13 +294,15 @@ src_configure() {
 src_test() {
 	cuda_add_sandbox -w
 
+	local myctestargs=(
+	)
+
 	local CMAKE_SKIP_TESTS=(
 		"ctest_examples_41_fmha_backward_python$"
 	)
 
-	local CTEST_JOBS=1
-	cmake_src_test --extra-verbose
-	cmake_build test_unit -j"${CTEST_JOBS}"
+	cmake_src_test -j1
+	cmake_build test_unit "${myctestargs[@]}" -j1
 }
 
 src_install() {
