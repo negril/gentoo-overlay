@@ -21,11 +21,11 @@ X86_CPU_FEATURES=(
 )
 CPU_FEATURES=( "${X86_CPU_FEATURES[@]/#/cpu_flags_x86_}" )
 
-IUSE="clang-cuda cublas cudnn doc dot examples headers-only jumbo-build performance profiler test tools ${CPU_FEATURES[*]%:*} "
+IUSE="clang-cuda cublas cudnn doc dot examples +headers-only jumbo-build performance profiler test tools ${CPU_FEATURES[*]%:*}"
 
 REQUIRED_USE="
 	headers-only? (
-		!examples tools !test
+		!examples !test
 	)
 "
 
@@ -71,7 +71,7 @@ src_prepare() {
 
 src_configure() {
 	# we can use clang as default
-	if use cuda-clang && ! tc-is-clang ; then
+	if use clang-cuda && ! tc-is-clang ; then
 		export CC="${CHOST}-clang"
 		export CXX="${CHOST}-clang++"
 	else
@@ -87,15 +87,17 @@ src_configure() {
 		export CUDACXX=clang++
 	fi
 
-	cuda_src_prepare
-	cuda_src_configure
+	# cuda_src_prepare
+	# cuda_src_configure
+	cuda_add_sandbox
+	addpredict "/dev/char"
 
 	local mycmakeargs=(
+		-DCMAKE_POLICY_DEFAULT_CMP0156="OLD" # cutlass_add_library
+
 		# -DCMAKE_CUDA_COMPILER="$(cuda_get_host_compiler)" # nvcc/clang++
 		-DCMAKE_CUDA_FLAGS="$(cuda_gccdir -f)"
 
-		-DCMAKE_POLICY_DEFAULT_CMP0156="OLD" # cutlass_add_library
-		-DCMAKE_POLICY_DEFAULT_CMP0181="OLD"
 		-DCMAKE_DISABLE_FIND_PACKAGE_Doxygen="$(usex !doc)"
 
 		-DCUTLASS_REVISION="${PVR}"
@@ -242,9 +244,6 @@ src_configure() {
 		# Test root install location, relative to CMAKE_INSTALL_PREFIX.
 		# -DCUTLASS_TEST_INSTALL_PREFIX=test/cutlass
 
-		# Level of tests to compile.
-		-DCUTLASS_TEST_LEVEL=2
-
 		# Enable warnings on waived unit tests.
 		# -DCUTLASS_TEST_UNIT_ENABLE_WARNINGS=OFF
 
@@ -274,7 +273,19 @@ src_configure() {
 		)
 	fi
 
+	if use test; then
+		mycmakeargs+=(
+			# Level of tests to compile.
+			-DCUTLASS_TEST_LEVEL="2"
+		)
+	fi
+
 	cmake_src_configure
+}
+
+src_test() {
+	cuda_add_sandbox -w
+	cmake_src_test
 }
 
 src_install() {
