@@ -5,8 +5,8 @@ EAPI=8
 
 inherit desktop edo unpacker
 
-DESCRIPTION="performance analysis tool designed to visualize an application’s algorithms"
-HOMEPAGE="https://developer.nvidia.com/nsight-systems"
+DESCRIPTION="interactive profiler for CUDA and NVIDIA OptiX"
+HOMEPAGE="https://developer.nvidia.com/nsight-compute"
 
 MY_PV="$(ver_rs 1-3 '_' "$(ver_cut 1-3)")"
 MY_PN="${PN//nsight-}"

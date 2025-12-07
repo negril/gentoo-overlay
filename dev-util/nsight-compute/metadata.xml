@@ -10,6 +10,6 @@
 		<name>Gentoo Science Project</name>
 	</maintainer>
 	<longdescription>
-		NVIDIA Nsight™ Systems is a system-wide performance analysis tool designed to visualize an application’s algorithms, identify the largest opportunities to optimize, and tune to scale efficiently across any quantity or size of CPUs and GPUs, from large servers to our smallest systems-on-a-chip (SoCs).
+		NVIDIA Nsight™ Compute is an interactive profiler for CUDA® and NVIDIA OptiX™ that provides detailed performance metrics and API debugging via a user interface and command-line tool. Users can run guided analysis and compare results with a customizable and data-driven user interface, as well as post-process and analyze results in their own workflows.
 	</longdescription>
 </pkgmetadata>
