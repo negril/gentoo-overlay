@@ -24,12 +24,13 @@ REQUIRED_USE="
 "
 
 RDEPEND="
-	dev-libs/cudnn[cuda_targets_11(-)?,cuda_targets_12(+)?]
+	>=dev-libs/cudnn-9.0.0:=[cuda_targets_11(-)?,cuda_targets_12(+)?]
 "
 DEPEND="${RDEPEND}
 	dev-cpp/nlohmann_json
 	test? (
 		>dev-cpp/catch-3
+		>=dev-libs/cudnn-9.7.0
 	)
 "
 
