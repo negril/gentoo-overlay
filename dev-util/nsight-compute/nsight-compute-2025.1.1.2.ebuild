@@ -28,7 +28,7 @@ S="${WORKDIR}/pkg"
 
 LICENSE="NVIDIA-r2"
 SLOT="${PV}"
-KEYWORDS="~amd64 ~arm64"
+KEYWORDS="-* ~amd64 ~arm64"
 
 RESTRICT="bindist mirror strip test"
 
