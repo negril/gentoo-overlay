@@ -9,4 +9,11 @@
 		<email>sci@gentoo.org</email>
 		<name>Gentoo Science Project</name>
 	</maintainer>
+	<upstream>
+		<doc>https://docs.nvidia.com/cuda/cusparselt/</doc>
+	</upstream>
+	<use>
+		<flag name="cuda_targets_12">Install for use with <pkg>dev-util/nvidia-cuda-toolkit</pkg>:12</flag>
+		<flag name="cuda_targets_13">Install for use with <pkg>dev-util/nvidia-cuda-toolkit</pkg>:13</flag>
+	</use>
 </pkgmetadata>
