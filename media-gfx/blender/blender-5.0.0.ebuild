@@ -137,7 +137,7 @@ RDEPEND="${PYTHON_DEPS}
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	draco? ( media-libs/draco:= )
 	embree? ( media-libs/embree:=[raymask] )
-	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
+	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),libaom,jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
 	fftw? ( sci-libs/fftw:3.0=[threads] )
 	gmp? ( dev-libs/gmp:=[cxx] )
 	gnome? ( gui-libs/libdecor )
@@ -166,7 +166,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-libs/openexr-3.3.5:0=
 	)
 	openpgl? ( media-libs/openpgl:= )
-	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,tbb?] )
+	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,cuda?,tbb?] )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
@@ -423,6 +423,12 @@ src_prepare() {
 			-i "build_files/cmake/testing.cmake" \
 			|| die "REPLACE.*TEST_INSTALL_DIR"
 
+		# assertEquals was deprecated in Python-3.2 use assertEqual instead
+		sed \
+			-e 's/assertEquals/assertEqual/g' \
+			-i tests/python/bl_animation_action.py \
+			|| die
+
 		sed -e '1i #include <cstdint>' -i extern/gtest/src/gtest-death-test.cc || die
 	else
 		cmake_comment_add_subdirectory tests
@@ -543,7 +549,7 @@ src_configure() {
 		-DWITH_PYTHON_INSTALL_NUMPY="no"
 		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
 		# -DWITH_PYTHON_MODULE="no"
-		-DWITH_PYTHON_SECURITY="no" # BUG
+		-DWITH_PYTHON_SECURITY="yes"
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
 		-DPYTHON_VERSION="${EPYTHON/python/}"
@@ -611,7 +617,6 @@ src_configure() {
 			# -DWITH_CYCLES_NATIVE_ONLY="yes"
 			# -DWITH_LIBMV_SCHUR_SPECIALIZATIONS="no"
 			# -DWITH_PYTHON_SAFETY="ON" # dev option
-			-DWITH_PYTHON_SAFETY="OFF"
 
 		)
 	else
@@ -796,6 +801,7 @@ src_test() {
 	fi
 
 	local -x CMAKE_SKIP_TESTS=(
+		"^script_pyapi_bpy_driver_secure_eval$"
 	)
 
 	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
