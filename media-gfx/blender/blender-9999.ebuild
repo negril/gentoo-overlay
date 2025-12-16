@@ -20,12 +20,12 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {18..19} )
+LLVM_COMPAT=( {20..20} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
 
-inherit cuda rocm llvm-r1
+inherit cuda rocm llvm-r2 edo
 inherit eapi9-pipestatus check-reqs flag-o-matic multiprocessing pax-utils python-single-r1 toolchain-funcs virtualx
 inherit cmake xdg-utils
 
@@ -41,6 +41,8 @@ if [[ "${PV}" == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://projects.blender.org/blender/blender.git"
 	EGIT_SUBMODULES=( '*' '-lib/*' )
+	# using shallow causes long wait times.
+	EGIT_LFS_CLONE_TYPE="single"
 
 	if [[ "${PV}" == 9999* ]]; then
 		EGIT_BRANCH="main"
@@ -55,7 +57,7 @@ else
 			https://download.blender.org/source/blender-test-data-${BLENDER_BRANCH}.0.tar.xz
 		)
 	"
-	KEYWORDS="~amd64 ~arm ~arm64"
+	KEYWORDS="~amd64 ~arm64"
 fi
 
 # assets is CC0-1.0
@@ -65,11 +67,15 @@ SLOT="${BLENDER_BRANCH}"
 # NOTE +openpgl breaks on very old amd64 hardware
 # potentially mirror cpu_flags_x86 + REQUIRED_USE
 IUSE="
-	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
+	alembic +bullet +color-management cuda +cycles +cycles-bin-kernels
 	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
-	jemalloc jpeg2k man manifold +nanovdb ndof nls +oidn oneapi openal +openexr +opengl +openpgl
+	jemalloc jpeg2k man +manifold +nanovdb ndof nls +oidn openal +openexr +opengl +openpgl
 	+opensubdiv +openvdb optix osl pipewire +pdf +potrace +pugixml pulseaudio
-	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
+	renderdoc +rubberband sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
+"
+
+IUSE+="
+	+draco hydra materialx oneapi oneapirt usd
 "
 
 if [[ "${PV}" == *9999* ]]; then
@@ -99,88 +105,103 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 
 # Library versions for official builds can be found in the blender source directory in:
 # build_files/build_environment/cmake/versions.cmake
+
+# EMHASH
+# PARALLEL_HASHMAP
+# RUBBERBAND_VERSION 4.0.0
 RDEPEND="${PYTHON_DEPS}
 	app-arch/zstd
 	dev-cpp/gflags:=
 	dev-cpp/glog:=
 	dev-libs/boost:=[nls?]
-	dev-libs/lzo:2=
 	$(python_gen_cond_dep '
+		dev-python/cattrs[${PYTHON_USEDEP}]
 		dev-python/cython[${PYTHON_USEDEP}]
 		dev-python/numpy[${PYTHON_USEDEP}]
-		dev-python/zstandard[${PYTHON_USEDEP}]
 		dev-python/requests[${PYTHON_USEDEP}]
+		dev-python/zstandard[${PYTHON_USEDEP}]
 	')
-	media-libs/freetype:=[brotli]
+	>=media-libs/freetype-2.13.3:=[brotli]
 	media-libs/libepoxy:=
 	media-libs/libjpeg-turbo:=
-	media-libs/libpng:=
+	>=media-libs/libpng-1.6.50:=
 	media-libs/libsamplerate
-	>=media-libs/openimageio-2.5.6.0:=
-	sys-libs/zlib:=
+	>=media-libs/openimageio-3.0.9.1:=
 	virtual/glu
 	virtual/libintl
 	virtual/opengl[X?]
+	virtual/zlib:=
 	alembic? ( >=media-gfx/alembic-1.8.3-r2[boost(+),hdf(+)] )
 	bullet? ( sci-physics/bullet:=[double-precision] )
-	collada? ( >=media-libs/opencollada-1.6.68 )
-	color-management? ( media-libs/opencolorio:= )
+	color-management? ( >=media-libs/opencolorio-2.4.2:= )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
+	draco? ( media-libs/draco:= )
 	embree? ( media-libs/embree:=[raymask] )
 	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
 	fftw? ( sci-libs/fftw:3.0=[threads] )
-	gmp? ( dev-libs/gmp[cxx] )
+	gmp? ( dev-libs/gmp:=[cxx] )
 	gnome? ( gui-libs/libdecor )
 	hip? (
-		>=dev-util/hip-5.7:=
+		>=dev-util/hip-6.0:=
 		hiprt? (
-			>=dev-libs/hiprt-2.5:=
+			dev-libs/hiprt:2.5=
 		)
 	)
+	hydra? ( media-libs/openusd )
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
-	jpeg2k? ( media-libs/openjpeg:2= )
-	manifold? ( >sci-mathematics/manifold-3.0.1 )
+	jpeg2k? ( >=media-libs/openjpeg-2.5.3:2= )
+	manifold? ( >=sci-mathematics/manifold-3.2.1:= )
+	materialx? ( >=media-libs/materialx-1.39.3:= )
 	ndof? (
 		app-misc/spacenavd
 		dev-libs/libspnav
 	)
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
-	oidn? ( >=media-libs/oidn-2.1.0 )
+	oidn? ( >=media-libs/oidn-2.1.0:= )
 	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
-		>=media-libs/openexr-3.2.1:0=
+		>=media-libs/openexr-3.3.5:0=
 	)
 	openpgl? ( media-libs/openpgl:= )
-	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2[opengl,cuda?,tbb?] )
+	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,tbb?] )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
 	)
-	optix? ( <dev-libs/optix-9:= )
+	optix? (
+		>=dev-libs/optix-8:=
+		osl? (
+			>=media-libs/osl-1.14[clang-cuda]
+		)
+	)
 	osl? (
-		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
+		>=media-libs/osl-1.14.7.0:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
 	)
-	pdf? ( media-libs/libharu )
+	pipewire? ( >=media-video/pipewire-1.1.0:= )
+	pdf? ( >=media-libs/libharu-2.4.5:= )
 	potrace? ( media-gfx/potrace )
 	pugixml? ( dev-libs/pugixml )
 	pulseaudio? ( media-libs/libpulse )
+	rubberband? ( >=media-libs/rubberband-4.0.0:= )
 	sdl? ( media-libs/libsdl2[sound,joystick] )
 	sndfile? ( media-libs/libsndfile )
 	tbb? ( dev-cpp/tbb:= )
 	tiff? ( media-libs/tiff:= )
 	valgrind? ( dev-debug/valgrind )
+	usd? ( >=media-libs/openusd-25.08 )
 	wayland? (
-		>=dev-libs/wayland-1.12
+		>=dev-libs/wayland-1.24.0
 		>=dev-libs/wayland-protocols-1.15
 		>=x11-libs/libxkbcommon-0.2.0
 		dev-util/wayland-scanner
 		media-libs/mesa[wayland]
 		sys-apps/dbus
 	)
+	webp? ( media-libs/libwebp:= )
 	vulkan? (
 		media-libs/shaderc
 		dev-util/spirv-tools
@@ -195,6 +216,7 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	X? (
 		x11-libs/libX11
+		x11-libs/libXfixes
 		x11-libs/libXi
 		x11-libs/libXxf86vm
 	)
@@ -202,6 +224,11 @@ RDEPEND="${PYTHON_DEPS}
 
 DEPEND="${RDEPEND}
 	dev-cpp/eigen:=
+	test? (
+		$(python_gen_cond_dep '
+			media-libs/openimageio[jpeg2k,python,${PYTHON_SINGLE_USEDEP},tools]
+		')
+	)
 "
 
 if [[ "${PV}" == *9999* ]]; then
@@ -245,7 +272,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
 	"${FILESDIR}/${PN}-4.3.2-system-glog.patch"
-	"${FILESDIR}/${PN}-4.4.0-optix-compile-flags.patch"
+# 	"${FILESDIR}/${PN}-4.4.0-optix-compile-flags.patch"
 )
 
 blender_check_requirements() {
@@ -298,8 +325,11 @@ pkg_setup() {
 	python-single-r1_pkg_setup
 
 	if use osl; then
-		llvm-r1_pkg_setup
+		llvm-r2_pkg_setup
 	fi
+
+	# cuda compression and more
+	export ZSTD_NBTHREADS="$(makeopts_jobs)"
 }
 
 src_unpack() {
@@ -314,8 +344,12 @@ src_unpack() {
 		# TODO
 		if use test && [[ ${PV} != ${SLOT}.0 ]] ; then
 			mv "blender-${BLENDER_BRANCH}.0/tests/"* "${S}/tests" || die
+			rmdir -p "blender-${BLENDER_BRANCH}.0/tests/" || die
 		fi
 	fi
+
+	# clear cmake_minimum_required
+	rm -R "${S}/build_files/build_environment/patches" || die
 }
 
 src_prepare() {
@@ -340,7 +374,7 @@ src_prepare() {
 		-i release/freedesktop/blender.desktop || die
 
 	sed \
-		-e "/CMAKE_INSTALL_PREFIX_WITH_CONFIG/{s|\${CMAKE_INSTALL_PREFIX}|${T}\${CMAKE_INSTALL_PREFIX}|g}" \
+		-e "/CMAKE_INSTALL_PREFIX_WITH_CONFIG/{s|\${CMAKE_INSTALL_PREFIX}|${T%/}\${CMAKE_INSTALL_PREFIX}|g}" \
 		-i CMakeLists.txt \
 		|| die CMAKE_INSTALL_PREFIX_WITH_CONFIG
 
@@ -379,7 +413,7 @@ src_prepare() {
 	fi
 
 	if use optix; then
-		sed -e "s/sm_50/sm_89/g" -i intern/cycles/kernel/CMakeLists.txt || die
+		sed -e "s/compute_75/compute_89/g" -i intern/cycles/kernel/CMakeLists.txt || die
 	fi
 
 	if use test; then
@@ -389,18 +423,17 @@ src_prepare() {
 			-i "build_files/cmake/testing.cmake" \
 			|| die "REPLACE.*TEST_INSTALL_DIR"
 
-		# assertEquals was deprecated in Python-3.2 use assertEqual instead
-		sed \
-			-e 's/assertEquals/assertEqual/g' \
-			-i tests/python/bl_animation_action.py \
-			|| die
-
 		sed -e '1i #include <cstdint>' -i extern/gtest/src/gtest-death-test.cc || die
 	else
 		cmake_comment_add_subdirectory tests
 	fi
 
 	rm -rf extern/gflags || die
+
+	# Use slotted libhiprt64
+	sed \
+		-e "s|\"libhiprt64.so\"|\"${ESYSROOT}/usr/lib/hiprt/2.5/$(get_libdir)/libhiprt64.so\"|" \
+		-i extern/hipew/src/hiprtew.cc || die
 }
 
 src_configure() {
@@ -439,9 +472,8 @@ src_configure() {
 		-DWITH_INPUT_NDOF="$(usex ndof)"
 		-DWITH_INTERNATIONAL="$(usex nls)"
 		-DWITH_MANIFOLD="$(usex manifold)"
-		-DWITH_MATERIALX="no" # TODO: Package MaterialX
+		-DWITH_MATERIALX="$(usex materialx)"
 		-DWITH_NANOVDB="$(usex nanovdb)"
-		-DWITH_OPENCOLLADA="$(usex collada)"
 		-DWITH_OPENCOLORIO="$(usex color-management)"
 		-DWITH_OPENGL_BACKEND="$(usex opengl)"
 		-DWITH_OPENIMAGEDENOISE="$(usex oidn)"
@@ -454,8 +486,8 @@ src_configure() {
 		-DWITH_RENDERDOC="$(usex renderdoc)"
 		-DWITH_TBB="$(usex tbb)"
 		-DWITH_UNITY_BUILD="no"
-		-DWITH_USD="no" # TODO: Package USD
-		-DWITH_VULKAN_BACKEND="$(usex vulkan)" # experimental
+		-DWITH_USD="$(usex usd)"
+		-DWITH_VULKAN_BACKEND="$(usex vulkan)"
 		-DWITH_XR_OPENXR="no"
 
 		-DWITH_SYSTEM_BULLET="yes"
@@ -463,7 +495,6 @@ src_configure() {
 		-DWITH_SYSTEM_FREETYPE="yes"
 		-DWITH_SYSTEM_GFLAGS="yes"
 		-DWITH_SYSTEM_GLOG="yes"
-		-DWITH_SYSTEM_LZO="yes"
 
 		# Compiler Options:
 		# -DWITH_BUILDINFO="yes"
@@ -475,11 +506,10 @@ src_configure() {
 
 		# GHOST Options:
 		-DWITH_GHOST_WAYLAND="$(usex wayland)"
-		-DWITH_GHOST_WAYLAND_APP_ID="blender-${BV}"
+		# -DWITH_GHOST_WAYLAND_APP_ID="blender-${BV}" # only visible with use wayland. see below
 		-DWITH_GHOST_WAYLAND_DYNLOAD="no"
 		-DWITH_GHOST_X11="$(usex X)"
 		# -DWITH_GHOST_XDND=ON
-		# -DWITH_X11_XF86VMODE=ON
 		# -DWITH_X11_XFIXES=ON
 		# -DWITH_X11_XINPUT=ON
 		# -DWITH_GHOST_WAYLAND_DYNLOAD # visible wayland?
@@ -513,20 +543,19 @@ src_configure() {
 		-DWITH_PYTHON_INSTALL_NUMPY="no"
 		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
 		# -DWITH_PYTHON_MODULE="no"
-		-DWITH_PYTHON_SAFETY="OFF"
-		-DWITH_PYTHON_SECURITY="yes"
+		-DWITH_PYTHON_SECURITY="no" # BUG
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
 		-DPYTHON_VERSION="${EPYTHON/python/}"
-		-DWITH_DRACO="yes" # TODO: Package Draco # NOTE use bundled for now
+		-DWITH_DRACO="$(usex draco)"
 
 		# Modifiers:
 		-DWITH_MOD_FLUID="$(usex fluid)"
-		# -DWITH_MOD_REMESH=ON
 		-DWITH_MOD_OCEANSIM="$(usex fftw)"
+		# -DWITH_MOD_REMESH=ON
 
 		# Rendering:
-		-DWITH_HYDRA="no" # TODO: Package Hydra
+		-DWITH_HYDRA="$(usex hydra)"
 
 		# Rendering (Cycles):
 		-DWITH_CYCLES_OSL="$(usex osl)"
@@ -541,13 +570,28 @@ src_configure() {
 		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi "$(usex cycles-bin-kernels)")"
 		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
 		-DWITH_CYCLES_HIP_BINARIES="$(usex hip "$(usex cycles-bin-kernels)")"
-		-DWITH_CYCLES_DEVICE_HIPRT="$(usex hiprt)"
-		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
+		-DWITH_CYCLES_DEVICE_HIPRT="$(usex hip "$(usex hiprt)")"
+		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="$(usex hydra)"
 
 		# -DWITH_CYCLES_STANDALONE=OFF
 		# -DWITH_CYCLES_STANDALONE_GUI=OFF
 
 		-DWITH_BLENDER_THUMBNAILER="yes"
+
+		-DWITH_ASSERT_ABORT="$(usex debug)"
+		-DWITH_ASSERT_RELEASE="no" # "$(usex debug)"
+
+		# -DWITH_FREESTYLE=ON
+		# -DWITH_IK_ITASC=ON
+		# -DWITH_IK_SOLVER=ON
+		# -DWITH_INPUT_IME=ON
+		# -DWITH_LIBMV=ON
+		# -DWITH_LIBMV_SCHUR_SPECIALIZATIONS=ON
+		# -DWITH_UV_SLIM=ON
+		-DWITH_NINJA_POOL_JOBS="yes"
+		-DWITH_RUBBERBAND="$(usex rubberband)"
+		# -DPOSTINSTALL_SCRIPT:PATH=""
+		# -DPOSTCONFIGURE_SCRIPT:PATH=""
 	)
 
 	if has_version ">=dev-python/numpy-2"; then
@@ -562,10 +606,19 @@ src_configure() {
 		mycmakeargs+=(
 			# -DWITH_BUILDINFO="no"
 			-DWITH_EXPERIMENTAL_FEATURES="$(usex experimental)"
+			# -DWITH_COMPILER_ASAN="yes"
+			# -DWITH_STRSIZE_DEBUG="yes"
+			# -DWITH_CYCLES_NATIVE_ONLY="yes"
+			# -DWITH_LIBMV_SCHUR_SPECIALIZATIONS="no"
+			# -DWITH_PYTHON_SAFETY="ON" # dev option
+			-DWITH_PYTHON_SAFETY="OFF"
+
 		)
 	else
 		mycmakeargs+=(
-			-DWITH_EXPERIMENTAL_FEATURES="no"
+			-DWITH_BUILDINFO="yes"
+			-DWITH_EXPERIMENTAL_FEATURES="OFF"
+			-DWITH_PYTHON_SAFETY="OFF"
 		)
 	fi
 
@@ -634,6 +687,7 @@ src_configure() {
 	# This is currently needed on arm64 to get the NEON SIMD wrapper to compile the code successfully
 	use arm64 && append-flags -flax-vector-conversions
 
+	# WITH_ASSERT_RELEASE filters this
 	append-cflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
 	append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
 
@@ -659,10 +713,10 @@ src_configure() {
 			use hip && CYCLES_TEST_DEVICES+=( "HIP" )
 			use hiprt && CYCLES_TEST_DEVICES+=( "HIP-RT" )
 			use oneapi && CYCLES_TEST_DEVICES+=( "ONEAPI" )
-			# use oneapirt && CYCLES_TEST_DEVICES+=( "ONEAPI-RT" )
+			use oneapirt && CYCLES_TEST_DEVICES+=( "ONEAPI-RT" )
 		fi
 		mycmakeargs+=(
-			-DCMAKE_INSTALL_PREFIX_WITH_CONFIG="${T}/usr"
+			-DCMAKE_INSTALL_PREFIX_WITH_CONFIG="${T%/}/usr"
 			-DCYCLES_TEST_DEVICES="$(local IFS=";"; echo "${CYCLES_TEST_DEVICES[*]}")"
 		)
 
@@ -677,20 +731,31 @@ src_configure() {
 
 				-DWITH_GPU_DRAW_TESTS="yes"
 
-				-DWITH_GPU_RENDER_TESTS="no"
-				-DWITH_GPU_RENDER_TESTS_HEADED="no"
-				-DWITH_GPU_RENDER_TESTS_SILENT="yes"
+				-DWITH_GPU_RENDER_TESTS="yes"
+				-DWITH_GPU_RENDER_TESTS_HEADED="yes"
+				# -DWITH_GPU_RENDER_TESTS_SILENT="yes"
 				-DWITH_GPU_RENDER_TESTS_VULKAN="$(usex vulkan)"
 
+				# Run Python script outside Blender, using system default Python3 interpreter,
+				# NOT the one specified in `TEST_PYTHON_EXE`.
 				-DWITH_SYSTEM_PYTHON_TESTS="yes"
 				-DTEST_SYSTEM_PYTHON_EXE="${PYTHON}"
+
+				# -DTEST_PYTHON_EXE="${T%/}/${EPYTHON}/bin/python"
+
+				# -DWITH_LINUX_OFFICIAL_RELEASE_TESTS="yes" # Not needed?
 			)
 
 			if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] && use experimental; then
 				mycmakeargs+=(
+					-DWITH_GPU_MESH_PAINT_TESTS="yes"
+					# -DWITH_UI_TESTS="$(usex wayland)"
+					-DWITH_UI_TESTS="yes"
+					-DWITH_TESTS_EXPERIMENTAL="yes"
+
 					# Enable user-interface tests using a headless display server.
 					# Currently this depends on WITH_GHOST_WAYLAND and the weston compositor (Experimental)
-					-DWITH_UI_TESTS="$(usex wayland)"
+					-DWITH_UI_TESTS_HEADLESS="$(usex !X "$(usex wayland)")"
 					-DWESTON_BIN="${ESYSROOT}/usr/bin/weston"
 				)
 			fi
@@ -707,7 +772,7 @@ src_configure() {
 src_test() {
 	# A lot of tests need to have access to the installed data files.
 	# So install them into the image directory now.
-	DESTDIR="${T}" cmake_build install
+	DESTDIR="${T%/}" cmake_build install
 
 	blender_get_version
 	# Define custom blender data/script file paths, or we won't be able to find them otherwise during testing.
@@ -721,7 +786,8 @@ src_test() {
 	# TODO only picks first card
 	addwrite "/dev/dri/card0"
 	addwrite "/dev/dri/renderD128"
-	addwrite "/dev/udmabuf"
+
+	[[ -c "/dev/udmabuf" ]] && addwrite "/dev/udmabuf"
 
 	if use cuda; then
 		cuda_add_sandbox -w
@@ -730,20 +796,13 @@ src_test() {
 	fi
 
 	local -x CMAKE_SKIP_TESTS=(
-		"^compositor_cpu_color$"
-		"^compositor_cpu_filter$"
-		"^cycles_image_colorspace_cpu$"
-		"^script_pyapi_bpy_driver_secure_eval$"
 	)
 
 	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
 		einfo "not running failing tests RUN_FAILING_TESTS=${RUN_FAILING_TESTS}"
 		CMAKE_SKIP_TESTS+=(
-			"^cycles_bsdf_cuda$"
-			"^cycles_image_data_types_cpu$"
-			"^cycles_image_data_types_optix$"
-			"^cycles_image_mapping_cpu$"
-			"^cycles_osl_cpu$"
+			# Does try to import from weird paths
+			# "^io_fbx_import$"
 		)
 	fi
 
@@ -754,19 +813,19 @@ src_test() {
 		)
 	fi
 
-	if ! has_version "media-libs/openimageio[python]"; then
+	if has_version ">=media-video/ffmpeg-8"; then
 		CMAKE_SKIP_TESTS+=(
-			# import OpenImageIO as oiio # ModuleNotFoundError: No module named 'OpenImageIO'
-			"^compositor_cpu_file_output$"
+			# output change TODO
+			"^sequencer_render_video_output$"
 		)
 	fi
-
-	# oiio can't find webp due to missing cmake files # 937031
-	sed -e "s/ WEBP//g" -i "${BUILD_DIR}/tests/python/CTestTestfile.cmake" || die
 
 	# For debugging, print out all information.
 	local -x VERBOSE="$(usex debug "true" "false")"
 	"${VERBOSE}" && einfo "VERBOSE=${VERBOSE}"
+
+	local -x DEBUG="$(usex debug "true" "false")"
+	"${DEBUG}" && einfo "DEBUG=${DEBUG}"
 
 	# Show the window in the foreground.
 	# local -x USE_WINDOW="true" # non-zero
@@ -775,32 +834,43 @@ src_test() {
 	# local -x USE_DEBUG="true" # non-zero
 	[[ -v USE_DEBUG ]] && einfo "USE_DEBUG=${USE_DEBUG}"
 
+	# Environment OPENIMAGEIO_CUDA=0 trumps everything else, turns off
+	# Cuda functionality. We don't even initialize in this case.
+	local -x OPENIMAGEIO_CUDA=0
+
+	# Needed if openimageio wasn't build with -DNDEBUG
+	local -x OPENIMAGEIO_DEBUG=0
+
+	local -x CYCLESTEST_ARGS="-t 0"
+
 	if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
 		einfo "running expensive tests EXPENSIVE_TESTS=${EXPENSIVE_TESTS}"
-		# if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] &&
-		# 	use experimental && use wayland; then
-		# 		# This runs weston
-		# 		xdg_environment_reset
-		# fi
+		if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] &&
+			use experimental && use wayland; then
+				# This runs weston
+				xdg_environment_reset
+		fi
 
-		xdg_environment_reset
-		# WITH_GPU_RENDER_TESTS_HEADED
-		if use wayland; then
-			local compositor exit_code
-			local logfile=${T}/weston.log
-			weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
-			compositor=$!
-			local -x WAYLAND_DISPLAY=wayland-5
-			sleep 1 # wait for xwayland to be up
-			# TODO use eapi9-pipestatus
-			local -x DISPLAY="$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)"
+		if [[ "${USE_WINDOW}" == "true" ]]; then
+			xdg_environment_reset
+			# WITH_GPU_RENDER_TESTS_HEADED
+			if use wayland; then
+				local compositor exit_code
+				local logfile=${T}/weston.log
+				weston --xwayland --backend=headless --width=800 --height=600 --socket=wayland-5 --idle-time=0 2>"${logfile}" &
+				compositor=$!
+				local -x WAYLAND_DISPLAY=wayland-5
+				sleep 1 # wait for xwayland to be up
+				# TODO use eapi9-pipestatus
+				local -x DISPLAY="$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)"
 
-			cmake_src_test
+				cmake_src_test
 
-			exit_code=$?
-			kill "${compositor}"
-		elif use X; then
-			virtx cmake_src_test
+				exit_code=$?
+				kill "${compositor}"
+			elif use X; then
+				virtx cmake_src_test
+			fi
 		else
 			cmake_src_test
 		fi
@@ -835,23 +905,23 @@ src_install() {
 		addpredict /dev/dri
 		addpredict /dev/nvidiactl
 
-		einfo "Generating Blender C/C++ API docs ..."
 		cd "${CMAKE_USE_DIR}/doc/doxygen" || die
-		doxygen -u Doxyfile || die
-		doxygen || die "doxygen failed to build API docs."
+		sed -e "/^NUM_PROC_THREADS/s/1/$(makeopts_jobs)/" -i Doxyfile || die
+		edob -m "Generating Blender C/C++ API docs ..." doxygen -u Doxyfile
+		edob -m "Building API docs" doxygen
 
 		cd "${CMAKE_USE_DIR}" || die
 		einfo "Generating (BPY) Blender Python API docs ..."
-		"${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio || die "sphinx failed."
+		edo "${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio
 
-		cd "${CMAKE_USE_DIR}/doc/python_api" || die
-		sphinx-build sphinx-in BPY_API || die "sphinx failed."
+		edo sphinx-build -j "$(makeopts_jobs)" doc/python_api/sphinx-in doc/python_api/BPY_API
 
+		cd "${CMAKE_USE_DIR}" || die
 		docinto "html/API/python"
-		dodoc -r "${CMAKE_USE_DIR}/doc/python_api/BPY_API/"
+		dodoc -r "doc/python_api/BPY_API/"
 
 		docinto "html/API/blender"
-		dodoc -r "${CMAKE_USE_DIR}/doc/doxygen/html/"
+		dodoc -r "doc/doxygen/html/"
 	fi
 
 	# Fix doc installdir
@@ -913,4 +983,28 @@ pkg_postrm() {
 		ewarn "It may contain extra render kernels not tracked by portage"
 		ewarn
 	fi
+}
+
+pkg_info () {
+	debugvars () {
+		local var
+		for var in "${@}"; do
+			[[ -v "${var}" ]] && echo "${var}: ${!var}"
+		done
+	}
+
+	local blender_info_vars=(
+		CUDACXX
+		CUDAHOSTCXX
+		CUDAHOSTLD
+		CUDAARCHS
+		CUDAFLAGS
+		CUDA_PATH
+		CUDA_VERBOSE
+		NVCCFLAGS
+		NVCC_PREPEND_FLAGS
+		NVCC_APPPEND_FLAGS
+	)
+
+	debugvars "${blender_info_vars[@]}"
 }
