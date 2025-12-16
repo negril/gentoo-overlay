@@ -94,7 +94,7 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/libpng:=
 	media-libs/libsamplerate
 	>=media-libs/openimageio-2.4.6.0:=
-	sys-libs/zlib:=
+	virtual/zlib:=
 	virtual/glu
 	virtual/libintl
 	virtual/opengl
@@ -134,7 +134,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-libs/openexr-3:0=
 	)
 	openpgl? ( media-libs/openpgl:0/0.5 )
-	opensubdiv? ( >=media-libs/opensubdiv-3.4.0 )
+	opensubdiv? ( >=media-libs/opensubdiv-3.4.0:= )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
@@ -278,10 +278,10 @@ src_unpack() {
 	else
 		default
 
-		if use test; then
-			mkdir -p "${S}/tests/data/" || die
-			mv blender-test-data/* "${S}/tests/data/" || die
-		fi
+		# if use test; then
+		# 	mkdir -p "${S}/tests/data/" || die
+		# 	mv blender-test-data/* "${S}/tests/data/" || die
+		# fi
 	fi
 }
 
