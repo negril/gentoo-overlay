@@ -33,11 +33,14 @@
 		<flag name="cuda">
 			Build cycles renderer with nVidia CUDA support.
 		</flag>
+		<flag name="draco">
+			Enable Draco mesh compression Python module (used for glTF)
+		</flag>
 		<flag name="hip">
 			Build cycles renderer with AMD HIP support.
 		</flag>
 		<flag name="hiprt">
-			Build cycles renderer with AMD HIPRT support.
+			Enable AMD HIP GPU ray tracing acceleration via <pkg>dev-libs/hiprt</pkg>.
 		</flag>
 		<flag name="cycles">
 			Enable the Cycles raytracing render engine.
@@ -56,8 +59,14 @@
 		<flag name="fluid">
 			Adds fluid simulation support via the built-in Mantaflow library.
 		</flag>
+		<flag name="hydra">
+			Build Cycles Hydra render delegate
+		</flag>
 		<flag name="manifold">
 			Enable Manifold render backend via <pkg>sci-mathematics/manifold</pkg>
+		</flag>
+		<flag name="materialx">
+			Enable MaterialX Support
 		</flag>
 		<flag name="nanovdb">
 			Enable nanoVDB support in Cycles. Uses less memory than regular openVDB when rendering.
@@ -67,6 +76,9 @@
 		</flag>
 		<flag name="oidn">Enable OpenImageDenoiser Support</flag>
 		<flag name="oneapi">Build cycles renderer with Intel oneAPI SyCL support</flag>
+		<flag name="oneapirt">
+			Enable Intel oneAPI SyCL ray tracing acceleration via
+		</flag>
 		<flag name="openpgl">Enable path guiding support in Cycles</flag>
 		<flag name="opensubdiv">
 			Add rendering support form OpenSubdiv from Dreamworks Animation
@@ -95,6 +107,9 @@
 		</flag>
 		<flag name="tbb">
 			Use threading building blocks library from <pkg>dev-cpp/tbb</pkg>.
+		</flag>
+		<flag name="usd">
+			Enable Universal Scene Description (USD) Support
 		</flag>
 		<flag name="vulkan">
 			Add support for the experimental Vulkan viewport backend
