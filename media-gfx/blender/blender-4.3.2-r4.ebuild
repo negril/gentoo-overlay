@@ -20,7 +20,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {18..19} )
+LLVM_COMPAT=( {17..18} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
@@ -53,9 +53,6 @@ else
 	SRC_URI="
 		https://download.blender.org/source/${P}.tar.xz
 		https://github.com/negril/gentoo-overlay-vendored/raw/refs/heads/blobs/blender-assets-${PV}.tar.xz
-		https://projects.blender.org/blender/blender/pulls/129136.patch -> ${PN}-pr-129136.patch
-		https://projects.blender.org/blender/blender/pulls/132361.patch -> ${PN}-pr-132361.patch
-		https://projects.blender.org/blender/blender/pulls/132654.patch -> ${PN}-pr-132654.patch
 	"
 	# BUG upstream returns LFS references instead of files
 	# SRC_URI+="
@@ -122,8 +119,8 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/libjpeg-turbo:=
 	media-libs/libpng:=
 	media-libs/libsamplerate
-	>=media-libs/openimageio-2.5.6.0:=
-	sys-libs/zlib:=
+	<media-libs/openimageio-3:=
+	virtual/zlib:=
 	virtual/glu
 	virtual/libintl
 	virtual/opengl[X?]
@@ -155,7 +152,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-libs/openexr-3.2.1:0=
 	)
 	openpgl? ( media-libs/openpgl:= )
-	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2[opengl,cuda?,openmp?,tbb?] )
+	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,cuda?,openmp?,tbb?] )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
@@ -537,16 +534,10 @@ src_configure() {
 	fi
 
 	if use hip; then
-		# local -x HIP_PATH="$(hipconfig -p)"
 		mycmakeargs+=(
-			# -DROCM_PATH="$(hipconfig -R)"
 			-DHIP_ROOT_DIR="$(hipconfig -p)"
-
 			-DHIP_HIPCC_FLAGS="-fcf-protection=none"
-
-			# -DHIP_LINKER_EXECUTABLE="$(get_llvm_prefix)/bin/clang++"
 			-DCMAKE_HIP_LINK_EXECUTABLE="$(get_llvm_prefix)/bin/clang++"
-
 			-DCYCLES_HIP_BINARIES_ARCH="$(get_amdgpu_flags)"
 		)
 	fi
@@ -766,8 +757,6 @@ src_install() {
 
 	# X-KDE-RunOnDiscreteGpu is obsolete, so trim it
 	sed \
-		-e "s/=blender/=${P}/" \
-		-e "s/Name=Blender/Name=Blender Bin ${PV}/" \
 		-e "/X-KDE-RunOnDiscreteGpu.*/d" \
 		-i "${ED}/usr/share/applications/blender-${BV}.desktop" || die
 
