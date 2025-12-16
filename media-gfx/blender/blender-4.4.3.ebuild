@@ -20,7 +20,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {18..19} )
+LLVM_COMPAT=( {18..18} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
@@ -115,11 +115,11 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/libjpeg-turbo:=
 	media-libs/libpng:=
 	media-libs/libsamplerate
-	>=media-libs/openimageio-2.5.6.0:=
-	sys-libs/zlib:=
+	<media-libs/openimageio-3:=
 	virtual/glu
 	virtual/libintl
 	virtual/opengl[X?]
+	virtual/zlib:=
 	alembic? ( >=media-gfx/alembic-1.8.3-r2[boost(+),hdf(+)] )
 	bullet? ( sci-physics/bullet:=[double-precision] )
 	collada? ( >=media-libs/opencollada-1.6.68 )
