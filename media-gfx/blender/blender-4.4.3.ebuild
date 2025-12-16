@@ -20,13 +20,13 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {18..18} )
+LLVM_COMPAT=( {18..20} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
 
 inherit cuda rocm llvm-r1
-inherit eapi9-pipestatus check-reqs flag-o-matic pax-utils python-single-r1 toolchain-funcs virtualx
+inherit eapi9-pipestatus edo check-reqs flag-o-matic multiprocessing pax-utils python-single-r1 toolchain-funcs virtualx
 inherit cmake xdg-utils
 
 DESCRIPTION="3D Creation/Animation/Publishing System"
@@ -52,7 +52,7 @@ else
 	SRC_URI="
 		https://download.blender.org/source/${P}.tar.xz
 		test? (
-			https://download.blender.org/source/blender-test-data-${BLENDER_BRANCH}.0.tar.xz
+			https://download.blender.org/source/blender-test-data-${BLENDER_BRANCH}.$(ver_cut 3).tar.xz
 		)
 	"
 	KEYWORDS="~amd64 ~arm ~arm64"
@@ -66,8 +66,8 @@ SLOT="${BLENDER_BRANCH}"
 # potentially mirror cpu_flags_x86 + REQUIRED_USE
 IUSE="
 	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
-	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip jack
-	jemalloc jpeg2k man +nanovdb ndof nls +oidn openal +openexr +opengl +openmp +openpgl
+	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
+	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +opengl +openmp +openpgl
 	+opensubdiv +openvdb optix osl pipewire +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
@@ -86,6 +86,7 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 	fluid? ( tbb )
 	gnome? ( wayland )
 	hip? ( cycles )
+	hiprt? ( hip )
 	nanovdb? ( openvdb )
 	openvdb? ( tbb openexr )
 	optix? ( cuda )
@@ -128,10 +129,13 @@ RDEPEND="${PYTHON_DEPS}
 	embree? ( media-libs/embree:=[raymask] )
 	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
 	fftw? ( sci-libs/fftw:3.0=[threads] )
-	gmp? ( dev-libs/gmp[cxx] )
+	gmp? ( dev-libs/gmp:=[cxx] )
 	gnome? ( gui-libs/libdecor )
 	hip? (
-		>=dev-util/hip-5.7:=
+		>=dev-util/hip-5.7:= <dev-util/hip-7:=
+		hiprt? (
+			dev-libs/hiprt:2.5=
+		)
 	)
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
@@ -142,13 +146,14 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
-	oidn? ( >=media-libs/oidn-2.1.0 )
+	oidn? ( >=media-libs/oidn-2.1.0:= )
+	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
 	)
 	openpgl? ( media-libs/openpgl:= )
-	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2[opengl,cuda?,openmp?,tbb?] )
+	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,cuda?,openmp?,tbb?] )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
@@ -158,7 +163,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
 	)
-	pdf? ( media-libs/libharu )
+	pdf? ( media-libs/libharu:= )
 	potrace? ( media-gfx/potrace )
 	pugixml? ( dev-libs/pugixml )
 	pulseaudio? ( media-libs/libpulse )
@@ -175,6 +180,7 @@ RDEPEND="${PYTHON_DEPS}
 		media-libs/mesa[wayland]
 		sys-apps/dbus
 	)
+	webp? ( media-libs/libwebp:= )
 	vulkan? (
 		media-libs/shaderc
 		dev-util/spirv-tools
@@ -189,6 +195,7 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	X? (
 		x11-libs/libX11
+		x11-libs/libXfixes
 		x11-libs/libXi
 		x11-libs/libXxf86vm
 	)
@@ -275,6 +282,18 @@ blender_get_version() {
 
 pkg_pretend() {
 	blender_check_requirements
+
+	if use oneapi; then
+		einfo "The Intel oneAPI support is rudimentary."
+		einfo ""
+		einfo "Please report any bugs you find to https://bugs.gentoo.org/"
+		if ! command -v icpx &>/dev/null && ! command -v dpcpp &>/dev/null; then
+			eerror "Could not find icpx or dpcpp."
+			eerror "You need SYCL/DCP++ to enable oneapi support."
+			eerror "Try sys-devel/DPC++::science"
+			die "FindSYCL would fail. Aborting."
+		fi
+	fi
 }
 
 pkg_setup() {
@@ -295,10 +314,10 @@ src_unpack() {
 	else
 		default
 
-		# TODO
-		if use test && [[ ${PV} != ${SLOT}.0 ]] ; then
-			mv "blender-${BLENDER_BRANCH}.0/tests/"* "${S}/tests" || die
-		fi
+		# # TODO
+		# if use test && [[ ${PV} != ${SLOT}.0 ]] ; then
+		# 	mv "blender-${BLENDER_BRANCH}.0/tests/"* "${S}/tests" || die
+		# fi
 	fi
 }
 
@@ -381,6 +400,11 @@ src_prepare() {
 	fi
 
 	rm -rf extern/gflags || die
+
+	# Use slotted libhiprt64
+	sed \
+		-e "s|\"libhiprt64.so\"|\"/usr/lib/hiprt/2.5/$(get_libdir)/libhiprt64.so\"|" \
+		-i extern/hipew/src/hiprtew.cc || die
 }
 
 src_configure() {
@@ -455,7 +479,7 @@ src_configure() {
 
 		# GHOST Options:
 		-DWITH_GHOST_WAYLAND="$(usex wayland)"
-		-DWITH_GHOST_WAYLAND_APP_ID="blender-${BV}"
+		# -DWITH_GHOST_WAYLAND_APP_ID="blender-${BV}"
 		-DWITH_GHOST_WAYLAND_DYNLOAD="no"
 		-DWITH_GHOST_X11="$(usex X)"
 		# -DWITH_GHOST_XDND=ON
@@ -493,7 +517,7 @@ src_configure() {
 		-DWITH_PYTHON_INSTALL_NUMPY="no"
 		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
 		# -DWITH_PYTHON_MODULE="no"
-		-DWITH_PYTHON_SAFETY="OFF"
+		-DWITH_PYTHON_SAFETY="OFF" # dev option
 		-DWITH_PYTHON_SECURITY="yes"
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
@@ -517,8 +541,11 @@ src_configure() {
 		-DWITH_CYCLES_DEVICE_CUDA="$(usex cuda)"
 		-DWITH_CYCLES_CUDA_BINARIES="$(usex cuda "$(usex cycles-bin-kernels)")"
 
+		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
+		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi "$(usex cycles-bin-kernels)")"
 		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
 		-DWITH_CYCLES_HIP_BINARIES="$(usex hip "$(usex cycles-bin-kernels)")"
+		-DWITH_CYCLES_DEVICE_HIPRT="$(usex hip "$(usex hiprt)")"
 		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
 
 		# -DWITH_CYCLES_STANDALONE=OFF
@@ -573,6 +600,25 @@ src_configure() {
 
 			-DCYCLES_HIP_BINARIES_ARCH="$(get_amdgpu_flags)"
 		)
+
+		if use hiprt; then
+			# # TODO pkgconfig file
+			# local hiprt_pn hiprt_pv
+			# hiprt_pn="dev-libs/hiprt"
+			# hiprt_pv="$(best_version "${hiprt_pn}")"
+			# if [[ -z "${hiprt_version}" ]]; then
+			# 	die "could not find hiprt"
+			# fi
+			# hiprt_pv="$(ver_cut 1-2 "${hiprt_pv/#${hiprt_pn}-/}")"
+			# hiprt_pv="$(ver_rs 1-2 ' ' "${hiprt_pv}")"
+			# hiprt_pv="$(eval printf "%02d%03d" "${hiprt_pv}")"
+			mycmakeargs+=(
+				# -DHIPRT_ROOT_DIR="${ESYSROOT}/usr/include/hiprt/${hiprt_pv}/"
+				-DHIPRT_ROOT_DIR="$(hipconfig -p)"
+				-DHIPRT_COMPILER_PARALLEL_JOBS="$(makeopts_jobs)"
+			)
+			# unset hiprt_pn hiprt_pv
+		fi
 	fi
 
 	if use optix; then
@@ -615,6 +661,9 @@ src_configure() {
 			use cuda && CYCLES_TEST_DEVICES+=( "CUDA" )
 			use optix && CYCLES_TEST_DEVICES+=( "OPTIX" )
 			use hip && CYCLES_TEST_DEVICES+=( "HIP" )
+			use hiprt && CYCLES_TEST_DEVICES+=( "HIP-RT" )
+			use oneapi && CYCLES_TEST_DEVICES+=( "ONEAPI" )
+			# use oneapirt && CYCLES_TEST_DEVICES+=( "ONEAPI-RT" )
 		fi
 		mycmakeargs+=(
 			-DCMAKE_INSTALL_PREFIX_WITH_CONFIG="${T}/usr"
@@ -685,37 +734,11 @@ src_test() {
 	fi
 
 	local -x CMAKE_SKIP_TESTS=(
-		"^compositor_cpu_color$"
-		"^compositor_cpu_filter$"
-		"^cycles_image_colorspace_cpu$"
+		# "^compositor_cpu_color$"
+		# "^compositor_cpu_filter$"
+		# "^cycles_image_colorspace_cpu$"
 		"^script_pyapi_bpy_driver_secure_eval$"
 	)
-
-	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
-		einfo "not running failing tests RUN_FAILING_TESTS=${RUN_FAILING_TESTS}"
-		CMAKE_SKIP_TESTS+=(
-			"^BLI$"
-			"^asset_system$"
-			"^cycles_bsdf_cpu$"
-			"^cycles_bsdf_cuda$"
-			"^cycles_bsdf_optix$"
-			"^cycles_displacement_cpu$"
-			"^cycles_displacement_cuda$"
-			"^cycles_displacement_optix$"
-			"^cycles_image_data_types_cpu$"
-			"^cycles_image_data_types_cuda$"
-			"^cycles_image_data_types_optix$"
-			"^cycles_osl_cpu$"
-			"^cycles_principled_bsdf_cpu$"
-			"^cycles_principled_bsdf_cuda$"
-			"^cycles_principled_bsdf_optix$"
-			"^cycles_shader_cpu$"
-			"^cycles_shader_cuda$"
-			"^cycles_shader_optix$"
-			"^geo_node_curves_curve_to_points$"
-			"^geo_node_geometry_duplicate_elements_curve_points$"
-		)
-	fi
 
 	if ! has_version "media-libs/openusd"; then
 		CMAKE_SKIP_TESTS+=(
@@ -735,32 +758,38 @@ src_test() {
 	# local -x USE_DEBUG="true" # non-zero
 	[[ -v USE_DEBUG ]] && einfo "USE_DEBUG=${USE_DEBUG}"
 
+	# Environment OPENIMAGEIO_CUDA=0 trumps everything else, turns off
+	# Cuda functionality. We don't even initialize in this case.
+	export OPENIMAGEIO_CUDA=0
+
+	export OPENIMAGEIO_DEBUG=0
+
 	if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
-		einfo "running expensive tests EXPENSIVE_TESTS=${EXPENSIVE_TESTS}"
-		# if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] &&
-		# 	use experimental && use wayland; then
-		# 		# This runs weston
-		# 		xdg_environment_reset
-		# fi
+		if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] &&
+			use experimental && use wayland; then
+				# This runs weston
+				xdg_environment_reset
+		fi
 
-		xdg_environment_reset
-		# WITH_GPU_RENDER_TESTS_HEADED
-		if use wayland; then
-			local compositor exit_code
-			local logfile=${T}/weston.log
-			weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
-			compositor=$!
-			local -x WAYLAND_DISPLAY=wayland-5
-			sleep 1 # wait for xwayland to be up
-			# TODO use eapi9-pipestatus
-			local -x DISPLAY="$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)"
+		if [[ "${USE_WINDOW}" == "true" ]]; then
+			xdg_environment_reset
+			# WITH_GPU_RENDER_TESTS_HEADED
+			if use wayland; then
+				local compositor exit_code
+				local logfile=${T}/weston.log
+				weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
+				compositor=$!
+				local -x WAYLAND_DISPLAY=wayland-5
+				sleep 1 # wait for xwayland to be up
+				local -x DISPLAY="$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)"
 
-			cmake_src_test
+				cmake_src_test
 
-			exit_code=$?
-			kill "${compositor}"
-		elif use X; then
-			virtx cmake_src_test
+				exit_code=$?
+				kill "${compositor}"
+			elif use X; then
+				virtx cmake_src_test
+			fi
 		else
 			cmake_src_test
 		fi
@@ -795,23 +824,23 @@ src_install() {
 		addpredict /dev/dri
 		addpredict /dev/nvidiactl
 
-		einfo "Generating Blender C/C++ API docs ..."
 		cd "${CMAKE_USE_DIR}/doc/doxygen" || die
-		doxygen -u Doxyfile || die
-		doxygen || die "doxygen failed to build API docs."
+		sed -e "/^NUM_PROC_THREADS/s/1/$(makeopts_jobs)/" -i Doxyfile || die
+		edob -m "Generating Blender C/C++ API docs ..." doxygen -u Doxyfile
+		edob -m "Building API docs" doxygen
 
 		cd "${CMAKE_USE_DIR}" || die
 		einfo "Generating (BPY) Blender Python API docs ..."
-		"${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio || die "sphinx failed."
+		edo "${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio
 
-		cd "${CMAKE_USE_DIR}/doc/python_api" || die
-		sphinx-build sphinx-in BPY_API || die "sphinx failed."
+		edo sphinx-build -j "$(makeopts_jobs)" doc/python_api/sphinx-in doc/python_api/BPY_API
 
+		cd "${CMAKE_USE_DIR}" || die
 		docinto "html/API/python"
-		dodoc -r "${CMAKE_USE_DIR}/doc/python_api/BPY_API/"
+		dodoc -r "doc/python_api/BPY_API/"
 
 		docinto "html/API/blender"
-		dodoc -r "${CMAKE_USE_DIR}/doc/doxygen/html/"
+		dodoc -r "doc/doxygen/html/"
 	fi
 
 	# Fix doc installdir
