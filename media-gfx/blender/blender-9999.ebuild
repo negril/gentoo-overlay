@@ -126,7 +126,7 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/libjpeg-turbo:=
 	>=media-libs/libpng-1.6.50:=
 	media-libs/libsamplerate
-	>=media-libs/openimageio-3.0.9.1:=
+	>=media-libs/openimageio-3.0.9.1:=[python,${PYTHON_SINGLE_USEDEP}]
 	virtual/glu
 	virtual/libintl
 	virtual/opengl[X?]
@@ -225,7 +225,7 @@ DEPEND="${RDEPEND}
 	dev-cpp/eigen:=
 	test? (
 		$(python_gen_cond_dep '
-			media-libs/openimageio[jpeg2k,python,${PYTHON_SINGLE_USEDEP},tools]
+			media-libs/openimageio[jpeg2k,tools]
 		')
 	)
 "
@@ -497,6 +497,7 @@ src_configure() {
 
 		# Compiler Options:
 		# -DWITH_BUILDINFO="yes"
+		-DWITH_COMPILER_SIMD="no" # This makes it so Blender doesn't append their own -march flags
 
 		# System Options:
 		-DWITH_INSTALL_PORTABLE="no"
