@@ -553,7 +553,15 @@ src_configure() {
 
 	cmake_src_configure
 
-	einfo "BLENDER_VERSION_CYCLE $(pcregrep -o1  ".*#define[ \t]+BLENDER_VERSION_CYCLE[ \t]+([a-z]+).*" "${BUILD_DIR}/source/blender/blenkernel/BKE_blender_version.h.done")"
+	local BLENDER_VERSION_CYCLE
+
+	read -r BLENDER_VERSION_CYCLE <<< "$(
+		pcregrep -o1 \
+			".*#define[ \t]+BLENDER_VERSION_CYCLE[ \t]+([a-z]+).*" \
+			"${BUILD_DIR}/source/blender/blenkernel/BKE_blender_version.h.done"
+	)"
+
+	eqawarn "BLENDER_VERSION_CYCLE ${BLENDER_VERSION_CYCLE}"
 }
 
 src_test() {
