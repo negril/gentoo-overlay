@@ -121,7 +121,7 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/libpng:=
 	media-libs/libsamplerate
 	>=media-libs/openimageio-2.5.6.0:=
-	sys-libs/zlib:=
+	virtual/zlib:=
 	virtual/glu
 	virtual/libintl
 	virtual/opengl[X?]
@@ -157,7 +157,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-libs/openexr-3.2.1:0=
 	)
 	openpgl? ( media-libs/openpgl:= )
-	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2[opengl,cuda?,openmp?,tbb?] )
+	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,cuda?,openmp?,tbb?] )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
@@ -804,6 +804,11 @@ src_install() {
 	pax-mark m "${BUILD_DIR}/bin/blender"
 
 	cmake_src_install
+
+	# X-KDE-RunOnDiscreteGpu is obsolete, so trim it
+	sed \
+		-e "/X-KDE-RunOnDiscreteGpu.*/d" \
+		-i "${ED}/usr/share/applications/blender-${BV}.desktop" || die
 
 	if use man; then
 		# Slot the man page
