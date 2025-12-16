@@ -3,9 +3,9 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{11..12} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {15..19} )
+LLVM_COMPAT=( {17..18} )
 LLVM_OPTIONAL=1
 
 inherit check-reqs cmake cuda flag-o-matic llvm-r1 pax-utils python-single-r1 toolchain-funcs xdg-utils virtualx
@@ -54,7 +54,7 @@ SLOT="${BLENDER_BRANCH}"
 IUSE="
 	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
 	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip jack
-	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +openmp +openpgl
+	jemalloc jpeg2k man +nanovdb ndof nls +oidn openal +openexr +openmp +openpgl
 	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
@@ -93,8 +93,8 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/libjpeg-turbo:=
 	media-libs/libpng:=
 	media-libs/libsamplerate
-	>=media-libs/openimageio-2.5.6.0:=
-	sys-libs/zlib:=
+	<media-libs/openimageio-3:=
+	virtual/zlib:=
 	virtual/glu
 	virtual/libintl
 	virtual/opengl
@@ -103,21 +103,11 @@ RDEPEND="${PYTHON_DEPS}
 	color-management? ( media-libs/opencolorio:= )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	embree? ( media-libs/embree:=[raymask] )
-	ffmpeg? (
-		media-video/ffmpeg:=[encode(+),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid]
-		|| ( media-video/ffmpeg[lame(-)] media-video/ffmpeg[mp3(-)] )
-	)
+	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
 	fftw? ( sci-libs/fftw:3.0= )
 	gmp? ( dev-libs/gmp[cxx] )
 	gnome? ( gui-libs/libdecor )
-	hip? (
-		llvm_slot_17? (
-			dev-util/hip:0/5.7
-		)
-		llvm_slot_18? (
-			>=dev-util/hip-6.1:=[llvm_slot_18(-)]
-		)
-	)
+	hip? ( >=dev-util/hip-5.7 )
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
 	jpeg2k? ( media-libs/openjpeg:2= )
@@ -128,20 +118,19 @@ RDEPEND="${PYTHON_DEPS}
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
 	oidn? ( >=media-libs/oidn-2.1.0 )
-	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
 	)
 	openpgl? ( media-libs/openpgl:= )
-	opensubdiv? ( >=media-libs/opensubdiv-3.5.0 )
+	opensubdiv? ( >=media-libs/opensubdiv-3.5.0:= )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
 	)
 	optix? ( <dev-libs/optix-9:= )
 	osl? (
-		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
+		<media-libs/osl-1.14:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
 	)
 	pdf? ( media-libs/libharu )
@@ -214,8 +203,6 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
 	"${FILESDIR}/${PN}-4.2.9-python3.12.patch"
-# 	"${FILESDIR}/${PN}-4.2.9-python3.13.patch"
-# 	"${FILESDIR}/${PN}-4.2.9-python3.12_1.patch"
 	"${FILESDIR}/${PN}-4.3.2-ffmpeg7.patch"
 	"${FILESDIR}/${PN}-4.3.2-openvdb-12.patch"
 	"${FILESDIR}/${PN}-4.3.2-optix-8.1.0.patch"
@@ -241,12 +228,6 @@ blender_get_version() {
 
 pkg_pretend() {
 	blender_check_requirements
-
-	if use oneapi; then
-		einfo "The Intel oneAPI support is rudimentary."
-		einfo ""
-		einfo "Please report any bugs you find to https://bugs.gentoo.org/"
-	fi
 }
 
 pkg_setup() {
@@ -274,10 +255,10 @@ src_unpack() {
 	else
 		default
 
-		if use test; then
-			mkdir -p "${S}/tests/data/" || die
-			mv blender-test-data/* "${S}/tests/data/" || die
-		fi
+		# if use test; then
+		# 	mkdir -p "${S}/tests/data/" || die
+		# 	mv blender-test-data/* "${S}/tests/data/" || die
+		# fi
 	fi
 }
 
@@ -366,6 +347,8 @@ src_configure() {
 	blender_get_version
 
 	local mycmakeargs=(
+		-DCMAKE_POLICY_DEFAULT_CMP0177="OLD"
+
 		# we build a host-specific binary
 		-DWITH_INSTALL_PORTABLE="no"
 		-DWITH_CPU_CHECK="no"
@@ -377,7 +360,7 @@ src_configure() {
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
 		-DPYTHON_VERSION="${EPYTHON/python/}"
 		-DWITH_ALEMBIC=$(usex alembic)
-		-DWITH_BOOST="yes"
+		-DWITH_BOOST=yes
 		-DWITH_BULLET=$(usex bullet)
 		-DWITH_CODEC_FFMPEG=$(usex ffmpeg)
 		-DWITH_CODEC_SNDFILE=$(usex sndfile)
@@ -391,15 +374,12 @@ src_configure() {
 		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
 		-DWITH_CYCLES_HIP_BINARIES=$(usex hip $(usex cycles-bin-kernels))
 
-		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
-		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi $(usex cycles-bin-kernels))"
-
 		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
 		-DWITH_CYCLES_EMBREE="$(usex embree)"
 		-DWITH_CYCLES_OSL=$(usex osl)
 		-DWITH_CYCLES_PATH_GUIDING=$(usex openpgl)
-		-DWITH_CYCLES_STANDALONE="no"
-		-DWITH_CYCLES_STANDALONE_GUI="no"
+		-DWITH_CYCLES_STANDALONE=no
+		-DWITH_CYCLES_STANDALONE_GUI=no
 
 		-DWITH_DOC_MANPAGE=$(usex man)
 		-DWITH_DRACO="no" # TODO: Package Draco
@@ -411,7 +391,7 @@ src_configure() {
 		-DWITH_GTESTS=$(usex test)
 		-DWITH_HARFBUZZ="$(usex truetype)"
 		-DWITH_HARU=$(usex pdf)
-		-DWITH_HEADLESS=$($(use X || use wayland) && echo "no" || echo "yes")
+		-DWITH_HEADLESS="$(usex !X "$(usex !wayland)")"
 		-DWITH_HYDRA="no" # TODO: Package Hydra
 		-DWITH_IMAGE_OPENEXR=$(usex openexr)
 		-DWITH_IMAGE_OPENJPEG=$(usex jpeg2k)
@@ -514,8 +494,8 @@ src_configure() {
 		# These options only exist when GCC is detected.
 		# We disable these to respect the user's choice of linker.
 		mycmakeargs+=(
-			-DWITH_LINKER_GOLD="no"
-			-DWITH_LINKER_LLD="no"
+			-DWITH_LINKER_GOLD=no
+			-DWITH_LINKER_LLD=no
 		)
 		# Ease compiling with required gcc similar to cuda_sanitize but for cmake
 		use cuda && use cycles-bin-kernels && mycmakeargs+=( -DCUDA_HOST_COMPILER="$(cuda_gccdir)" )
@@ -523,8 +503,8 @@ src_configure() {
 
 	if tc-is-clang || use osl; then
 		mycmakeargs+=(
-			-DWITH_CLANG="yes"
-			-DWITH_LLVM="yes"
+			-DWITH_CLANG=yes
+			-DWITH_LLVM=yes
 		)
 	fi
 
@@ -538,9 +518,9 @@ src_configure() {
 		mycmakeargs+=(
 			-DCMAKE_INSTALL_PREFIX_WITH_CONFIG="${T}/usr"
 			-DCYCLES_TEST_DEVICES="$(local IFS=";"; echo "${CYCLES_TEST_DEVICES[*]}")"
-			-DWITH_COMPOSITOR_REALTIME_TESTS="yes"
-			-DWITH_GPU_DRAW_TESTS="yes"
-			-DWITH_GPU_RENDER_TESTS="yes"
+			-DWITH_COMPOSITOR_REALTIME_TESTS=yes
+			-DWITH_GPU_DRAW_TESTS=yes
+			-DWITH_GPU_RENDER_TESTS=yes
 		)
 	fi
 
@@ -631,6 +611,11 @@ src_install() {
 	pax-mark m "${BUILD_DIR}"/bin/blender
 
 	cmake_src_install
+
+	# X-KDE-RunOnDiscreteGpu is obsolete, so trim it
+	sed \
+		-e "/X-KDE-RunOnDiscreteGpu.*/d" \
+		-i "${ED}/usr/share/applications/blender-${BV}.desktop" || die
 
 	if use man; then
 		# Slot the man page
