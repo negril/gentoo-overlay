@@ -9,7 +9,6 @@ LLVM_COMPAT=( {17..18} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
-CMAKE_QA_COMPAT_SKIP=1
 
 inherit cuda rocm llvm-r2
 inherit eapi9-pipestatus check-reqs flag-o-matic pax-utils python-single-r1 toolchain-funcs virtualx
@@ -61,14 +60,9 @@ IUSE="
 	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
-IUSE+="
-	oneapi
-"
 
 if [[ "${PV}" == *9999* ]]; then
-	IUSE+="
-		experimental
-	"
+	IUSE+="experimental"
 fi
 
 REQUIRED_USE="${PYTHON_REQUIRED_USE}
@@ -124,12 +118,7 @@ RDEPEND="${PYTHON_DEPS}
 	gmp? ( dev-libs/gmp:=[cxx] )
 	gnome? ( gui-libs/libdecor )
 	hip? (
-		llvm_slot_17? (
-			dev-util/hip:0/5.7
-		)
-		llvm_slot_18? (
-			>=dev-util/hip-6.1:=[llvm_slot_18(-)]
-		)
+		>=dev-util/hip-5.7:=
 	)
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
@@ -141,7 +130,6 @@ RDEPEND="${PYTHON_DEPS}
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
 	oidn? ( >=media-libs/oidn-2.1.0:= )
-	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
@@ -228,6 +216,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-CUDA_NVCC_FLAGS.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
+# 	"${FILESDIR}/${PN}-4.2.9-python3.12.patch"
 	"${FILESDIR}/${PN}-4.3.2-ffmpeg7.patch"
 	"${FILESDIR}/${PN}-4.3.2-openvdb-12.patch"
 	"${FILESDIR}/${PN}-4.3.2-optix-8.1.0.patch"
@@ -268,12 +257,6 @@ blender_get_version() {
 
 pkg_pretend() {
 	blender_check_requirements
-
-	if use oneapi; then
-		einfo "The Intel oneAPI support is rudimentary."
-		einfo ""
-		einfo "Please report any bugs you find to https://bugs.gentoo.org/"
-	fi
 }
 
 pkg_setup() {
@@ -301,10 +284,10 @@ src_unpack() {
 	else
 		default
 
-		if use test; then
-			mkdir -p "${S}/tests/data/" || die
-			mv blender-test-data/* "${S}/tests/data/" || die
-		fi
+		# if use test; then
+		# 	mkdir -p "${S}/tests/data/" || die
+		# 	mv blender-test-data/* "${S}/tests/data/" || die
+		# fi
 	fi
 }
 
@@ -403,7 +386,7 @@ src_configure() {
 
 		-DWITH_STRICT_BUILD_OPTIONS="yes"
 		-DWITH_LIBS_PRECOMPILED="no"
-		-DBUILD_SHARED_LIBS="no" # this over-ridden by cmake.eclass
+		-DBUILD_SHARED_LIBS="no" # quadriflow only?
 		-DWITH_STATIC_LIBS=OFF
 
 		# Build Options:
@@ -505,11 +488,8 @@ src_configure() {
 		-DWITH_CYCLES_HIP_BINARIES="$(usex hip "$(usex cycles-bin-kernels)")"
 		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
 
-		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
-		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi "$(usex cycles-bin-kernels)")"
-
-		# -DWITH_CYCLES_STANDALONE="OFF"
-		# -DWITH_CYCLES_STANDALONE_GUI="OFF"
+		# -DWITH_CYCLES_STANDALONE=OFF
+		# -DWITH_CYCLES_STANDALONE_GUI=OFF
 
 		-DWITH_BLENDER_THUMBNAILER="yes"
 	)

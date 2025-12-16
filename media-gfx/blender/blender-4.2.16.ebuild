@@ -12,7 +12,7 @@ ROCM_SKIP_GLOBALS=1
 CMAKE_QA_COMPAT_SKIP=1
 
 inherit cuda rocm llvm-r2
-inherit eapi9-pipestatus check-reqs flag-o-matic pax-utils python-single-r1 toolchain-funcs virtualx
+inherit eapi9-pipestatus edo check-reqs flag-o-matic pax-utils python-single-r1 toolchain-funcs virtualx
 inherit cmake xdg-utils
 
 DESCRIPTION="3D Creation/Animation/Publishing System"
@@ -36,9 +36,7 @@ if [[ "${PV}" == *9999* ]]; then
 
 	RESTRICT="!test? ( test )"
 else
-	SRC_URI="
-		https://download.blender.org/source/${P}.tar.xz
-	"
+	SRC_URI="https://download.blender.org/source/${P}.tar.xz"
 	# 	test? (
 	# 		https://projects.blender.org/blender/blender-test-data/archive/blender-v${BLENDER_BRANCH}-release.tar.gz
 	# 		https://projects.blender.org/blender/blender-test-data/archive/v${PV}.tar.gz
@@ -61,14 +59,9 @@ IUSE="
 	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
-IUSE+="
-	oneapi
-"
 
 if [[ "${PV}" == *9999* ]]; then
-	IUSE+="
-		experimental
-	"
+	IUSE+="experimental"
 fi
 
 REQUIRED_USE="${PYTHON_REQUIRED_USE}
@@ -117,7 +110,7 @@ RDEPEND="${PYTHON_DEPS}
 	bullet? ( sci-physics/bullet:=[double-precision] )
 	collada? ( >=media-libs/opencollada-1.6.68 )
 	color-management? ( media-libs/opencolorio:= )
-	cuda? ( dev-util/nvidia-cuda-toolkit:= )
+	cuda? ( <dev-util/nvidia-cuda-toolkit-13:= )
 	embree? ( media-libs/embree:=[raymask] )
 	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
 	fftw? ( sci-libs/fftw:3.0=[threads] )
@@ -141,7 +134,6 @@ RDEPEND="${PYTHON_DEPS}
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
 	oidn? ( >=media-libs/oidn-2.1.0:= )
-	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
@@ -268,12 +260,6 @@ blender_get_version() {
 
 pkg_pretend() {
 	blender_check_requirements
-
-	if use oneapi; then
-		einfo "The Intel oneAPI support is rudimentary."
-		einfo ""
-		einfo "Please report any bugs you find to https://bugs.gentoo.org/"
-	fi
 }
 
 pkg_setup() {
@@ -378,6 +364,7 @@ src_prepare() {
 	rm -rf extern/gflags || die
 
 	if use vulkan; then
+		# TODO why?
 		sed -e "s/extern_vulkan_memory_allocator/extern_vulkan_memory_allocator\nSPIRV-Tools-opt\nSPIRV-Tools\nSPIRV-Tools-link\nglslang\nSPIRV\nSPVRemapper/" -i source/blender/gpu/CMakeLists.txt || die
 	fi
 }
@@ -504,9 +491,6 @@ src_configure() {
 		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
 		-DWITH_CYCLES_HIP_BINARIES="$(usex hip "$(usex cycles-bin-kernels)")"
 		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
-
-		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
-		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi "$(usex cycles-bin-kernels)")"
 
 		# -DWITH_CYCLES_STANDALONE="OFF"
 		# -DWITH_CYCLES_STANDALONE_GUI="OFF"
@@ -718,21 +702,21 @@ src_install() {
 
 		einfo "Generating Blender C/C++ API docs ..."
 		cd "${CMAKE_USE_DIR}/doc/doxygen" || die
-		doxygen -u Doxyfile || die
-		doxygen || die "doxygen failed to build API docs."
-
-		cd "${CMAKE_USE_DIR}" || die
-		einfo "Generating (BPY) Blender Python API docs ..."
-		"${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio || die "sphinx failed."
-
-		cd "${CMAKE_USE_DIR}/doc/python_api" || die
-		sphinx-build sphinx-in BPY_API || die "sphinx failed."
-
-		docinto "html/API/python"
-		dodoc -r "${CMAKE_USE_DIR}/doc/python_api/BPY_API/"
+		edob doxygen -u Doxyfile
+		edob doxygen
 
 		docinto "html/API/blender"
 		dodoc -r "${CMAKE_USE_DIR}/doc/doxygen/html/"
+
+		einfo "Generating (BPY) Blender Python API docs ..."
+		cd "${CMAKE_USE_DIR}" || die
+		edob "${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio
+
+		cd "${CMAKE_USE_DIR}/doc/python_api" || die
+		sphinx-build sphinx-in BPY_API || die
+
+		docinto "html/API/python"
+		dodoc -r "${CMAKE_USE_DIR}/doc/python_api/BPY_API/"
 	fi
 
 	# Fix doc installdir
