@@ -1,0 +1,15 @@
+# Copyright 1999-2025 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+# This file is only for generic masks. For arch-specific masks (i.e.
+# mask everywhere, unmask on arch/*) use arch/base.
+
+# New entries go on top.
+
+# Paul Zander <negril.nx+gentoo@gmail.com> (2025-04-29)
+# cuda is experimental for now
+media-libs/openimageio:0/3.0 cuda
+
+# Paul Zander <negril.nx+gentoo@gmail.com> (2025-04-20)
+# requires SYCL/DCP++ from ::science
+media-gfx/blender oneapi
