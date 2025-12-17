@@ -6,6 +6,10 @@
 
 # New entries go on top.
 
+# Paul Zander <negril.nx+gentoo@gmail.com> (2025-12-17)
+# no dev-util/emscripten
+media-libs/draco javascript
+
 # Paul Zander <negril.nx+gentoo@gmail.com> (2025-04-29)
 # cuda is experimental for now
 media-libs/openimageio:0/3.0 cuda
