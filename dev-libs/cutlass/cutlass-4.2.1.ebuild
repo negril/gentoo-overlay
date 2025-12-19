@@ -103,13 +103,23 @@ src_configure() {
 
 		# CUTLASS Repository Directory
 		# -DCUTLASS_DIR=/var/tmp/paludis/dev-libs-cutlass-3.9.0/work/cutlass-3.9.0
+	)
 
-		# cuBLAS usage for tests
-		-DCUTLASS_ENABLE_CUBLAS="$(usex cublas)"
+	if use profiler || use test || use tools; then
+		mycmakeargs+=(
+			# cuBLAS usage for tests
+			-DCUTLASS_ENABLE_CUBLAS="$(usex cublas)"
+		)
+	fi
 
-		# cuDNN usage for tests
-		-DCUTLASS_ENABLE_CUDNN="$(usex cudnn)"
+	if use test || use tools; then
+		mycmakeargs+=(
+			# cuDNN usage for tests
+			-DCUTLASS_ENABLE_CUDNN="$(usex cudnn)"
+		)
+	fi
 
+	mycmakeargs+=(
 		# Enable CUTLASS Examples
 		-DCUTLASS_ENABLE_EXAMPLES="$(usex examples)"
 
@@ -265,7 +275,7 @@ src_configure() {
 		)
 	fi
 
-	if use cudnn; then
+	if use cudnn && { use test || use tools; }; then
 		mycmakeargs+=(
 			-DCUDNN_INCLUDE_DIR="${CUDNN_PATH:-${ESYSROOT}/opt/cuda}/linux/include"
 			-DCUDNN_LIBRARY="${CUDNN_PATH:-${ESYSROOT}/opt/cuda}/$(get_libdir)/libcudnn.so"
