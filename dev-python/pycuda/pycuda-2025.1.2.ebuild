@@ -65,7 +65,7 @@ src_unpack() {
 		git -C "${S}" submodule update --init
 	else
 		default
-		rm -r "${S}/bpl-subset/"* || die
+		# rm -r "${S}/bpl-subset/"* || die
 	fi
 }
 
