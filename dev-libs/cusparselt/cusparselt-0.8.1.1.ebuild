@@ -33,7 +33,7 @@ S="${WORKDIR}"
 
 LICENSE="NVIDIA-SDK-v2020.10.12 NVIDIA-cuSPARSELt-v2020.10.12"
 SLOT="0"
-KEYWORDS="~amd64 ~arm64 ~amd64-linux ~arm64-linux"
+KEYWORDS="~amd64 ~arm64"
 IUSE="+cuda_targets_12 cuda_targets_13"
 RESTRICT="bindist mirror test"
 

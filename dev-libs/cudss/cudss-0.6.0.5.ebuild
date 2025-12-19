@@ -23,7 +23,7 @@ S="${WORKDIR}"
 
 LICENSE="NVIDIA-cuDSS"
 SLOT="0/$(ver_cut 1-3)"
-KEYWORDS="~amd64 ~arm64 ~amd64-linux ~arm64-linux"
+KEYWORDS="~amd64 ~arm64"
 IUSE="+cuda_targets_12"
 RESTRICT="bindist test"
 

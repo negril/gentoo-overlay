@@ -30,7 +30,7 @@ LICENSE="NVIDIA-CUDA"
 # SLOT="0/${PV}" # UNSLOTTED
 SLOT="${PV}" # SLOTTED
 
-KEYWORDS="-* ~amd64 ~arm64 ~amd64-linux ~arm64-linux"
+KEYWORDS="-* ~amd64 ~arm64"
 IUSE="clang debugger examples nsight profiler rdma sanitizer"
 # IUSE=" +static-libs"
 RESTRICT="bindist mirror strip test"
