@@ -88,7 +88,7 @@ RDEPEND="
 	sci-libs/hdf5:=[mpi=]
 	sci-libs/proj:=
 	sci-libs/netcdf:=[mpi=]
-	sys-libs/zlib
+	virtual/zlib:=
 	boost? ( dev-libs/boost:=[mpi?] )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	ffmpeg? ( media-video/ffmpeg:= )

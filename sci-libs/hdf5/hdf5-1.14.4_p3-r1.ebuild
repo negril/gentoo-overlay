@@ -33,7 +33,7 @@ RESTRICT="!test? ( test )"
 RDEPEND="
 	mpi? ( virtual/mpi[romio] )
 	szip? ( virtual/szip )
-	zlib? ( sys-libs/zlib:= )
+	zlib? ( virtual/zlib:= )
 "
 DEPEND="${RDEPEND}"
 

@@ -154,7 +154,7 @@ RDEPEND="
 	media-libs/tiff:=
 	sci-libs/hdf5:=[mpi=]
 	sci-libs/proj:=
-	sys-libs/zlib
+	virtual/zlib:=
 	boost? ( dev-libs/boost:=[mpi?] )
 	cgns? ( >=sci-libs/cgnslib-4.1.1:=[hdf5,mpi=] )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
