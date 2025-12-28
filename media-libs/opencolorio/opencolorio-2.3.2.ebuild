@@ -36,8 +36,7 @@ RDEPEND="
 	>=dev-cpp/yaml-cpp-0.7.0:=
 	dev-libs/expat
 	>=dev-libs/imath-3.1.5:=
-	sys-libs/minizip-ng
-	sys-libs/zlib
+	sys-libs/minizip-ng:=
 	apps? (
 		media-libs/lcms:2
 		>=media-libs/openexr-3.1.5:=

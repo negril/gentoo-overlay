@@ -58,7 +58,8 @@ RDEPEND="
 	dev-qt/qtbase:6[concurrent,network,xml]
 	media-libs/freetype
 	sci-libs/opencascade:=[json]
-	sys-libs/zlib
+	sci-libs/orocos_kdl:=
+	virtual/zlib:=
 	$(python_gen_cond_dep '
 		dev-python/numpy[${PYTHON_USEDEP}]
 		dev-python/pybind11[${PYTHON_USEDEP}]

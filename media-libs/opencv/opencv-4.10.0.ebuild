@@ -187,7 +187,7 @@ RESTRICT="!test? ( test )"
 COMMON_DEPEND="
 	app-arch/bzip2[${MULTILIB_USEDEP}]
 	dev-libs/protobuf:=[${MULTILIB_USEDEP}]
-	sys-libs/zlib[${MULTILIB_USEDEP}]
+	virtual/zlib:=[${MULTILIB_USEDEP}]
 	avif? ( media-libs/libavif:=[${MULTILIB_USEDEP}] )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	cudnn? (

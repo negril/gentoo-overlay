@@ -49,11 +49,11 @@ RDEPEND="
 	)
 	blosc? (
 		dev-libs/c-blosc:=
-		sys-libs/zlib:=
+		virtual/zlib:=
 	)
 	nanovdb? (
 		zlib? (
-			sys-libs/zlib:=
+			virtual/zlib:=
 		)
 		cuda? (
 			dev-util/nvidia-cuda-toolkit:=
