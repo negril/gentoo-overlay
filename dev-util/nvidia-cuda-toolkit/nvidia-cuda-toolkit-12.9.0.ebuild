@@ -31,7 +31,7 @@ LICENSE="NVIDIA-CUDA"
 SLOT="${PV}" # SLOTTED
 
 KEYWORDS="-* ~amd64 ~arm64"
-IUSE="clang debugger examples nsight profiler rdma sanitizer"
+IUSE="clang-cuda debugger examples nsight profiler rdma sanitizer"
 # IUSE=" +static-libs"
 RESTRICT="bindist mirror strip test"
 
@@ -41,10 +41,10 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}"
 # since CUDA 11, the bundled toolkit driver (== ${DRIVER_PV}) and the
 # actual required minimum driver version are different.
 RDEPEND="
-	!clang? (
+	!clang-cuda? (
 		<sys-devel/gcc-$(( GCC_MAX_VER + 1 ))_pre[cxx]
 	)
-	clang? (
+	clang-cuda? (
 		<llvm-core/clang-$(( CLANG_MAX_VER + 1 ))_pre
 	)
 	sys-process/numactl
@@ -165,9 +165,9 @@ pkg_setup() {
 	python_setup
 
 	if use amd64; then
-		narch=x86_64
+		narch="x86_64"
 	elif use arm64; then
-		narch=sbsa
+		narch="sbsa"
 	else
 		die "unknown arch ${ARCH}"
 	fi
@@ -420,7 +420,7 @@ src_install() {
 }
 
 pkg_postinst_check() {
-	if tc-is-gcc || ! use clang; then
+	if tc-is-gcc || ! use clang-cuda; then
 		if ver_test "$(gcc-major-version)" -gt "${GCC_MAX_VER}"; then
 			ewarn
 			ewarn "gcc > ${GCC_MAX_VER} will not work with CUDA"
@@ -433,7 +433,7 @@ pkg_postinst_check() {
 		fi
 	fi
 
-	if tc-is-clang || use clang; then
+	if tc-is-clang || use clang-cuda; then
 		if ver_test "$(clang-major-version)" -gt "${CLANG_MAX_VER}"; then
 			ewarn
 			ewarn "clang > ${CLANG_MAX_VER} will not work with CUDA"

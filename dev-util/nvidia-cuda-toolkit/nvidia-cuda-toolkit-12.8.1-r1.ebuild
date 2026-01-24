@@ -5,7 +5,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+PYTHON_COMPAT=( python3_{11..13} )
 inherit check-reqs edo toolchain-funcs
 inherit python-r1
 
@@ -31,7 +31,7 @@ LICENSE="NVIDIA-CUDA"
 SLOT="${PV}" # SLOTTED
 
 KEYWORDS="-* ~amd64 ~arm64"
-IUSE="clang debugger examples nsight profiler rdma sanitizer"
+IUSE="clang-cuda debugger examples nsight profiler rdma sanitizer"
 # IUSE=" +static-libs"
 RESTRICT="bindist mirror strip test"
 
@@ -41,10 +41,10 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}"
 # since CUDA 11, the bundled toolkit driver (== ${DRIVER_PV}) and the
 # actual required minimum driver version are different.
 RDEPEND="
-	!clang? (
+	!clang-cuda? (
 		<sys-devel/gcc-$(( GCC_MAX_VER + 1 ))_pre[cxx]
 	)
-	clang? (
+	clang-cuda? (
 		<llvm-core/clang-$(( CLANG_MAX_VER + 1 ))_pre
 	)
 	sys-process/numactl
@@ -165,9 +165,9 @@ pkg_setup() {
 	python_setup
 
 	if use amd64; then
-		narch=x86_64
+		narch="x86_64"
 	elif use arm64; then
-		narch=sbsa
+		narch="sbsa"
 	else
 		die "unknown arch ${ARCH}"
 	fi
@@ -196,7 +196,7 @@ src_unpack() {
 
 	# printf "%s\n" "${exclude[@]}"
 	# eqawarn bash "${DISTDIR}/${A}" --tar xf -X <(printf "%s\n" "${exclude[@]}")
-	edob -m "failed to extract ${A}" \
+	edob -m "Extracting ${A}" \
 		bash "${DISTDIR}/${A}" --tar xf -X <(printf "%s\n" "${exclude[@]}")
 
 	# if use static-libs; then
@@ -420,8 +420,16 @@ src_install() {
 }
 
 pkg_postinst_check() {
-	if tc-is-gcc &&
-		ver_test "$(gcc-major-version)" -gt "${GCC_MAX_VER}"; then
+	# Due to requiring specific compiler versions here, we check more then we have to, for the sake of clarity.
+	# tc-getCC defaults to gcc, so clang-major-version is checked using gcc and fails on gcc-profiles. # 959420
+	# We therefore attempt to find the right tuple for both gcc and clang.
+
+	if tc-is-gcc || ! use clang-cuda; then
+		if ! use clang-cuda && ! tc-is-gcc; then
+			local CC="$(tc-getPROG CC gcc)"
+		fi
+
+		if ver_test "$(gcc-major-version)" -gt "${GCC_MAX_VER}"; then
 			ewarn
 			ewarn "gcc > ${GCC_MAX_VER} will not work with CUDA"
 			ewarn
@@ -430,10 +438,15 @@ pkg_postinst_check() {
 			ewarn "	NVCCFLAGS=\"--ccbin=$(eval echo "${EPREFIX}/usr/*-linux-gnu/gcc-bin/${GCC_MAX_VER}")\""
 			ewarn "	NVCC_CCBIN=$(eval echo "${EPREFIX}/usr/*-linux-gnu/gcc-bin/${GCC_MAX_VER}")"
 			ewarn
+		fi
 	fi
 
-	if tc-is-clang &&
-		ver_test "$(clang-major-version)" -gt "${CLANG_MAX_VER}"; then
+	if tc-is-clang || use clang-cuda; then
+		if use clang-cuda && ! tc-is-clang; then
+			local CC="$(tc-getPROG CC clang)"
+		fi
+
+		if ver_test "$(clang-major-version)" -gt "${CLANG_MAX_VER}"; then
 			ewarn
 			ewarn "clang > ${CLANG_MAX_VER} will not work with CUDA"
 			ewarn
@@ -442,6 +455,7 @@ pkg_postinst_check() {
 			ewarn "	NVCCFLAGS=\"--ccbin=$(eval echo "${EPREFIX}/usr/lib/llvm/*/bin${CLANG_MAX_VER}")\""
 			ewarn "	NVCC_CCBIN=$(eval echo "${EPREFIX}/usr/lib/llvm/*/bin${CLANG_MAX_VER}")"
 			ewarn
+		fi
 	fi
 }
 

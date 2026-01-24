@@ -95,7 +95,7 @@ src_test() {
 	cuda_add_sandbox -w
 	addwrite "/proc/self/task"
 
-	edo "${BUILD_DIR}/bin/tests" '~[key]'
+	edo "${BUILD_DIR}/bin/tests" -s
 
 	if use samples; then
 		edo "${BUILD_DIR}/bin/samples" -s

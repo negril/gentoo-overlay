@@ -1,11 +1,11 @@
 # Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2153,SC2154,SC2317,SC2329
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+PYTHON_COMPAT=( python3_{11..13} )
 inherit check-reqs edo toolchain-funcs
 inherit python-r1
 
@@ -31,7 +31,7 @@ LICENSE="NVIDIA-CUDA"
 SLOT="${PV}" # SLOTTED
 
 KEYWORDS="-* ~amd64 ~arm64"
-IUSE="clang debugger examples nsight profiler rdma sanitizer"
+IUSE="clang-cuda debugger examples nsight profiler rdma sanitizer"
 # IUSE=" +static-libs"
 RESTRICT="bindist mirror strip test"
 
@@ -41,10 +41,10 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}"
 # since CUDA 11, the bundled toolkit driver (== ${DRIVER_PV}) and the
 # actual required minimum driver version are different.
 RDEPEND="
-	!clang? (
+	!clang-cuda? (
 		<sys-devel/gcc-$(( GCC_MAX_VER + 1 ))_pre[cxx]
 	)
-	clang? (
+	clang-cuda? (
 		<llvm-core/clang-$(( CLANG_MAX_VER + 1 ))_pre
 	)
 	sys-process/numactl
@@ -165,9 +165,9 @@ pkg_setup() {
 	python_setup
 
 	if use amd64; then
-		narch=x86_64
+		narch="x86_64"
 	elif use arm64; then
-		narch=sbsa
+		narch="sbsa"
 	else
 		die "unknown arch ${ARCH}"
 	fi
@@ -196,7 +196,7 @@ src_unpack() {
 
 	# printf "%s\n" "${exclude[@]}"
 	# eqawarn bash "${DISTDIR}/${A}" --tar xf -X <(printf "%s\n" "${exclude[@]}")
-	edob -m "failed to extract ${A}" \
+	edob -m "Extracting ${A}" \
 		bash "${DISTDIR}/${A}" --tar xf -X <(printf "%s\n" "${exclude[@]}")
 
 	# if use static-libs; then
@@ -239,6 +239,68 @@ src_compile() {
 src_install() {
 	local -x SKIP_COMPONENTS=(
 		"Kernel_Objects"
+		"Documentation"  # obsolete
+		"cuda-gdb-src"   # not used
+
+		"Tools"
+			# "Command_Line_Tools"
+			# 	# "cuda-cupti"
+			# 	# "cuda-gdb"
+			# 	# "cuda-gdb-src"
+			# 	# "nvdisasm"
+			# 	# "nvprof"
+			# 	# "nvtx"
+			# 	# "compute-sanitizer"
+			# "Visual_Tools"
+			# 	# "nsight"
+			# 	# "nvvp"
+			# 	# "nsight-compute"
+			# 	# "nsight-systems"
+		"Compiler"
+			# "cuda-cuobjdump"
+			# "cuda-cuxxfilt"
+			# "cuda-nvcc"
+			# "cuda-nvvm"
+			# "cuda-crt"
+			# "cuda-nvprune"
+		# "Libraries"
+			# "Development"
+				"cuda-cccl"
+				"cuda-cudart-dev"
+				"cuda-driver-dev"
+				"cuda-nvml-dev"
+				# "cuda-nvrtc-dev"
+				"cuda-opencl-dev"
+				"cuda-profiler-api"
+				"cuda-sandbox-dev"
+				"libcublas-dev"
+				"libcufft-dev"
+				"libcufile-dev"
+				"libcurand-dev"
+				"libcusolver-dev"
+				"libcusparse-dev"
+				"libnpp-dev"
+				"libnvfatbin-dev"
+				"libnvjitlink-dev"
+				"libnvjpeg-dev"
+			# "Runtime"
+				"cuda-cudart"
+				# "cuda-nvrtc"
+				"cuda-opencl"
+				"libcublas12"
+				"libcufft"
+				"libcufile"
+				"libcurand"
+				"libcusolver"
+				"libcusparse"
+				"libnpp"
+				"libnvfatbin"
+				"libnvjitlink"
+				"libnvjpeg"
+	)
+
+	local -x SKIP_COMPONENTS=(
+		"Kernel_Objects"
 		"Visual_Tools"
 		"Documentation"  # obsolete
 		"cuda-gdb-src"   # not used
@@ -270,8 +332,8 @@ src_install() {
 			if [[ -e "${ED}${_DESTDIR}/$(basename "${1}")" ]]; then
 				return
 			fi
-			if [[ "$1" == "targets/x86_64-linux/lib/stubs/libcusolverMg*" ]] ||
-				[[ "$1" == "targets/x86_64-linux/lib/libcusparse.so.*" ]]; then
+			if [[ "$1" == "targets/${narch}-linux/lib/stubs/libcusolverMg*" ]] ||
+				[[ "$1" == "targets/${narch}-linux/lib/libcusparse.so.*" ]]; then
 				return
 			fi
 			# {{{ # BUG OVERLAY ONLY
@@ -343,7 +405,7 @@ src_install() {
 
 	# TODO use eval, source or bash here?
 	# eval "$(${EPYTHON} "${FILESDIR}/parse_manifest.py" "${S}/manifests/cuda_"*.xml )"
-	# shellcheck disable=SC1091
+
 	source "${T}/install.sh" || die "failed  to source install script"
 
 	eend $? # }}}
@@ -366,7 +428,8 @@ src_install() {
 
 	# remove rdma libs (unless USE=rdma)
 	if ! use rdma; then
-		rm "${ED}/${CUDA_PATH}/targets/${narch}-linux/lib/libcufile_rdma"* || die "failed to remove rdma files"
+		# intentionally -f to support SKIP_COMPONENTS
+		rm -f "${ED}/${CUDA_PATH}/targets/${narch}-linux/lib/libcufile_rdma"* || die "failed to remove rdma files"
 	fi
 
 	# Add include and lib symlinks
@@ -404,6 +467,7 @@ src_install() {
 	# https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements
 	local cuda_supported_gcc=( 8.5 9.5 10 11 12 13 "${GCC_MAX_VER}" )
 
+	mkdir -p "${ED}/${CUDA_PATH}/bin" || die
 	sed \
 		-e "s:CUDA_SUPPORTED_GCC:${cuda_supported_gcc[*]}:g" \
 		"${FILESDIR}"/cuda-config.in > "${ED}/${CUDA_PATH}/bin/cuda-config" || die
@@ -423,8 +487,12 @@ src_install() {
 }
 
 pkg_postinst_check() {
-	if tc-is-gcc || ! use clang; then
-		if ver_test "$(gcc-major-version)" -gt "${GCC_MAX_VER}"; then
+	# Due to requiring specific compiler versions here, we check more then we have to, for the sake of clarity.
+	# tc-getCC defaults to gcc, so clang-major-version is checked using gcc and fails on gcc-profiles. # 959420
+	# We therefore force gcc and clang for the check.
+
+	if tc-is-gcc || ! use clang-cuda; then
+		if ver_test "$(CC=gcc gcc-major-version)" -gt "${GCC_MAX_VER}"; then
 			ewarn
 			ewarn "gcc > ${GCC_MAX_VER} will not work with CUDA"
 			ewarn
@@ -436,8 +504,8 @@ pkg_postinst_check() {
 		fi
 	fi
 
-	if tc-is-clang || use clang; then
-		if ver_test "$(clang-major-version)" -gt "${CLANG_MAX_VER}"; then
+	if tc-is-clang || use clang-cuda; then
+		if ver_test "$(CC=clang clang-major-version)" -gt "${CLANG_MAX_VER}"; then
 			ewarn
 			ewarn "clang > ${CLANG_MAX_VER} will not work with CUDA"
 			ewarn
@@ -466,4 +534,23 @@ pkg_postinst() {
 		einfo "options nvidia NVreg_RestrictProfilingToAdminUsers=0"
 		einfo
 	fi
+}
+
+pkg_info () {
+	debugvar () {
+		for i in "$@"; do
+			[[ -v "${i}" ]] && echo "${i}=\"${!i}\""
+		done
+	}
+	debugvar \
+		CUDACXX \
+		CUDAHOSTCXX \
+		CUDAHOSTLD \
+		CUDAARCHS \
+		CUDAFLAGS \
+		CUDA_PATH \
+		CUDA_VERBOSE \
+		NVCCFLAGS \
+		NVCC_PREPEND_FLAGS \
+		NVCC_APPPEND_FLAGS
 }

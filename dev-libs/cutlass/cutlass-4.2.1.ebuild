@@ -311,8 +311,9 @@ src_test() {
 		"ctest_examples_41_fmha_backward_python$"
 	)
 
-	cmake_src_test -j1
 	cmake_build test_unit "${myctestargs[@]}" -j1
+
+	cmake_src_test -j1
 }
 
 src_install() {

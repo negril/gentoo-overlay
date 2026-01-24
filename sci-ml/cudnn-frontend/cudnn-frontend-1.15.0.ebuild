@@ -30,7 +30,7 @@ RDEPEND="
 DEPEND="${RDEPEND}
 	dev-cpp/nlohmann_json
 	test? (
-		>dev-cpp/catch-3
+		>=dev-cpp/catch-3
 		>=dev-libs/cudnn-9.14.0
 	)
 "
@@ -95,7 +95,27 @@ src_test() {
 	cuda_add_sandbox -w
 	addwrite "/proc/self/task"
 
-	edo "${BUILD_DIR}/bin/tests" '~s'
+	# List all tests
+	# "${BUILD_DIR}/bin/tests" --list-tests --verbosity quiet
+
+	local catchargs=()
+
+	local CATCH_SKIP_TESTS=()
+
+	if [[ -v CUDAARCHS && "${CUDAARCHS}" != 89 ]]; then
+		CATCH_SKIP_TESTS+=(
+			 # doesn't work on 86 52
+			'Graph key'
+			'Graph key dynamic shape'
+
+			 # doesn't work on 86
+			'sdpa backward graph serialization'
+		)
+	fi
+
+	[[ -v CATCH_SKIP_TESTS ]] && catchargs+=( "${CATCH_SKIP_TESTS[@]/#/\~}" )
+
+	edo "${BUILD_DIR}/bin/tests" -s "${catchargs[@]}"
 
 	if use samples; then
 		edo "${BUILD_DIR}/bin/samples" -s
