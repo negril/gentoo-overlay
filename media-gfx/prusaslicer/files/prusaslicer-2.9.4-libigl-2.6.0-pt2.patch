@@ -1,0 +1,81 @@
+From 6500a9e9e06bf43c232bc7e235ecd117791f41d3 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sun, 18 Jan 2026 13:01:00 +0100
+Subject: [PATCH] libigl 2.6.0 pt2
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/tests/libslic3r/test_aabbindirect.cpp b/tests/libslic3r/test_aabbindirect.cpp
+index 36b3593..0074a39 100644
+--- a/tests/libslic3r/test_aabbindirect.cpp
++++ b/tests/libslic3r/test_aabbindirect.cpp
+@@ -17,7 +17,7 @@ TEST_CASE("Building a tree over a box, ray caster and closest query", "[AABBIndi
+     auto tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(tmesh.its.vertices, tmesh.its.indices);
+     REQUIRE(! tree.empty());
+ 
+-    igl::Hit hit;
++    igl::Hit<double> hit;
+ 	bool intersected = AABBTreeIndirect::intersect_ray_first_hit(
+ 		tmesh.its.vertices, tmesh.its.indices,
+ 		tree,
+@@ -28,7 +28,7 @@ TEST_CASE("Building a tree over a box, ray caster and closest query", "[AABBIndi
+     REQUIRE(intersected);
+     REQUIRE(hit.t == Approx(5.));
+ 
+-    std::vector<igl::Hit> hits;
++    std::vector<igl::Hit<double>> hits;
+ 	bool intersected2 = AABBTreeIndirect::intersect_ray_all_hits(
+ 		tmesh.its.vertices, tmesh.its.indices,
+ 		tree,
+diff --git a/tests/libslic3r/test_emboss.cpp b/tests/libslic3r/test_emboss.cpp
+index cdac9b3..19691ef 100644
+--- a/tests/libslic3r/test_emboss.cpp
++++ b/tests/libslic3r/test_emboss.cpp
+@@ -76,7 +76,7 @@ Vec2d get_intersection(const Vec2d &               point,
+     return point + dir * (*t);
+ }
+ 
+-Vec3d calc_hit_point(const igl::Hit &          h,
++Vec3d calc_hit_point(const igl::Hit<double> &          h,
+                      const Vec3i &             triangle,
+                      const std::vector<Vec3f> &vertices)
+ {
+@@ -89,7 +89,7 @@ Vec3d calc_hit_point(const igl::Hit &          h,
+     return v0 * c0 + v1 * c1 + v2 * c2;
+ }
+ 
+-Vec3d calc_hit_point(const igl::Hit &h, indexed_triangle_set &its)
++Vec3d calc_hit_point(const igl::Hit<double> &h, indexed_triangle_set &its)
+ {
+     return calc_hit_point(h, its.indices[h.id], its.vertices);
+ }
+@@ -376,7 +376,7 @@ TEST_CASE("Test hit point", "[AABBTreeIndirect]")
+ 
+     Vec3d    ray_point(8, 1, 0);
+     Vec3d    ray_dir(0, 0, 1);
+-    igl::Hit hit;
++    igl::Hit<double> hit;
+     AABBTreeIndirect::intersect_ray_first_hit(its.vertices, its.indices, tree,
+                                               ray_point, ray_dir, hit);
+     Vec3d hp = Private::calc_hit_point(hit, its);
+diff --git a/tests/libslic3r/test_quadric_edge_collapse.cpp b/tests/libslic3r/test_quadric_edge_collapse.cpp
+index ea1e4f4..f3207d8 100644
+--- a/tests/libslic3r/test_quadric_edge_collapse.cpp
++++ b/tests/libslic3r/test_quadric_edge_collapse.cpp
+@@ -262,10 +262,12 @@ TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[its]")
+     }
+ 
+     size_t max_m = wanted_count;
++    bool block_intersections = true;
+     Eigen::MatrixXd U;
+     Eigen::MatrixXi G;
+     Eigen::VectorXi J, I;
+-    CHECK(igl::qslim(V, F, max_m, U, G, J, I));
++    Eigen::MatrixXd X;
++    CHECK(igl::qslim(V, F, max_m, block_intersections, U, G, J, I));
+ 
+     // convert to its
+     indexed_triangle_set its_out;
+-- 
+2.52.0
+

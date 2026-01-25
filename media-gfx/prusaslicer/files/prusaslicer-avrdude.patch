@@ -1,0 +1,41 @@
+From c7af9dded6d77dd68a54670ebd0dff52fc5bb3bf Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 11 Apr 2025 11:35:38 +0200
+Subject: [PATCH 2/2] avrdude
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/bundled_deps/avrdude/avrdude/lexer.c b/bundled_deps/avrdude/avrdude/lexer.c
+index 46d8817..f59cd47 100644
+--- a/bundled_deps/avrdude/avrdude/lexer.c
++++ b/bundled_deps/avrdude/avrdude/lexer.c
+@@ -294,7 +294,7 @@ static void yy_init_buffer ( YY_BUFFER_STATE b, FILE *file  );
+ 
+ YY_BUFFER_STATE yy_scan_buffer ( char *base, yy_size_t size  );
+ YY_BUFFER_STATE yy_scan_string ( const char *yy_str  );
+-YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, int len  );
++YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, size_t len  );
+ 
+ void *yyalloc ( yy_size_t  );
+ void *yyrealloc ( void *, yy_size_t  );
+@@ -2813,7 +2813,7 @@ YY_BUFFER_STATE yy_scan_buffer  (char * base, yy_size_t  size )
+ YY_BUFFER_STATE yy_scan_string (const char * yystr )
+ {
+     
+-	return yy_scan_bytes( yystr, (int) strlen(yystr) );
++	return yy_scan_bytes( yystr, strlen(yystr) );
+ }
+ 
+ /** Setup the input buffer state to scan the given bytes. The next call to yylex() will
+@@ -2823,7 +2823,7 @@ YY_BUFFER_STATE yy_scan_string (const char * yystr )
+  * 
+  * @return the newly allocated buffer state object.
+  */
+-YY_BUFFER_STATE yy_scan_bytes  (const char * yybytes, int  _yybytes_len )
++YY_BUFFER_STATE yy_scan_bytes  (const char * yybytes, size_t _yybytes_len )
+ {
+ 	YY_BUFFER_STATE b;
+ 	char *buf;
+-- 
+2.49.0
+

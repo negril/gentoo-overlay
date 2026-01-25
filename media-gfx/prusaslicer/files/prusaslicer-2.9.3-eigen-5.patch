@@ -1,0 +1,23 @@
+From 6f7c06aea1699bcd0c523a0198473c78592d837e Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 25 Sep 2025 22:41:02 +0200
+Subject: [PATCH] eigen 5
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b6444bd..482d9ec 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -373,7 +373,7 @@ set(MINIMUM_BOOST_VERSION "1.83.0")
+ set(_boost_components "system;filesystem;thread;log;locale;regex;chrono;atomic;date_time;iostreams;nowide")
+ find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS ${_boost_components})
+ 
+-find_package(Eigen3 3.3.7 REQUIRED)
++find_package(Eigen3 REQUIRED NO_MODULE)
+ 
+ add_library(boost_libs INTERFACE)
+ add_library(boost_headeronly INTERFACE)
+-- 
+2.51.0
+

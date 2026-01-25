@@ -1,0 +1,33 @@
+From 90e31dfa401ad882154f92f6a296f48e56e33c92 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 11 Apr 2025 11:35:30 +0200
+Subject: [PATCH 1/2] libigl
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/BranchingTree/PointCloud.cpp b/src/libslic3r/BranchingTree/PointCloud.cpp
+index 5c736f0..2cac1e9 100644
+--- a/src/libslic3r/BranchingTree/PointCloud.cpp
++++ b/src/libslic3r/BranchingTree/PointCloud.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include <igl/random_points_on_mesh.h> // IWYU pragma: keep
+ #include <array>
++#include <igl/random_points_on_mesh_intrinsic.h>
+ #include <limits>
+ 
+ #include "libslic3r/Tesselate.hpp"
+@@ -54,8 +55,9 @@ std::vector<Node> sample_mesh(const indexed_triangle_set &its, double radius)
+     Eigen::MatrixXi FI;
+     Eigen::MatrixXd V;
+     Eigen::MatrixXi F;
++    Eigen::MatrixXd X;
+     to_eigen_mesh(its, V, F);
+-    igl::random_points_on_mesh(N, V, F, B, FI);
++    igl::random_points_on_mesh(N, V, F, B, FI, X);
+ 
+     ret.reserve(size_t(N));
+     for (int i = 0; i < FI.size(); i++) {
+-- 
+2.49.0
+
