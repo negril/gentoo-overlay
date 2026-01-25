@@ -1,22 +1,44 @@
-# Copyright 1999-2023 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-inherit desktop virtualx xdg cmake git-r3
+VIRTUALX_REQUIRED="manual"
+inherit cmake edo virtualx xdg
+inherit desktop
+
+if [[ ${PV} == *9999* ]]; then
+	EGIT_REPO_URI="https://github.com/input-leap/input-leap.git"
+	inherit git-r3
+	EGIT_SUBMODULES+=( '-ext/*' )
+else
+	SRC_URI="https://github.com/input-leap/input-leap/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz"
+	KEYWORDS="~amd64 ~x86"
+fi
 
 DESCRIPTION="Share a mouse and keyboard between computers (fork of Barrier)"
 HOMEPAGE="https://github.com/input-leap/input-leap"
-EGIT_REPO_URI="https://github.com/input-leap/input-leap.git"
-EGIT_SUBMODULES+=( '-ext/*' )
 
 LICENSE="GPL-2"
 SLOT="0"
-IUSE="X gui +libei qt6 test"
+IUSE="+X gui test +wayland"
+REQUIRED_USE="|| ( wayland X )"
 RESTRICT="!test? ( test )"
 
 RDEPEND="
-	net-misc/curl
+	dev-libs/openssl:0=
+	gui? (
+		dev-qt/qtbase:6[gui,network,widgets,X?]
+		net-dns/avahi[mdnsresponder-compat]
+	)
+	wayland? (
+		dev-libs/glib:2
+		dev-libs/libei
+		x11-libs/libxkbcommon
+		gui? (
+			dev-libs/libportal:=[qt6(+)]
+		)
+	)
 	X? (
 		x11-libs/libICE
 		x11-libs/libSM
@@ -27,32 +49,6 @@ RDEPEND="
 		x11-libs/libXrandr
 		x11-libs/libXtst
 	)
-	gui? (
-		!qt6? (
-			dev-qt/qtcore:5
-			dev-qt/qtgui:5
-			dev-qt/qtnetwork:5
-			dev-qt/qtwidgets:5
-		)
-		qt6? (
-				dev-qt/qtbase:6[gui,network,widgets]
-		)
-		net-dns/avahi[mdnsresponder-compat]
-	)
-	libei? (
-		dev-libs/libei
-		x11-libs/libxkbcommon
-		dev-libs/glib
-		gui? (
-			!qt6? (
-				dev-libs/libportal[qt5]
-			)
-			qt6? (
-				dev-libs/libportal[qt6]
-			)
-		)
-	)
-	dev-libs/openssl:0=
 "
 DEPEND="
 	${RDEPEND}
@@ -62,6 +58,11 @@ DEPEND="
 	)
 	test? ( dev-cpp/gtest )
 "
+BDEPEND="
+	virtual/pkgconfig
+	gui? ( dev-qt/qttools:6[linguist] )
+	test? ( X? ( ${VIRTUALX_DEPEND} ) )
+"
 
 DOCS=(
 	ChangeLog
@@ -69,40 +70,46 @@ DOCS=(
 	doc/${PN}.conf.example{,-advanced,-basic}
 )
 
+src_prepare() {
+	# respect CXXFLAGS
+	sed -i '/CMAKE_POSITION_INDEPENDENT_CODE/d' CMakeLists.txt || die
+
+	cmake_src_prepare
+}
+
 src_configure() {
+	local REV="${EGIT_VERSION:-00000000}"
 	local mycmakeargs=(
 		-DINPUTLEAP_BUILD_GUI=$(usex gui)
-		-DINPUTLEAP_BUILD_INSTALLER="no"
-		-DINPUTLEAP_BUILD_LIBEI="$(usex libei)"
-		-DINPUTLEAP_BUILD_TESTS="$(usex test)"
-		-DINPUTLEAP_BUILD_X11="$(usex X)"
-		# -DINPUTLEAP_REVISION=00000000
-		-DINPUTLEAP_USE_EXTERNAL_GTEST="yes"
+		-DINPUTLEAP_BUILD_LIBEI=$(usex wayland)
+		-DINPUTLEAP_BUILD_TESTS=$(usex test)
+		-DINPUTLEAP_BUILD_X11=$(usex X)
+		-DINPUTLEAP_REVISION="${REV:0:8}"
+		-DINPUTLEAP_USE_EXTERNAL_GTEST=ON
 		-DINPUTLEAP_VERSION_STAGE="gentoo"
 	)
-
-	if use gui || use qt6; then
-		mycmakeargs+=(
-			-DQT_DEFAULT_MAJOR_VERSION="$(usex qt6 6 5)"
-		)
-	fi
-
 	cmake_src_configure
 }
 
 src_test() {
-	"${BUILD_DIR}"/bin/unittests || die
-	virtx "${BUILD_DIR}"/bin/integtests || die
+	edo "${BUILD_DIR}/bin/unittests"
+
+	if use X; then
+		edo virtx "${BUILD_DIR}/bin/integtests"
+	else
+		edo "${BUILD_DIR}/bin/integtests"
+	fi
 }
 
 src_install() {
 	cmake_src_install
 	einstalldocs
-	doman doc/${PN}{c,s}.1
+
+	doman "doc/${PN}"{c,s}.1
 
 	if use gui; then
-		doicon -s scalable res/io.github.input_leap.InputLeap.svg
-		doicon -s 256 res/${PN}.png
-		make_desktop_entry ${PN} InputLeap ${PN} Utility
+		doicon -s scalable "res/io.github.input_leap.input-leap.svg"
+		doicon -s 256 "res/${PN}.png"
+		make_desktop_entry "${PN}" "InputLeap" "${PN}" "Utility"
 	fi
 }

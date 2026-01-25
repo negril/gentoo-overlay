@@ -5,9 +5,6 @@
 		<email>zdanevich.vitaly@ya.ru</email>
 		<name>Vitaly Zdanevich</name>
 	</maintainer>
-	<use>
-		<flag name="libei">Enable emulated input using <pkg>dev-libs/libei</pkg></flag>
-	</use>
 	<upstream>
 		<remote-id type="github">input-leap/input-leap</remote-id>
 	</upstream>
