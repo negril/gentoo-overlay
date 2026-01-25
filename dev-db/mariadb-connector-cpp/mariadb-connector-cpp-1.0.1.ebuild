@@ -11,7 +11,7 @@ else
 	MY_PV=${PV/_b/-b}
 	SRC_URI="https://downloads.mariadb.com/Connectors/cpp/connector-cpp-${PV}/${P}-src.tar.gz"
 	S="${WORKDIR%/}/${PN}-${MY_PV}-src"
-	KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ia64 ~ppc ~ppc64 ~riscv ~s390 ~sparc ~x86"
+	KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ppc ~ppc64 ~riscv ~s390 ~sparc ~x86"
 fi
 
 CMAKE_ECLASS=cmake
