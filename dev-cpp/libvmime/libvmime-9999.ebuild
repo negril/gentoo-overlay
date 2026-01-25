@@ -46,7 +46,7 @@ src_configure() {
 		-DVMIME_HAVE_MESSAGING_FEATURES="$(usex imap yes "$(usex maildir yes "$(usex pop yes "$(usex sendmail yes "$(usex smtp yes no)")")")")"
 
 		-DVMIME_HAVE_MESSAGING_PROTO_IMAP="$(usex imap)"
-		DVMIME_HAVE_MESSAGING_PROTO_MAILDIR="$(usex maildir)"
+		-DVMIME_HAVE_MESSAGING_PROTO_MAILDIR="$(usex maildir)"
 		-DVMIME_HAVE_MESSAGING_PROTO_POP3="$(usex pop)"
 		-DVMIME_HAVE_MESSAGING_PROTO_SENDMAIL="$(usex sendmail)"
 		-DVMIME_HAVE_MESSAGING_PROTO_SMTP="$(usex smtp)"
