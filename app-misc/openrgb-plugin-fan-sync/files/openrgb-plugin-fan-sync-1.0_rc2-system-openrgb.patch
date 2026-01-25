@@ -1,0 +1,36 @@
+From cbf3d7869c90fb2f0b019ee238a17ff989b53999 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 23 Oct 2025 16:36:49 +0200
+Subject: [PATCH] system openrgb
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/OpenRGBFanSyncPlugin.pro b/OpenRGBFanSyncPlugin.pro
+index 8d6daf5..24ca33a 100644
+--- a/OpenRGBFanSyncPlugin.pro
++++ b/OpenRGBFanSyncPlugin.pro
+@@ -93,21 +93,6 @@ HEADERS +=
+     OpenRGB/ResourceManagerInterface.h                                                          \
+     OpenRGB/qt/TabLabel.h                                                                       \
+ 
+-SOURCES +=                                                                                      \
+-    OpenRGB/RGBController/RGBController.cpp                                                     \
+-    OpenRGB/RGBController/RGBController_Network.cpp                                             \
+-    OpenRGB/NetworkServer.cpp                                                                   \
+-    OpenRGB/NetworkClient.cpp                                                                   \
+-    OpenRGB/NetworkProtocol.cpp                                                                 \
+-    OpenRGB/LogManager.cpp                                                                      \
+-    OpenRGB/net_port/net_port.cpp                                                               \
+-    OpenRGB/qt/hsv.cpp                                                                          \
+-    OpenRGB/qt/TabLabel.cpp                                                                     \
+-    OpenRGB/qt/OpenRGBFont.cpp                                                                  \
+-
+-FORMS +=                                                                                        \
+-    OpenRGB/qt/TabLabel.ui                                                                      \
+-
+ #-------------------------------------------------------------------#
+ # Includes                                                          #
+ #-------------------------------------------------------------------#
+-- 
+2.51.1
+
