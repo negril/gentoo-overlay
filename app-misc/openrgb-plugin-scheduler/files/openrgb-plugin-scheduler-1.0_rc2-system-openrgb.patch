@@ -1,0 +1,30 @@
+From 9f6d0afc67f6fd94848c35546b8fdb03eff748e9 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 23 Oct 2025 16:23:23 +0200
+Subject: [PATCH] system openrgb
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/OpenRGBSchedulerPlugin.pro b/OpenRGBSchedulerPlugin.pro
+index 95f9d39..5c7f655 100644
+--- a/OpenRGBSchedulerPlugin.pro
++++ b/OpenRGBSchedulerPlugin.pro
+@@ -103,15 +100,6 @@ HEADERS +=
+     OpenRGB/OpenRGBPluginInterface.h                                                            \
+     OpenRGB/ResourceManagerInterface.h                                                          \
+ 
+-SOURCES +=                                                                                      \
+-    OpenRGB/RGBController/RGBController.cpp                                                     \
+-    OpenRGB/RGBController/RGBController_Network.cpp                                             \
+-    OpenRGB/NetworkServer.cpp                                                                   \
+-    OpenRGB/NetworkClient.cpp                                                                   \
+-    OpenRGB/NetworkProtocol.cpp                                                                 \
+-    OpenRGB/LogManager.cpp                                                                      \
+-    OpenRGB/net_port/net_port.cpp                                                               \
+-
+ #-----------------------------------------------------------------------------------------------#
+ # Includes                                                                                      #
+ #-----------------------------------------------------------------------------------------------#
+-- 
+2.51.1
+
