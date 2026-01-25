@@ -1,0 +1,23 @@
+From 612ca8e88fd00bb12522b70de90adb4baec021e2 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 25 Sep 2025 22:39:58 +0200
+Subject: [PATCH] eigen 5
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b04d447..190f65f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -517,7 +517,7 @@ endif()
+ 
+ # Find eigen3 or use bundled version
+ if (NOT SLIC3R_STATIC)
+-    find_package(Eigen3 3.3 NO_MODULE)
++    find_package(Eigen3 NO_MODULE)
+ endif ()
+ if (NOT EIGEN3_FOUND)
+     set(EIGEN3_FOUND 1)
+-- 
+2.51.0
+

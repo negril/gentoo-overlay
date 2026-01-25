@@ -1,0 +1,1255 @@
+From d1d3530c1db10fe29e4ab25d8e94cdabafcfecd9 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 5 Mar 2025 21:19:42 +0100
+Subject: [PATCH 01/19] cmp0175
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ac1af19e3..3695087c5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -584,13 +584,16 @@ add_custom_target(gettext_merge_po_with_pot
+ )
+ file(GLOB BBL_L10N_PO_FILES "${BBL_L18N_DIR}/*/OrcaSlicer*.po")
+ foreach(po_file ${BBL_L10N_PO_FILES})
++    GET_FILENAME_COMPONENT(po_file_name "${po_file}" NAME)
+     GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
++    GET_FILENAME_COMPONENT(po_dir_name "${po_dir}" NAME)
+     SET(po_new_file "${po_dir}/OrcaSlicer_.po")
+-    add_custom_command(
+-        TARGET gettext_merge_po_with_pot PRE_BUILD
++    add_custom_target(
++        gettext_merge_po_with_pot_${po_dir_name}_${po_file_name}
+         COMMAND msgmerge -N -o ${po_file} ${po_file} "${BBL_L18N_DIR}/OrcaSlicer.pot"
+         DEPENDS ${po_file}
+     )
++    add_dependencies(gettext_merge_po_with_pot gettext_merge_po_with_pot_${po_dir_name}_${po_file_name})
+ endforeach()
+ add_custom_target(gettext_po_to_mo
+     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+@@ -598,15 +601,17 @@ add_custom_target(gettext_po_to_mo
+ )
+ file(GLOB L10N_PO_FILES "${BBL_L18N_DIR}/*/OrcaSlicer*.po")
+ foreach(po_file ${BBL_L10N_PO_FILES})
++    GET_FILENAME_COMPONENT(po_file_name "${po_file}" NAME)
+     GET_FILENAME_COMPONENT(SECOND_FOLDER_ABSOLUTE ${po_file} DIRECTORY)
+     string(REGEX REPLACE ".*/(.*)" "\\1" po_dir "${SECOND_FOLDER_ABSOLUTE}" )
+     SET(mo_file "${L10N_DIR}/${po_dir}/OrcaSlicer.mo")
+-    add_custom_command(
+-        TARGET gettext_po_to_mo PRE_BUILD
++    add_custom_target(
++        gettext_po_to_mo_${po_dir}_${po_file_name}
+         COMMAND msgfmt ARGS --check-format -o ${mo_file} ${po_file}
+         #COMMAND msgfmt ARGS --check-compatibility -o ${mo_file} ${po_file}
+         DEPENDS ${po_file}
+     )
++    add_dependencies(gettext_po_to_mo gettext_po_to_mo_${po_dir}_${po_file_name})
+ endforeach()
+ 
+ find_package(NLopt 1.4 REQUIRED)
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 8133c2b06..7c8887b67 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -235,10 +235,6 @@ else ()
+             COMMAND ln -sf OrcaSlicer orca-slicer
+             WORKING_DIRECTORY "$<TARGET_FILE_DIR:OrcaSlicer>"
+             VERBATIM)
+-    else ()
+-        add_custom_command(TARGET OrcaSlicer POST_BUILD
+-            WORKING_DIRECTORY "$<TARGET_FILE_DIR:OrcaSlicer>"
+-            VERBATIM)
+     endif ()
+     if (XCODE)
+         # Because of Debug/Release/etc. configurations (similar to MSVC) the slic3r binary is located in an extra level
+-- 
+2.49.0
+
+
+From d0f89cfa46f4c6d6eba7f16cdc9a2592b73dab58 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sun, 16 Feb 2025 16:46:26 +0100
+Subject: [PATCH 02/19] cmp0175 build-utils
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/build-utils/CMakeLists.txt b/src/build-utils/CMakeLists.txt
+index 464fd9c8f..06d8d9495 100644
+--- a/src/build-utils/CMakeLists.txt
++++ b/src/build-utils/CMakeLists.txt
+@@ -37,6 +37,7 @@ function(encoding_check TARGET)
+         # Add checking of each source file as a subcommand of encoding-check-${TARGET}
+         foreach(file ${T_SOURCES})
+             add_custom_command(TARGET encoding-check-${TARGET}
++                PRE_BUILD
+                 COMMAND $<TARGET_FILE:encoding-check> ${TARGET} ${file}
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+             )
+-- 
+2.49.0
+
+
+From 2f242034a2b5c38f10f02ced72b36db18531324f Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sat, 24 May 2025 22:26:49 +0200
+Subject: [PATCH 03/19] find libigl
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libigl/CMakeLists.txt b/src/libigl/CMakeLists.txt
+index f023826a5..6a439bf1b 100644
+--- a/src/libigl/CMakeLists.txt
++++ b/src/libigl/CMakeLists.txt
+@@ -3,11 +3,11 @@ project(libigl)
+ 
+ add_library(libigl INTERFACE)
+ 
+-find_package(libigl QUIET)
++find_package(Libigl CONFIG)
+ 
+-if(libigl_FOUND)
++if(Libigl_FOUND)
+     message(STATUS "IGL found, using system version...")
+-    target_link_libraries(libigl INTERFACE igl::core)
++    target_link_libraries(libigl INTERFACE igl::igl_core)
+ else()
+     message(STATUS "IGL NOT found, using bundled version...")
+     target_include_directories(libigl SYSTEM BEFORE INTERFACE ${LIBDIR}/libigl)
+-- 
+2.49.0
+
+
+From 64fb6c690e64456afb264260a19bbf22431c975c Mon Sep 17 00:00:00 2001
+From: Laurent Rineau <laurent.rineau@cgal.org>
+Date: Sat, 13 Jul 2024 01:19:21 +0200
+Subject: [PATCH 04/19] compatibility with CGAL-6.0 (and 5.6.x)
+
+updated for 2.8.1
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/CutSurface.cpp b/src/libslic3r/CutSurface.cpp
+index 01a5a8383..486473fea 100644
+--- a/src/libslic3r/CutSurface.cpp
++++ b/src/libslic3r/CutSurface.cpp
+@@ -1,5 +1,13 @@
+ #include "CutSurface.hpp"
+ 
++template <typename T>
++auto access_pmap(std::optional<T> opt) -> T {
++    return opt.value();
++}
++
++template <typename Pair>
++auto access_pmap(Pair pair) { return pair.first; }
++
+ /// models_input.obj - Check transormation of model to each others
+ /// projection_center.obj - circle representing center of projection with correct distance
+ /// {M} .. model index
+@@ -29,6 +37,7 @@ using namespace Slic3r;
+ #include <CGAL/Exact_integer.h>
+ #include <CGAL/Surface_mesh.h>
+ #include <CGAL/Cartesian_converter.h>
++#include <CGAL/AABB_traits.h>
+ #include <tbb/parallel_for.h>
+ 
+ // libslic3r
+@@ -993,8 +1002,8 @@ priv::CutMesh priv::to_cgal(const ExPolygons  &shapes,
+     if (shapes.empty()) return {};
+         
+     CutMesh result;
+-    EdgeShapeMap edge_shape_map = result.add_property_map<EI, IntersectingElement>(edge_shape_map_name).first;
+-    FaceShapeMap face_shape_map = result.add_property_map<FI, IntersectingElement>(face_shape_map_name).first;
++    EdgeShapeMap edge_shape_map  = access_pmap((result.add_property_map<EI, IntersectingElement>(edge_shape_map_name)));
++    FaceShapeMap face_shape_map  = access_pmap((result.add_property_map<FI, IntersectingElement>(face_shape_map_name)));
+ 
+     std::vector<VI> indices;
+     auto insert_contour = [&projection, &indices, &result, 
+@@ -1404,17 +1413,17 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
+                                    const ExPolygonsIndices &s2i)
+ {
+     // pointer to edge or face shape_map
+-    VertexShapeMap vert_shape_map = cgal_model.add_property_map<VI, const IntersectingElement*>(vert_shape_map_name, nullptr).first;
++    VertexShapeMap vert_shape_map  = access_pmap((cgal_model.add_property_map<VI, const IntersectingElement*>(vert_shape_map_name, nullptr)));
+     
+     // detect anomalities in visitor.
+     bool is_valid = true;
+     // NOTE: map are created when convert shapes to cgal model
+-    const EdgeShapeMap& edge_shape_map = cgal_shape.property_map<EI, IntersectingElement>(edge_shape_map_name).first;
+-    const FaceShapeMap& face_shape_map = cgal_shape.property_map<FI, IntersectingElement>(face_shape_map_name).first;
++    const EdgeShapeMap& edge_shape_map  = access_pmap((cgal_shape.property_map<EI, IntersectingElement>(edge_shape_map_name)));
++    const FaceShapeMap& face_shape_map  = access_pmap((cgal_shape.property_map<FI, IntersectingElement>(face_shape_map_name)));
+     Visitor visitor{cgal_model, cgal_shape, edge_shape_map, face_shape_map, vert_shape_map, &is_valid};
+ 
+     // a property map containing the constrained-or-not status of each edge
+-    EdgeBoolMap ecm = cgal_model.add_property_map<EI, bool>(is_constrained_edge_name, false).first;
++    EdgeBoolMap ecm  = access_pmap((cgal_model.add_property_map<EI, bool>(is_constrained_edge_name, false)));
+     const auto &p = CGAL::parameters::visitor(visitor)
+                         .edge_is_constrained_map(ecm)
+                         .throw_on_self_intersection(false);
+@@ -1423,7 +1432,7 @@ priv::CutAOIs priv::cut_from_model(CutMesh                &cgal_model,
+ 
+     if (!is_valid) return {};
+ 
+-    FaceTypeMap face_type_map = cgal_model.add_property_map<FI, FaceType>(face_type_map_name, FaceType::not_constrained).first;
++    FaceTypeMap face_type_map  = access_pmap((cgal_model.add_property_map<FI, FaceType>(face_type_map_name, FaceType::not_constrained)));
+ 
+     // Select inside and outside face in model
+     set_face_type(face_type_map, cgal_model, vert_shape_map, ecm, cgal_shape, s2i);
+@@ -1559,8 +1568,8 @@ void priv::collect_surface_data(std::queue<FI>  &process,
+ 
+ void priv::create_reduce_map(ReductionMap &reduction_map, const CutMesh &mesh)
+ {
+-    const VertexShapeMap &vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name).first;
+-    const EdgeBoolMap &ecm = mesh.property_map<EI, bool>(is_constrained_edge_name).first;
++    const VertexShapeMap &vert_shape_map  = access_pmap((mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name)));
++    const EdgeBoolMap &ecm  = access_pmap((mesh.property_map<EI, bool>(is_constrained_edge_name)));
+ 
+     // check if vertex was made by edge_2 which is diagonal of quad
+     auto is_reducible_vertex = [&vert_shape_map](VI reduction_from) -> bool {
+@@ -1745,10 +1754,10 @@ priv::VDistances priv::calc_distances(const SurfacePatches &patches,
+     for (const SurfacePatch &patch : patches) {
+         // map is created during intersection by corefine visitor
+         const VertexShapeMap &vert_shape_map = 
+-            models[patch.model_id].property_map<VI, const IntersectingElement *>(vert_shape_map_name).first;
++            access_pmap((models[patch.model_id].property_map<VI, const IntersectingElement *>(vert_shape_map_name)));
+         uint32_t patch_index = &patch - &patches.front();
+         // map is created during patch creation / dividing
+-        const CvtVI2VI& cvt = patch.mesh.property_map<VI, VI>(patch_source_name).first;
++        const CvtVI2VI& cvt  = access_pmap((patch.mesh.property_map<VI, VI>(patch_source_name)));
+         // for each point on outline
+         for (const Loop &loop : patch.loops) 
+         for (const VI &vi_patch : loop) {
+@@ -2636,7 +2645,7 @@ priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis,
+                                               /* const */ CutMesh   &mesh,
+                                               const ReductionMap    *rmap)
+ {
+-    auto is_counted = mesh.add_property_map<VI, bool>("v:is_counted").first;
++    auto is_counted  = access_pmap((mesh.add_property_map<VI, bool>("v:is_counted")));
+     uint32_t count_vertices = 0;
+     if (rmap == nullptr) {
+         for (FI fi : fis) 
+@@ -2666,7 +2675,7 @@ priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis,
+     cm.reserve(count_vertices, count_edges, count_faces);
+ 
+     // vertex conversion function from mesh VI to result VI
+-    CvtVI2VI mesh2result = mesh.add_property_map<VI,VI>("v:mesh2result").first;
++    CvtVI2VI mesh2result  = access_pmap((mesh.add_property_map<VI,VI>("v:mesh2result")));
+ 
+     if (rmap == nullptr) {
+         for (FI fi : fis) {
+@@ -2718,7 +2727,7 @@ priv::SurfacePatch priv::create_surface_patch(const std::vector<FI> &fis,
+     assert(count_edges >= cm.edges().size());
+     
+     // convert VI from this patch to source VI, when exist
+-    CvtVI2VI cvt = cm.add_property_map<VI, VI>(patch_source_name).first;
++    CvtVI2VI cvt  = access_pmap((cm.add_property_map<VI, VI>(patch_source_name)));
+     // vi_s .. VertexIndex into mesh (source)
+     // vi_d .. new VertexIndex in cm (destination)
+     for (VI vi_s : mesh.vertices()) { 
+@@ -2909,7 +2918,7 @@ bool priv::is_patch_inside_of_model(const SurfacePatch &patch,
+ uint32_t priv::get_shape_point_index(const CutAOI &cut, const CutMesh &model)
+ {
+     // map is created during intersection by corefine visitor
+-    const VertexShapeMap &vert_shape_map = model.property_map<VI, const IntersectingElement *>(vert_shape_map_name).first;
++    const VertexShapeMap &vert_shape_map  = access_pmap((model.property_map<VI, const IntersectingElement *>(vert_shape_map_name)));
+     // for each half edge of outline
+     for (HI hi : cut.second) {
+         VI vi = model.source(hi);
+@@ -2934,7 +2943,7 @@ priv::SurfacePatch priv::separate_patch(const std::vector<FI>& fis,
+     patch_new.model_id     = patch.model_id;
+     patch_new.shape_id     = patch.shape_id;
+     // fix cvt
+-    CvtVI2VI cvt = patch_new.mesh.property_map<VI, VI>(patch_source_name).first;
++    CvtVI2VI cvt  = access_pmap((patch_new.mesh.property_map<VI, VI>(patch_source_name)));
+     for (VI &vi : cvt) {
+         if (!vi.is_valid()) continue;
+         vi = cvt_from[vi];
+@@ -2952,9 +2961,9 @@ void priv::divide_patch(size_t i, SurfacePatchesEx &patches)
+     CutMesh& cm = patch.mesh;
+     assert(!cm.faces().empty());
+     std::string patch_number_name = "f:patch_number";
+-    CutMesh::Property_map<FI,bool> is_processed = cm.add_property_map<FI, bool>(patch_number_name, false).first;
++    CutMesh::Property_map<FI,bool> is_processed  = access_pmap((cm.add_property_map<FI, bool>(patch_number_name, false)));
+     
+-    const CvtVI2VI& cvt_from = patch.mesh.property_map<VI, VI>(patch_source_name).first;
++    const CvtVI2VI& cvt_from  = access_pmap((patch.mesh.property_map<VI, VI>(patch_source_name)));
+ 
+     std::vector<FI> fis;
+     fis.reserve(cm.faces().size());
+@@ -3055,7 +3064,7 @@ priv::SurfacePatches priv::diff_models(VCutAOIs            &cuts,
+         CutAOIs &model_cuts = cuts[model_index];
+         CutMesh &cut_model_ = cut_models[model_index];
+         const CutMesh &cut_model = cut_model_;
+-        ReductionMap vertex_reduction_map = cut_model_.add_property_map<VI, VI>(vertex_reduction_map_name).first;
++        ReductionMap vertex_reduction_map  = access_pmap((cut_model_.add_property_map<VI, VI>(vertex_reduction_map_name)));
+         create_reduce_map(vertex_reduction_map, cut_model);
+ 
+         for (size_t cut_index = 0; cut_index < model_cuts.size(); ++cut_index, ++index) {
+@@ -3141,7 +3150,7 @@ bool priv::is_over_whole_expoly(const CutAOI    &cutAOI,
+                                 const CutMesh   &mesh)
+ {
+     // NonInterupted contour is without other point and contain all from shape    
+-    const VertexShapeMap &vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name).first;
++    const VertexShapeMap &vert_shape_map  = access_pmap((mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name)));
+     for (HI hi : cutAOI.second) { 
+         const IntersectingElement *ie_s = vert_shape_map[mesh.source(hi)];
+         const IntersectingElement *ie_t = vert_shape_map[mesh.target(hi)];
+@@ -3678,7 +3687,7 @@ void priv::store(const CutMesh &mesh, const FaceTypeMap &face_type_map, const st
+     }
+ 
+     CutMesh &mesh_ = const_cast<CutMesh &>(mesh);
+-    auto face_colors = mesh_.add_property_map<priv::FI, CGAL::Color>("f:color").first;    
++    auto face_colors  = access_pmap((mesh_.add_property_map<priv::FI, CGAL::Color>("f:color")));
+     for (FI fi : mesh.faces()) { 
+         auto &color = face_colors[fi];
+         switch (face_type_map[fi]) {
+@@ -3704,7 +3713,7 @@ void priv::store(const CutMesh &mesh, const ReductionMap &reduction_map, const s
+     std::string off_file = dir + "model" + std::to_string(reduction_order++) + ".off";
+ 
+     CutMesh &mesh_ = const_cast<CutMesh &>(mesh);
+-    auto vertex_colors = mesh_.add_property_map<priv::VI, CGAL::Color>("v:color").first;    
++    auto vertex_colors  = access_pmap((mesh_.add_property_map<priv::VI, CGAL::Color>("v:color")));
+     // initialize to gray color
+     for (VI vi: mesh.vertices())
+         vertex_colors[vi] = CGAL::Color{127, 127, 127};
+-- 
+2.49.0
+
+
+From 14084be5f492e2aed0ada666703b538ff429dc63 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 4 Dec 2024 23:01:21 +0100
+Subject: [PATCH 05/19] make unambiguous
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/slic3r/GUI/PhysicalPrinterDialog.cpp b/src/slic3r/GUI/PhysicalPrinterDialog.cpp
+index 1ec7b537e..f40d5cbbb 100644
+--- a/src/slic3r/GUI/PhysicalPrinterDialog.cpp
++++ b/src/slic3r/GUI/PhysicalPrinterDialog.cpp
+@@ -374,7 +374,7 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
+     // Always fill in the "printhost_port" combo box from the config and select it.
+     {
+         Choice* choice = dynamic_cast<Choice*>(m_optgroup->get_field("printhost_port"));
+-        choice->set_values({ m_config->opt_string("printhost_port") });
++        choice->set_values(std::vector<std::string>({ m_config->opt_string("printhost_port") }));
+         choice->set_selection();
+     }
+ 
+-- 
+2.49.0
+
+
+From d557ae7dd72d0f213ab1c0853559159f5afa5d78 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 20:05:05 +0200
+Subject: [PATCH 06/19] boost 1.87
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/GCodeSender.cpp b/src/libslic3r/GCodeSender.cpp
+index 275dd61a7..463340caf 100644
+--- a/src/libslic3r/GCodeSender.cpp
++++ b/src/libslic3r/GCodeSender.cpp
+@@ -102,12 +102,13 @@ GCodeSender::connect(std::string devname, unsigned int baud_rate)
+     fs.open("serial.txt", std::fstream::out | std::fstream::trunc);
+ #endif
+     
+-    // this gives some work to the io_service before it is started
++    // this gives some work to the io_context before it is started
+     // (post() runs the supplied function in its thread)
+-    this->io.post(boost::bind(&GCodeSender::do_read, this));
++    boost::asio::post(this->io, boost::bind(&GCodeSender::do_read, this));
++    //this->io.get_executor().post(boost::bind(&GCodeSender::do_read, this));
+     
+     // start reading in the background thread
+-    boost::thread t(boost::bind(&boost::asio::io_service::run, &this->io));
++    boost::thread t(boost::bind(&boost::asio::io_context::run, &this->io));
+     this->background_thread.swap(t);
+     
+     // always send a M105 to check for connection because firmware might be silent on connect
+@@ -164,7 +165,8 @@ GCodeSender::disconnect()
+     if (!this->open) return;
+     this->open = false;
+     this->connected = false;
+-    this->io.post(boost::bind(&GCodeSender::do_close, this));
++    boost::asio::post(this->io, boost::bind(&GCodeSender::do_close, this));
++    //this->io.get_executor().post(boost::bind(&GCodeSender::do_close, this));
+     this->background_thread.join();
+     this->io.reset();
+     /*
+@@ -457,7 +459,9 @@ GCodeSender::send(const std::string &line, bool priority)
+ void
+ GCodeSender::send()
+ {
+-    this->io.post(boost::bind(&GCodeSender::do_send, this));
++
++    boost::asio::post(this->io, boost::bind(&GCodeSender::do_send, this));
++    //this->io.get_executor().post(boost::bind(&GCodeSender::do_send, this));
+ }
+ 
+ void
+diff --git a/src/libslic3r/GCodeSender.hpp b/src/libslic3r/GCodeSender.hpp
+index 3a2055e54..5c8eec437 100644
+--- a/src/libslic3r/GCodeSender.hpp
++++ b/src/libslic3r/GCodeSender.hpp
+@@ -35,7 +35,7 @@ class GCodeSender : private boost::noncopyable {
+     void reset();
+     
+     private:
+-    asio::io_service io;
++    asio::io_context io;
+     asio::serial_port serial;
+     boost::thread background_thread;
+     boost::asio::streambuf read_buffer, write_buffer;
+diff --git a/src/slic3r/GUI/HttpServer.cpp b/src/slic3r/GUI/HttpServer.cpp
+index 83757ed4f..3a2c81a56 100644
+--- a/src/slic3r/GUI/HttpServer.cpp
++++ b/src/slic3r/GUI/HttpServer.cpp
+@@ -156,7 +156,7 @@ void HttpServer::start()
+ 
+         server_->do_accept();
+ 
+-        server_->io_service.run();
++        server_->io_context.run();
+     });
+ }
+ 
+@@ -166,7 +166,7 @@ void HttpServer::stop()
+     if (server_) {
+         server_->acceptor.close();
+         server_->stop_all();
+-        server_->io_service.stop();
++        server_->io_context.stop();
+     }
+     if (m_http_server_thread.joinable())
+         m_http_server_thread.join();
+diff --git a/src/slic3r/GUI/HttpServer.hpp b/src/slic3r/GUI/HttpServer.hpp
+index 5c1547f01..d10d0d9d9 100644
+--- a/src/slic3r/GUI/HttpServer.hpp
++++ b/src/slic3r/GUI/HttpServer.hpp
+@@ -115,11 +115,11 @@ private:
+     {
+     public:
+         HttpServer&                        server;
+-        boost::asio::io_service            io_service;
++        boost::asio::io_context            io_context;
+         boost::asio::ip::tcp::acceptor     acceptor;
+         std::set<std::shared_ptr<session>> sessions;
+ 
+-        IOServer(HttpServer& server) : server(server), acceptor(io_service, {boost::asio::ip::tcp::v4(), server.port}) {}
++        IOServer(HttpServer& server) : server(server), acceptor(io_context, {boost::asio::ip::tcp::v4(), server.port}) {}
+ 
+         void do_accept();
+ 
+diff --git a/src/slic3r/Utils/Bonjour.cpp b/src/slic3r/Utils/Bonjour.cpp
+index 0701695ef..237b34bf2 100644
+--- a/src/slic3r/Utils/Bonjour.cpp
++++ b/src/slic3r/Utils/Bonjour.cpp
+@@ -620,11 +620,11 @@ UdpSession::UdpSession(Bonjour::ReplyFn rfn) : replyfn(rfn)
+ 	buffer.resize(DnsMessage::MAX_SIZE);
+ }
+ 
+-UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, const asio::ip::address& interface_address, std::shared_ptr< boost::asio::io_service > io_service)
++UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, const asio::ip::address& interface_address, std::shared_ptr< boost::asio::io_context > io_context)
+ 	: replyfn(replyfn)
+ 	, multicast_address(multicast_address)
+-	, socket(*io_service)
+-	, io_service(io_service)
++	, socket(*io_context)
++	, io_context(io_context)
+ {
+ 	try {
+ 		// open socket
+@@ -654,11 +654,11 @@ UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multica
+ }
+ 
+ 
+-UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, std::shared_ptr< boost::asio::io_service > io_service)
++UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, std::shared_ptr< boost::asio::io_context > io_context)
+ 	: replyfn(replyfn)
+ 	, multicast_address(multicast_address)
+-	, socket(*io_service)
+-	, io_service(io_service)
++	, socket(*io_context)
++	, io_context(io_context)
+ {
+ 	try {
+ 		// open socket
+@@ -707,10 +707,10 @@ void UdpSocket::async_receive()
+ 
+ void UdpSocket::receive_handler(SharedSession session, const boost::system::error_code& error, size_t bytes)
+ {
+-	// let io_service to handle the datagram on session
+-	// from boost documentation io_service::post:
+-	// The io_service guarantees that the handler will only be called in a thread in which the run(), run_one(), poll() or poll_one() member functions is currently being invoked.
+-	io_service->post(boost::bind(&UdpSession::handle_receive, session, error, bytes));
++	// let io_context to handle the datagram on session
++	// from boost documentation io_context::post:
++	// The io_context guarantees that the handler will only be called in a thread in which the run(), run_one(), poll() or poll_one() member functions is currently being invoked.
++	boost::asio::post(*io_context, boost::bind(&UdpSession::handle_receive, session, error, bytes));
+ 	// immediately accept new datagrams
+ 	async_receive();
+ }
+@@ -867,13 +867,13 @@ void Bonjour::priv::lookup_perform()
+ {
+ 	service_dn = (boost::format("_%1%._%2%.local") % service % protocol).str();
+ 
+-	std::shared_ptr< boost::asio::io_service > io_service(new boost::asio::io_service);
++	std::shared_ptr< boost::asio::io_context > io_context(new boost::asio::io_context);
+ 
+ 	std::vector<LookupSocket*> sockets;
+ 
+ 	// resolve intefaces - from PR#6646
+ 	std::vector<boost::asio::ip::address> interfaces;
+-	asio::ip::udp::resolver resolver(*io_service);
++	asio::ip::udp::resolver resolver(*io_context);
+ 	boost::system::error_code ec;
+ 	// ipv4 interfaces
+ 	auto results = resolver.resolve(udp::v4(), asio::ip::host_name(), "", ec);
+@@ -886,12 +886,12 @@ void Bonjour::priv::lookup_perform()
+ 		// create ipv4 socket for each interface
+ 		// each will send to querry to for both ipv4 and ipv6
+ 		for (const auto& intrfc : interfaces) 		
+-			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP4, intrfc, io_service));
++			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP4, intrfc, io_context));
+ 	} else {
+ 		BOOST_LOG_TRIVIAL(info) << "Failed to resolve ipv4 interfaces: " << ec.message();
+ 	}
+ 	if (sockets.empty())
+-		sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP4, io_service));
++		sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP4, io_context));
+ 	// ipv6 interfaces
+ 	interfaces.clear();
+ 	//udp::resolver::query query(host, PORT, boost::asio::ip::resolver_query_base::numeric_service);
+@@ -906,9 +906,9 @@ void Bonjour::priv::lookup_perform()
+ 		// create ipv6 socket for each interface
+ 		// each will send to querry to for both ipv4 and ipv6
+ 		for (const auto& intrfc : interfaces)
+-			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP6, intrfc, io_service));
++			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP6, intrfc, io_context));
+ 		if (interfaces.empty())
+-			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP6, io_service));
++			sockets.emplace_back(new LookupSocket(txt_keys, service, service_dn, protocol, replyfn, BonjourRequest::MCAST_IP6, io_context));
+ 	} else {
+ 		BOOST_LOG_TRIVIAL(info)<< "Failed to resolve ipv6 interfaces: " << ec.message();
+ 	}
+@@ -919,13 +919,13 @@ void Bonjour::priv::lookup_perform()
+ 			socket->send();
+ 
+ 		// timer settings
+-		asio::deadline_timer timer(*io_service);
++		asio::deadline_timer timer(*io_context);
+ 		retries--;
+ 		std::function<void(const error_code&)> timer_handler = [&](const error_code& error) {
+ 			// end 
+ 			if (retries == 0 || error) {
+ 				// is this correct ending?
+-				io_service->stop();
++				io_context->stop();
+ 				if (completefn) {
+ 					completefn();
+ 				}
+@@ -942,8 +942,8 @@ void Bonjour::priv::lookup_perform()
+ 		// start timer
+ 		timer.expires_from_now(boost::posix_time::seconds(timeout));
+ 		timer.async_wait(timer_handler);
+-		// start io_service, it will run until it has something to do - so in this case until stop is called in timer
+-		io_service->run();
++		// start io_context, it will run until it has something to do - so in this case until stop is called in timer
++		io_context->run();
+ 	}
+ 	catch (std::exception& e) {
+ 		BOOST_LOG_TRIVIAL(error) << e.what();
+@@ -952,7 +952,7 @@ void Bonjour::priv::lookup_perform()
+ 
+ void Bonjour::priv::resolve_perform()
+ {
+-	// reply callback is shared to every UDPSession which is called on same thread as io_service->run();
++	// reply callback is shared to every UDPSession which is called on same thread as io_context->run();
+ 	// thus no need to mutex replies in reply_callback, same should go with the timer
+ 	std::vector<BonjourReply> replies;
+ 	// examples would store [self] to the lambda (and the timer one), is it ok not to do it? (Should be c++03)
+@@ -962,12 +962,12 @@ void Bonjour::priv::resolve_perform()
+ 			rpls.push_back(reply);
+ 	};
+ 
+-	std::shared_ptr< boost::asio::io_service > io_service(new boost::asio::io_service);
++	std::shared_ptr< boost::asio::io_context > io_context(new boost::asio::io_context);
+ 	std::vector<ResolveSocket*> sockets;
+ 
+ 	// resolve interfaces - from PR#6646
+ 	std::vector<boost::asio::ip::address> interfaces;
+-	asio::ip::udp::resolver resolver(*io_service);
++	asio::ip::udp::resolver resolver(*io_context);
+ 	boost::system::error_code ec;
+ 	// ipv4 interfaces
+ 	auto results = resolver.resolve(udp::v4(), asio::ip::host_name(), "", ec);
+@@ -980,12 +980,12 @@ void Bonjour::priv::resolve_perform()
+ 		// create ipv4 socket for each interface
+ 		// each will send to querry to for both ipv4 and ipv6
+ 		for (const auto& intrfc : interfaces)
+-			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP4, intrfc, io_service));
++			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP4, intrfc, io_context));
+ 	} else {
+ 		BOOST_LOG_TRIVIAL(info) << "Failed to resolve ipv4 interfaces: " << ec.message();
+ 	}
+ 	if (sockets.empty())
+-		sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP4, io_service));
++		sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP4, io_context));
+ 
+ 	// ipv6 interfaces
+ 	interfaces.clear();
+@@ -999,9 +999,9 @@ void Bonjour::priv::resolve_perform()
+ 		// create ipv6 socket for each interface
+ 		// each will send to querry to for both ipv4 and ipv6
+ 		for (const auto& intrfc : interfaces) 
+-			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP6, intrfc, io_service));
++			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP6, intrfc, io_context));
+ 		if (interfaces.empty())
+-			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP6, io_service));
++			sockets.emplace_back(new ResolveSocket(hostname, reply_callback, BonjourRequest::MCAST_IP6, io_context));
+ 	} else {
+ 		BOOST_LOG_TRIVIAL(info) << "Failed to resolve ipv6 interfaces: " << ec.message();
+ 	}
+@@ -1012,14 +1012,14 @@ void Bonjour::priv::resolve_perform()
+ 			socket->send();
+ 
+ 		// timer settings
+-		asio::deadline_timer timer(*io_service);
++		asio::deadline_timer timer(*io_context);
+ 		retries--;
+ 		std::function<void(const error_code&)> timer_handler = [&](const error_code& error) {
+ 			int replies_count = replies.size();
+ 			// end 
+ 			if (retries == 0 || error || replies_count > 0) {
+ 				// is this correct ending?
+-				io_service->stop();
++				io_context->stop();
+ 				if (replies_count > 0 && resolvefn) {
+ 					resolvefn(replies);
+ 				}
+@@ -1036,8 +1036,8 @@ void Bonjour::priv::resolve_perform()
+ 		// start timer
+ 		timer.expires_from_now(boost::posix_time::seconds(timeout));
+ 		timer.async_wait(timer_handler);
+-		// start io_service, it will run until it has something to do - so in this case until stop is called in timer
+-		io_service->run();
++		// start io_context, it will run until it has something to do - so in this case until stop is called in timer
++		io_context->run();
+ 	}
+ 	catch (std::exception& e) {
+ 		BOOST_LOG_TRIVIAL(error) << e.what();
+diff --git a/src/slic3r/Utils/Bonjour.hpp b/src/slic3r/Utils/Bonjour.hpp
+index 50b71791f..dd12a0549 100644
+--- a/src/slic3r/Utils/Bonjour.hpp
++++ b/src/slic3r/Utils/Bonjour.hpp
+@@ -109,7 +109,7 @@ private:
+ class LookupSocket;
+ class ResolveSocket;
+ 
+-// Session is created for each async_receive of socket. On receive, its handle_receive method is called (Thru io_service->post).
++// Session is created for each async_receive of socket. On receive, its handle_receive method is called (Thru io_context->post).
+ // ReplyFn is called if correct datagram was received. 
+ class UdpSession 
+ {
+@@ -143,7 +143,7 @@ protected:
+ 	const ResolveSocket* socket;
+ };
+ 
+-// Udp socket, starts receiving answers after first send() call until io_service is stopped.
++// Udp socket, starts receiving answers after first send() call until io_context is stopped.
+ class UdpSocket
+ {
+ public:
+@@ -151,11 +151,11 @@ public:
+ 	UdpSocket(Bonjour::ReplyFn replyfn
+ 		, const boost::asio::ip::address& multicast_address
+ 		, const boost::asio::ip::address& interface_address
+-		, std::shared_ptr< boost::asio::io_service > io_service);
++		, std::shared_ptr< boost::asio::io_context > io_context);
+ 
+ 	UdpSocket(Bonjour::ReplyFn replyfn
+ 		, const boost::asio::ip::address& multicast_address
+-		, std::shared_ptr< boost::asio::io_service > io_service);
++		, std::shared_ptr< boost::asio::io_context > io_context);
+ 
+ 	void send();
+ 	void async_receive();
+@@ -168,7 +168,7 @@ protected:
+ 	boost::asio::ip::address					    multicast_address;
+ 	boost::asio::ip::udp::socket					socket;
+ 	boost::asio::ip::udp::endpoint					mcast_endpoint;
+-	std::shared_ptr< boost::asio::io_service >	io_service;
++	std::shared_ptr< boost::asio::io_context >	io_context;
+ 	std::vector<BonjourRequest>						requests;
+ };
+ 
+@@ -182,8 +182,8 @@ public:
+ 		, Bonjour::ReplyFn replyfn
+ 		, const boost::asio::ip::address& multicast_address
+ 		, const boost::asio::ip::address& interface_address
+-		, std::shared_ptr< boost::asio::io_service > io_service)
+-		: UdpSocket(replyfn, multicast_address, interface_address, io_service)
++		, std::shared_ptr< boost::asio::io_context > io_context)
++		: UdpSocket(replyfn, multicast_address, interface_address, io_context)
+ 		, txt_keys(txt_keys)
+ 		, service(service)
+ 		, service_dn(service_dn)
+@@ -199,8 +199,8 @@ public:
+ 		, std::string protocol
+ 		, Bonjour::ReplyFn replyfn
+ 		, const boost::asio::ip::address& multicast_address
+-		, std::shared_ptr< boost::asio::io_service > io_service)
+-		: UdpSocket(replyfn, multicast_address, io_service)
++		, std::shared_ptr< boost::asio::io_context > io_context)
++		: UdpSocket(replyfn, multicast_address, io_context)
+ 		, txt_keys(txt_keys)
+ 		, service(service)
+ 		, service_dn(service_dn)
+@@ -237,8 +237,8 @@ public:
+ 		, Bonjour::ReplyFn replyfn
+ 		, const boost::asio::ip::address& multicast_address
+ 		, const boost::asio::ip::address& interface_address
+-		, std::shared_ptr< boost::asio::io_service > io_service)
+-		: UdpSocket(replyfn, multicast_address, interface_address, io_service)
++		, std::shared_ptr< boost::asio::io_context > io_context)
++		: UdpSocket(replyfn, multicast_address, interface_address, io_context)
+ 		, hostname(hostname)
+ 
+ 	{
+@@ -249,8 +249,8 @@ public:
+ 	ResolveSocket(const std::string& hostname
+ 		, Bonjour::ReplyFn replyfn
+ 		, const boost::asio::ip::address& multicast_address
+-		, std::shared_ptr< boost::asio::io_service > io_service)
+-		: UdpSocket(replyfn, multicast_address, io_service)
++		, std::shared_ptr< boost::asio::io_context > io_context)
++		: UdpSocket(replyfn, multicast_address, io_context)
+ 		, hostname(hostname)
+ 
+ 	{
+diff --git a/src/slic3r/Utils/Serial.cpp b/src/slic3r/Utils/Serial.cpp
+index 4db1acc6b..555f907a1 100644
+--- a/src/slic3r/Utils/Serial.cpp
++++ b/src/slic3r/Utils/Serial.cpp
+@@ -278,12 +278,12 @@ std::vector<std::string> scan_serial_ports()
+ namespace asio = boost::asio;
+ using boost::system::error_code;
+ 
+-Serial::Serial(asio::io_service& io_service) :
+-	asio::serial_port(io_service)
++Serial::Serial(asio::io_context& io_context) :
++	asio::serial_port(io_context)
+ {}
+ 
+-Serial::Serial(asio::io_service& io_service, const std::string &name, unsigned baud_rate) :
+-	asio::serial_port(io_service, name)
++Serial::Serial(asio::io_context& io_context, const std::string &name, unsigned baud_rate) :
++	asio::serial_port(io_context, name)
+ {
+ 	set_baud_rate(baud_rate);
+ }
+@@ -386,19 +386,19 @@ void Serial::reset_line_num()
+ 
+ bool Serial::read_line(unsigned timeout, std::string &line, error_code &ec)
+ {
+-	auto& io_service =
++	auto& io_context =
+ #if BOOST_VERSION >= 107000
+ 		//FIXME this is most certainly wrong!
+ 		(boost::asio::io_context&)this->get_executor().context();
+  #else
+-		this->get_io_service();
++		this->get_io_context();
+ #endif
+-	asio::deadline_timer timer(io_service);
++	asio::deadline_timer timer(io_context);
+ 	char c = 0;
+ 	bool fail = false;
+ 
+ 	while (true) {
+-		io_service.reset();
++		io_context.reset();
+ 
+ 		asio::async_read(*this, boost::asio::buffer(&c, 1), [&](const error_code &read_ec, size_t size) {
+ 			if (ec || size == 0) {
+@@ -419,7 +419,7 @@ bool Serial::read_line(unsigned timeout, std::string &line, error_code &ec)
+ 			});
+ 		}
+ 
+-		io_service.run();
++		io_context.run();
+ 
+ 		if (fail) {
+ 			return false;
+diff --git a/src/slic3r/Utils/Serial.hpp b/src/slic3r/Utils/Serial.hpp
+index 8bad75b31..138c238a4 100644
+--- a/src/slic3r/Utils/Serial.hpp
++++ b/src/slic3r/Utils/Serial.hpp
+@@ -39,8 +39,8 @@ extern std::vector<SerialPortInfo> 	scan_serial_ports_extended();
+ class Serial : public boost::asio::serial_port
+ {
+ public:
+-	Serial(boost::asio::io_service &io_service);
+-	Serial(boost::asio::io_service &io_service, const std::string &name, unsigned baud_rate);
++	Serial(boost::asio::io_context &io_context);
++	Serial(boost::asio::io_context &io_context, const std::string &name, unsigned baud_rate);
+ 	Serial(const Serial &) = delete;
+ 	Serial &operator=(const Serial &) = delete;
+ 	~Serial();
+diff --git a/src/slic3r/Utils/TCPConsole.cpp b/src/slic3r/Utils/TCPConsole.cpp
+index d76d29fe5..f52ce382b 100644
+--- a/src/slic3r/Utils/TCPConsole.cpp
++++ b/src/slic3r/Utils/TCPConsole.cpp
+@@ -1,9 +1,11 @@
++#include <boost/asio/connect.hpp>
+ #include <boost/asio/buffer.hpp>
+ #include <boost/asio/io_context.hpp>
+ #include <boost/asio/ip/tcp.hpp>
+ #include <boost/asio/read_until.hpp>
+ #include <boost/asio/steady_timer.hpp>
+ #include <boost/asio/write.hpp>
++#include <boost/asio/connect.hpp>
+ #include <boost/bind/bind.hpp>
+ #include <boost/format.hpp>
+ #include <boost/log/trivial.hpp>
+@@ -167,8 +169,8 @@ bool TCPConsole::run_queue()
+ 
+         auto endpoints = m_resolver.resolve(m_host_name, m_port_name);
+ 
+-        m_socket.async_connect(endpoints->endpoint(),
+-            boost::bind(&TCPConsole::handle_connect, this, boost::placeholders::_1)
++        boost::asio::async_connect(m_socket, endpoints,
++           boost::bind(&TCPConsole::handle_connect, this, boost::placeholders::_1)
+         );
+ 
+         // Loop until we get any reasonable result. Negative result is also result.
+-- 
+2.49.0
+
+
+From 5895ed0b196c4edf08b9e272fdf1e75a3fb256b5 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 20:05:57 +0200
+Subject: [PATCH 07/19] boost filesystem
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/hints/HintsToPot.cpp b/src/hints/HintsToPot.cpp
+index a2ff5ddfa..55e27eeb3 100644
+--- a/src/hints/HintsToPot.cpp
++++ b/src/hints/HintsToPot.cpp
+@@ -2,6 +2,7 @@
+ #include <vector>
+ #include <string>
+ #include <boost/filesystem.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/dll.hpp>
+ #include <boost/property_tree/ini_parser.hpp>
+ #include <boost/nowide/fstream.hpp>
+diff --git a/src/slic3r/Config/Snapshot.cpp b/src/slic3r/Config/Snapshot.cpp
+index d995e3a6c..4a5115594 100644
+--- a/src/slic3r/Config/Snapshot.cpp
++++ b/src/slic3r/Config/Snapshot.cpp
+@@ -7,6 +7,7 @@
+ #include <boost/nowide/fstream.hpp>
+ #include <boost/property_tree/ini_parser.hpp>
+ #include <boost/property_tree/ptree_fwd.hpp>
++#include <boost/filesystem/directory.hpp>
+ #include <boost/filesystem/operations.hpp>
+ #include <boost/log/trivial.hpp>
+ 
+diff --git a/src/slic3r/Config/Version.cpp b/src/slic3r/Config/Version.cpp
+index 092594ce5..c51f4fec6 100644
+--- a/src/slic3r/Config/Version.cpp
++++ b/src/slic3r/Config/Version.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include <cctype>
+ 
++#include <boost/filesystem/directory.hpp>
+ #include <boost/filesystem/operations.hpp>
+ #include <boost/nowide/fstream.hpp>
+ 
+-- 
+2.49.0
+
+
+From e22de402f5d3772fe262d12e71fd7918f653b7c3 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 19:26:51 +0200
+Subject: [PATCH 08/19] boost 1.88
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/GCode/PostProcessor.cpp b/src/libslic3r/GCode/PostProcessor.cpp
+index 927d106b5..ba2b4457e 100644
+--- a/src/libslic3r/GCode/PostProcessor.cpp
++++ b/src/libslic3r/GCode/PostProcessor.cpp
+@@ -149,7 +149,14 @@ static int run_script(const std::string &script, const std::string &gcode, std::
+ 
+ #include <cstdlib>   // getenv()
+ #include <sstream>
++#if BOOST_VERSION >= 108800 // v2 is now default
++#define BOOST_PROCESS_VERSION 1
++#include <boost/process/v1/child.hpp>
++#include <boost/process/v1/io.hpp>
++#include <boost/process/v1/pipe.hpp>
++#else
+ #include <boost/process.hpp>
++#endif
+ 
+ namespace process = boost::process;
+ 
+diff --git a/src/slic3r/GUI/MediaPlayCtrl.cpp b/src/slic3r/GUI/MediaPlayCtrl.cpp
+index 92367a597..223a38cd8 100644
+--- a/src/slic3r/GUI/MediaPlayCtrl.cpp
++++ b/src/slic3r/GUI/MediaPlayCtrl.cpp
+@@ -13,7 +13,16 @@
+ #include <boost/nowide/cstdio.hpp>
+ #include <boost/nowide/utf8_codecvt.hpp>
+ #undef pid_t
++#if BOOST_VERSION >= 108800 // v2 is now default
++#define BOOST_PROCESS_VERSION 1
++#include <boost/process/v1/child.hpp>
++#include <boost/process/v1/io.hpp>
++#include <boost/process/v1/pipe.hpp>
++#include <boost/process/v1/start_dir.hpp>
++#include <boost/process/v1/handles.hpp>
++#else
+ #include <boost/process.hpp>
++#endif
+ #ifdef __WIN32__
+ #include <boost/process/windows.hpp>
+ #else
+diff --git a/src/slic3r/GUI/RemovableDriveManager.cpp b/src/slic3r/GUI/RemovableDriveManager.cpp
+index 83ec4695c..c888ddfbc 100644
+--- a/src/slic3r/GUI/RemovableDriveManager.cpp
++++ b/src/slic3r/GUI/RemovableDriveManager.cpp
+@@ -22,8 +22,16 @@
+ #include <pwd.h>
+ #include <boost/filesystem.hpp>
+ #include <boost/system/error_code.hpp>
++#if BOOST_VERSION >= 108800 // v2 is now default
++#define BOOST_PROCESS_VERSION 1
++#include <boost/process/v1/child.hpp>
++#include <boost/process/v1/io.hpp>
++#include <boost/process/v1/pipe.hpp>
++#include <boost/process/v1/search_path.hpp>
++#else
+ #include <boost/process.hpp>
+ #endif
++#endif
+ 
+ namespace Slic3r {
+ namespace GUI { 
+-- 
+2.49.0
+
+
+From 794cd58e7d5113fe414df81f57c6eee71aa041fa Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 20:07:50 +0200
+Subject: [PATCH 09/19] opencascade 7.8.0
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/CMakeLists.txt b/src/libslic3r/CMakeLists.txt
+index 64e0a9e87..a6258fe6e 100644
+--- a/src/libslic3r/CMakeLists.txt
++++ b/src/libslic3r/CMakeLists.txt
+@@ -523,11 +523,8 @@ target_include_directories(libslic3r PUBLIC ${OpenCASCADE_INCLUDE_DIR})
+ find_package(JPEG REQUIRED)
+ 
+ set(OCCT_LIBS
+-    TKXDESTEP
+-    TKSTEP
+-    TKSTEP209
+-    TKSTEPAttr
+-    TKSTEPBase
++    TKDESTEP
++    TKDESTL
+     TKXCAF
+     TKXSBase
+     TKVCAF
+-- 
+2.49.0
+
+
+From b3c6222681d3a219c2710fbc203f92b3e8304ee7 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 20:08:20 +0200
+Subject: [PATCH 10/19] opencv-imgproc
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/CMakeLists.txt b/src/libslic3r/CMakeLists.txt
+index a6258fe6e..152bf7df0 100644
+--- a/src/libslic3r/CMakeLists.txt
++++ b/src/libslic3r/CMakeLists.txt
+@@ -475,7 +475,7 @@ set(CGAL_DO_NOT_WARN_ABOUT_CMAKE_BUILD_TYPE ON CACHE BOOL "" FORCE)
+ cmake_policy(PUSH)
+ cmake_policy(SET CMP0011 NEW)
+ find_package(CGAL REQUIRED)
+-find_package(OpenCV REQUIRED core)
++find_package(OpenCV REQUIRED core imgproc)
+ cmake_policy(POP)
+ 
+ add_library(libslic3r_cgal STATIC 
+@@ -573,7 +573,7 @@ target_link_libraries(libslic3r
+     mcut
+     JPEG::JPEG
+     qoi
+-    opencv_world
++    ${OpenCV_LIBS}
+     noise::noise
+     )
+ 
+-- 
+2.49.0
+
+
+From 20038c1793d90391c7c608b43bc91957c4969c70 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 20:08:41 +0200
+Subject: [PATCH 11/19] eigen cmake config
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3695087c5..3da5dd627 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -517,7 +517,7 @@ endif()
+ 
+ # Find eigen3 or use bundled version
+ if (NOT SLIC3R_STATIC)
+-    find_package(Eigen3 3.3)
++    find_package(Eigen3 3.3 NO_MODULE)
+ endif ()
+ if (NOT EIGEN3_FOUND)
+     set(EIGEN3_FOUND 1)
+-- 
+2.49.0
+
+
+From a72c7dfc6605e614a095ddf5551636f5a66b7e47 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 20:09:22 +0200
+Subject: [PATCH 12/19] cstdint
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/mcut/source/math.cpp b/src/mcut/source/math.cpp
+index cdb5c70ec..1e9238f66 100644
+--- a/src/mcut/source/math.cpp
++++ b/src/mcut/source/math.cpp
+@@ -24,6 +24,7 @@
+ #include <algorithm> // std::sort
+ #include <cstdlib>
+ #include <tuple> // std::make_tuple std::get<>
++#include <cstdint>
+ 
+ 
+     double square_root(const double& number)
+-- 
+2.49.0
+
+
+From b1ce8f77ab372d7538ede619d15b8d983fd36a04 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 20:09:47 +0200
+Subject: [PATCH 13/19] drop osmesa
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/slic3r/CMakeLists.txt b/src/slic3r/CMakeLists.txt
+index 1e5ae3451..6b398fc1b 100644
+--- a/src/slic3r/CMakeLists.txt
++++ b/src/slic3r/CMakeLists.txt
+@@ -631,7 +631,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+     FIND_LIBRARY(WAYLAND_EGL_LIBRARIES    NAMES wayland-egl)
+     FIND_LIBRARY(WAYLAND_CLIENT_LIBRARIES NAMES wayland-client)
+     find_package(CURL REQUIRED)
+-    target_link_libraries(libslic3r_gui ${DBUS_LIBRARIES} OSMesa)
++    target_link_libraries(libslic3r_gui ${DBUS_LIBRARIES})
+     target_link_libraries(libslic3r_gui
+         OpenGL::EGL
+         ${WAYLAND_SERVER_LIBRARIES}
+-- 
+2.49.0
+
+
+From 6a41bb6ee13e21e7570ce2d2f87d663f187e9d29 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 5 Mar 2025 21:45:45 +0100
+Subject: [PATCH 14/19] misc
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/clipper2/Clipper2Lib/include/clipper2/clipper.core.h b/src/clipper2/Clipper2Lib/include/clipper2/clipper.core.h
+index f8d6b42b7..53852bdc6 100644
+--- a/src/clipper2/Clipper2Lib/include/clipper2/clipper.core.h
++++ b/src/clipper2/Clipper2Lib/include/clipper2/clipper.core.h
+@@ -114,7 +114,7 @@ struct Point {
+ 	Point(const T2 x_, const T2 y_) { Init(x_, y_); }
+ 
+ 	template <typename T2>
+-	explicit Point<T>(const Point<T2>& p) { Init(p.x, p.y); }
++	explicit Point(const Point<T2>& p) { Init(p.x, p.y); }
+ 
+ 	Point operator * (const double scale) const
+ 	{
+-- 
+2.49.0
+
+
+From ce44466e7754e10238592b0f9b7895f532a1ec70 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 20:10:02 +0200
+Subject: [PATCH 15/19] link webkit2gtk
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/slic3r/CMakeLists.txt b/src/slic3r/CMakeLists.txt
+index 6b398fc1b..0e97d5c69 100644
+--- a/src/slic3r/CMakeLists.txt
++++ b/src/slic3r/CMakeLists.txt
+@@ -666,13 +666,13 @@ endif ()
+ # link these libraries.
+ if (UNIX AND NOT APPLE)
+     find_package(GTK${SLIC3R_GTK} REQUIRED)
+-    if (FLATPAK)
++    if (FLATPAK OR TRUE)
+         # I don't know why this is needed, but for whatever reason slic3r isn't
+         # linking to X11 and webkit2gtk. force it.
+         find_package(X11 REQUIRED)
+         find_package(PkgConfig REQUIRED)
+         pkg_check_modules(webkit2gtk REQUIRED webkit2gtk-4.1)
+-        target_link_libraries (libslic3r_gui ${X11_LIBRARIES} ${webkit2gtk_LIBRARIES})
++        target_link_libraries (libslic3r_gui ${X11_LIBRARIES} ${webkit2gtk_LIBRARIES})
+     endif()
+     target_include_directories(libslic3r_gui PRIVATE ${GTK${SLIC3R_GTK}_INCLUDE_DIRS})
+     target_link_libraries(libslic3r_gui ${GTK${SLIC3R_GTK}_LIBRARIES} fontconfig)
+-- 
+2.49.0
+
+
+From 449918e67cbb105de02965b4f964056a847106e1 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 22:01:53 +0200
+Subject: [PATCH 16/19] 
+ /var/db/repos/negril/media-gfx/orcaslicer/files/orcaslicer-2.2.0-fix-wx.patch
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/slic3r/GUI/Widgets/StateColor.cpp b/src/slic3r/GUI/Widgets/StateColor.cpp
+index f2e1b0702..89460875b 100644
+--- a/src/slic3r/GUI/Widgets/StateColor.cpp
++++ b/src/slic3r/GUI/Widgets/StateColor.cpp
+@@ -186,7 +186,7 @@ inline wxColour darkModeColorFor2(wxColour const &color)
+     if (!gDarkMode)
+         return color;
+     auto iter = gDarkColors.find(color);
+-    wxASSERT(iter != gDarkColors.end());
++    //wxASSERT(iter != gDarkColors.end());
+     if (iter != gDarkColors.end()) return iter->second;
+     return color;
+ }
+-- 
+2.49.0
+
+
+From d2f5aae1322cd62ae1d4c74d4f99349c6927c0d6 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 22:01:53 +0200
+Subject: [PATCH 17/19] 
+ /var/db/repos/negril/media-gfx/orcaslicer/files/orcaslicer-2.2.0-fix-install-path.patch
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3da5dd627..dd0b07ed1 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -783,8 +783,10 @@ if (WIN32)
+     install (PROGRAMS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS} DESTINATION ".")
+ elseif (SLIC3R_FHS)
+     # CMAKE_INSTALL_FULL_DATAROOTDIR: read-only architecture-independent data root (share)
+-    set(SLIC3R_FHS_RESOURCES "${CMAKE_INSTALL_FULL_DATAROOTDIR}/OrcaSlicer")
+-    install(DIRECTORY ${SLIC3R_RESOURCES_DIR}/ DESTINATION ${SLIC3R_FHS_RESOURCES}
++    # set(SLIC3R_FHS_RESOURCES "${CMAKE_INSTALL_FULL_DATAROOTDIR}/OrcaSlicer")
++    set(SLIC3R_FHS_RESOURCES "/usr/share/OrcaSlicer")
++    # install(DIRECTORY ${SLIC3R_RESOURCES_DIR}/ DESTINATION ${SLIC3R_FHS_RESOURCES}
++    install(DIRECTORY ${SLIC3R_RESOURCES_DIR}/ DESTINATION "${CMAKE_INSTALL_PREFIX}/share/OrcaSlicer"
+         PATTERN "*/udev" EXCLUDE
+     )
+     install(FILES src/platform/unix/OrcaSlicer.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+-- 
+2.49.0
+
+
+From bc2d6a2a707dc73dc6aa2f5a2f34be8067a8e303 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 22:01:54 +0200
+Subject: [PATCH 18/19] 
+ /var/db/repos/negril/media-gfx/orcaslicer/files/7057.patch
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/PrintObject.cpp b/src/libslic3r/PrintObject.cpp
+index 080c7aa94..c7d16f95d 100644
+--- a/src/libslic3r/PrintObject.cpp
++++ b/src/libslic3r/PrintObject.cpp
+@@ -25,6 +25,7 @@
+ #include <oneapi/tbb/blocked_range.h>
+ #include <oneapi/tbb/concurrent_vector.h>
+ #include <oneapi/tbb/parallel_for.h>
++#include <oneapi/tbb/spin_mutex.h>
+ #include <string_view>
+ #include <utility>
+ 
+-- 
+2.49.0
+
+
+From 294c605f04feed77409384f4137c2420bb1d01a9 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 26 May 2025 22:01:54 +0200
+Subject: [PATCH 19/19] 
+ /var/db/repos/negril/media-gfx/orcaslicer/files/7591.patch
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/OrcaSlicer.cpp b/src/OrcaSlicer.cpp
+index 7cd84babe..156daf660 100644
+--- a/src/OrcaSlicer.cpp
++++ b/src/OrcaSlicer.cpp
+@@ -1051,6 +1051,10 @@ int CLI::run(int argc, char **argv)
+     // Also on Linux, we need to tell Xlib that we will be using threads,
+     // lest we crash when we fire up GStreamer.
+     XInitThreads();
++
++    // https://github.com/prusa3d/PrusaSlicer/issues/12969
++    ::setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", /* replace */ false);
++    ::setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", /* replace */ false);
+ #endif
+ 
+ 	// Switch boost::filesystem to utf8.
+-- 
+2.49.0
+

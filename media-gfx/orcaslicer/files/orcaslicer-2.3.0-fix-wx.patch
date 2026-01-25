@@ -1,0 +1,13 @@
+diff --git a/src/slic3r/CMakeLists.txt b/src/slic3r/CMakeLists.txt
+index 0e97d5c69..e322cef65 100644
+--- a/src/slic3r/CMakeLists.txt
++++ b/src/slic3r/CMakeLists.txt
+@@ -643,7 +643,7 @@ elseif (APPLE)
+     target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY})
+ endif()
+ 
+-if (SLIC3R_STATIC)
++if (SLIC3R_STATIC OR TRUE)
+     # FIXME: This was previously exported by wx-config but the wxWidgets
+     # cmake build forgets this and the build fails in debug mode (or on raspberry release)
+     target_compile_definitions(libslic3r_gui PUBLIC -DwxDEBUG_LEVEL=0)
