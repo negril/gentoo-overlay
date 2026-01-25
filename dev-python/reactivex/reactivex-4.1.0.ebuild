@@ -13,4 +13,4 @@ HOMEPAGE="http://reactivex.io/"
 
 LICENSE="MIT"
 SLOT="0"
-KEYWORDS="~amd64 ~amd64-linux"
+KEYWORDS="~amd64"
