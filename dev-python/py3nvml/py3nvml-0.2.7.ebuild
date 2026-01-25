@@ -14,7 +14,7 @@ SRC_URI="https://github.com/fbcotter/py3nvml/archive/${PV}.tar.gz -> ${P}.gh.tar
 
 LICENSE="BSD"
 SLOT="0"
-KEYWORDS="~amd64 ~amd64-linux"
+KEYWORDS="~amd64"
 
 EPYTEST_PLUGINS=(
 	hypothesis
