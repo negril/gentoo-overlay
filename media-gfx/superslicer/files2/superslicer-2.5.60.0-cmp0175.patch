@@ -1,0 +1,80 @@
+From 1dd452f736e0842784995bddf5be8fffddc3d27d Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:35:05 +0200
+Subject: [PATCH 10/19] 2.5.60.0 cmp0175
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 34fe44a2e..ac9680f2f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -534,18 +534,20 @@ file(GLOB L10N_PO_FILES "${L10N_DIR}/*/Slic3r*.po")
+ # list of names of directories, which are licalized by PS internally
+ list(APPEND PS_L10N_DIRS "cs" "de" "es" "fr" "it" "ja" "pl")
+ foreach(po_file ${L10N_PO_FILES})
++    GET_FILENAME_COMPONENT(po_file_name "${po_file}" NAME)
+     GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
+     GET_FILENAME_COMPONENT(po_dir_name "${po_dir}" NAME)
+     list(FIND PS_L10N_DIRS ${po_dir_name} found_dir_id)
+     # found_dir_id==-1 means that po_dir_name wasn't found in PS_L10N_DIRS
+     if(found_dir_id LESS 0)
+-    add_custom_command(
+-            TARGET gettext_merge_community_po_with_pot PRE_BUILD
++    add_custom_target(
++        gettext_merge_community_po_with_pot_${po_dir_name}_${po_file_name}
+         COMMAND msgmerge -N -o ${po_file} ${po_file} "${L10N_DIR}/Slic3r.pot"
+         # delete obsolete lines from resulting PO to avoid conflicts after a merging of it with wxWidgets.po
+         COMMAND msgattrib --no-obsolete -o ${po_file} ${po_file}
+         DEPENDS ${po_file}
+     )
++    add_dependencies(gettext_merge_community_po_with_pot gettext_merge_community_po_with_pot_${po_dir_name}_${po_file_name})
+     endif()
+ endforeach()
+ 
+@@ -555,17 +557,19 @@ add_custom_target(gettext_concat_wx_po_with_po
+ )
+ file(GLOB L10N_PO_FILES "${L10N_DIR}/*/Slic3r*.po")
+ foreach(po_file ${L10N_PO_FILES})
++    GET_FILENAME_COMPONENT(po_file_name "${po_file}" NAME)
+     GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
+     GET_FILENAME_COMPONENT(po_dir_name "${po_dir}" NAME)
+     SET(wx_po_file "${L10N_DIR}/wx_locale/${po_dir_name}.po")
+     #SET(po_new_file "${po_dir}/Slic3r_.po")
+-    add_custom_command(
+-        TARGET gettext_concat_wx_po_with_po PRE_BUILD
++    add_custom_target(
++        gettext_concat_wx_po_with_po_${po_dir_name}_${po_file_name}
+         COMMAND msgcat --use-first -o ${po_file} ${po_file} ${wx_po_file}
+         # delete obsolete lines from resulting PO
+         COMMAND msgattrib --no-obsolete -o ${po_file} ${po_file}
+         DEPENDS ${po_file}
+     )
++    add_dependencies(gettext_concat_wx_po_with_po gettext_concat_wx_po_with_po_${po_dir_name}_${po_file_name})
+ endforeach()
+ 
+ add_custom_target(gettext_po_to_mo
+@@ -574,15 +578,18 @@ add_custom_target(gettext_po_to_mo
+ )
+ file(GLOB L10N_PO_FILES "${L10N_DIR}/*/Slic3r.po")
+ foreach(po_file ${L10N_PO_FILES})
++    GET_FILENAME_COMPONENT(po_file_name "${po_file}" NAME)
+     GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
++    GET_FILENAME_COMPONENT(po_dir_name "${po_dir}" NAME)
+     SET(mo_file "${po_dir}/${SLIC3R_APP_KEY}.mo")
+     message(STATUS "po_dir mo_file imgui : '${po_file}' and mo file is '${mo_file}'") 
+-    add_custom_command(
+-        TARGET gettext_po_to_mo PRE_BUILD
++    add_custom_target(
++        gettext_po_to_mo_${po_dir_name}_${po_file_name}
+         COMMAND msgfmt ARGS --check-format -o ${mo_file} ${po_file}
+         #COMMAND msgfmt ARGS --check-compatibility -o ${mo_file} ${po_file}
+         DEPENDS ${po_file}
+     )
++    add_dependencies(gettext_po_to_mo gettext_po_to_mo_${po_dir_name}_${po_file_name})
+ endforeach()
+ 
+ find_package(NLopt 1.4 REQUIRED)
+-- 
+2.49.0
+

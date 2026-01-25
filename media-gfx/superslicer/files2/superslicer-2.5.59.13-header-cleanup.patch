@@ -1,0 +1,22 @@
+From 38095466427dcce396e3cec023247672b5053a4f Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:35:05 +0200
+Subject: [PATCH 09/19] 2.5.59.13 header cleanup
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/slic3r/GUI/RemovableDriveManager.cpp b/src/slic3r/GUI/RemovableDriveManager.cpp
+index dfbd7c9fa..02b2904cb 100644
+--- a/src/slic3r/GUI/RemovableDriveManager.cpp
++++ b/src/slic3r/GUI/RemovableDriveManager.cpp
+@@ -28,7 +28,6 @@
+ #include <shldisp.h>
+ #else
+ // unix, linux & OSX includes
+-#include <errno.h>
+ #include <sys/mount.h>
+ #include <sys/stat.h>
+ #include <glob.h>
+-- 
+2.49.0
+

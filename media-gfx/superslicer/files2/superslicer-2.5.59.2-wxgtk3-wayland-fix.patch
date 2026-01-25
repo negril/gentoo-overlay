@@ -1,0 +1,31 @@
+From 871651f3b356469b63e0365dc96cceffb54b290b Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:33:06 +0200
+Subject: [PATCH 03/19] 2.5.59.2 wxgtk3 wayland fix
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/slic3r/GUI/GUI.cpp b/src/slic3r/GUI/GUI.cpp
+index 0d1875297..0e5a87bdf 100644
+--- a/src/slic3r/GUI/GUI.cpp
++++ b/src/slic3r/GUI/GUI.cpp
+@@ -43,6 +43,16 @@ class AppConfig;
+ 
+ namespace GUI {
+ 
++// wxgtk3 is broken on wayland: https://trac.wxwidgets.org/ticket/17702
++#ifdef __WXGTK3__
++struct ForceX11 {
++    ForceX11() {
++        setenv("GDK_BACKEND", "x11", 1);
++    }
++};
++static struct ForceX11 forcex11;
++#endif
++
+ #if __APPLE__
+ IOPMAssertionID assertionID;
+ #endif
+-- 
+2.49.0
+

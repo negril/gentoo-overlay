@@ -1,0 +1,28 @@
+From 3688936f046e38adbbe94b2d2c1c93719b3d43b9 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:35:05 +0200
+Subject: [PATCH 12/19] 2.5.60.0 find libigl
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libigl/CMakeLists.txt b/src/libigl/CMakeLists.txt
+index f180ea416..c9f886e14 100644
+--- a/src/libigl/CMakeLists.txt
++++ b/src/libigl/CMakeLists.txt
+@@ -3,11 +3,11 @@ project(libigl)
+ 
+ add_library(libigl INTERFACE)
+ 
+-find_package(libigl QUIET)
++find_package(libigl QUIET CONFIG)
+ 
+ if(libigl_FOUND)
+     message(STATUS "IGL found, using system version...")
+-    target_link_libraries(libigl INTERFACE igl::core)
++    target_link_libraries(libigl INTERFACE igl::igl_core)
+ else()
+     message(STATUS "IGL NOT found, using bundled version...")
+     target_include_directories(libigl SYSTEM BEFORE INTERFACE ${LIBDIR}/libigl)
+-- 
+2.49.0
+

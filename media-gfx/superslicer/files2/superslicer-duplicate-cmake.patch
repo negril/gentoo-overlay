@@ -1,0 +1,488 @@
+From c51fc6928685674c4ce92650ecd5f87c9625d963 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sat, 31 May 2025 00:17:14 +0200
+Subject: [PATCH 15/19] duplicate cmake
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/cmake/modules/FindCURL.cmake b/cmake/modules/FindCURL.cmake
+deleted file mode 100644
+index ced591134..000000000
+--- a/cmake/modules/FindCURL.cmake
++++ /dev/null
+@@ -1,130 +0,0 @@
+-# Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
+-# file Copyright.txt or https://cmake.org/licensing for details.
+-
+-#.rst:
+-# FindCURL
+-# --------
+-#
+-# Find the native CURL headers and libraries.
+-#
+-# IMPORTED Targets
+-# ^^^^^^^^^^^^^^^^
+-#
+-# This module defines :prop_tgt:`IMPORTED` target ``CURL::libcurl``, if
+-# curl has been found.
+-#
+-# Result Variables
+-# ^^^^^^^^^^^^^^^^
+-#
+-# This module defines the following variables:
+-#
+-# ``CURL_FOUND``
+-#   True if curl found.
+-#
+-# ``CURL_INCLUDE_DIRS``
+-#   where to find curl/curl.h, etc.
+-#
+-# ``CURL_LIBRARIES``
+-#   List of libraries when using curl.
+-#
+-# ``CURL_VERSION_STRING``
+-#   The version of curl found.
+-
+-# First, prefer config scripts
+-set(_q "")
+-if(CURL_FIND_QUIETLY)
+-    set(_q QUIET)
+-endif()
+-find_package(CURL ${CURL_FIND_VERSION} CONFIG ${_q})
+-
+-if(NOT CURL_FIND_QUIETLY)
+-    if (NOT CURL_FOUND)
+-        message(STATUS "Falling back to MODULE search for CURL...")
+-    else()
+-        message(STATUS "CURL found in ${CURL_DIR}")
+-    endif()
+-endif()
+-
+-if (NOT CURL_FOUND)
+-
+-  # Look for the header file.
+-  find_path(CURL_INCLUDE_DIR NAMES curl/curl.h)
+-  mark_as_advanced(CURL_INCLUDE_DIR)
+-
+-  if(NOT CURL_LIBRARY)
+-    # Look for the library (sorted from most current/relevant entry to least).
+-    find_library(CURL_LIBRARY_RELEASE NAMES
+-        curl
+-      # Windows MSVC prebuilts:
+-        curllib
+-        libcurl_imp
+-        curllib_static
+-      # Windows older "Win32 - MSVC" prebuilts (libcurl.lib, e.g. libcurl-7.15.5-win32-msvc.zip):
+-        libcurl
+-      # Static library on Windows
+-        libcurl_a
+-    )
+-    mark_as_advanced(CURL_LIBRARY_RELEASE)
+-
+-    find_library(CURL_LIBRARY_DEBUG NAMES
+-      # Windows MSVC CMake builds in debug configuration on vcpkg:
+-        libcurl-d_imp
+-        libcurl-d
+-      # Static library on Windows, compiled in debug mode
+-        libcurl_a_debug
+-    )
+-    mark_as_advanced(CURL_LIBRARY_DEBUG)
+-
+-    include(${CMAKE_CURRENT_LIST_DIR}/SelectLibraryConfigurations_SLIC3R.cmake)
+-    select_library_configurations_SLIC3R(CURL)
+-  endif()
+-
+-  if(CURL_INCLUDE_DIR)
+-    foreach(_curl_version_header curlver.h curl.h)
+-      if(EXISTS "${CURL_INCLUDE_DIR}/curl/${_curl_version_header}")
+-        file(STRINGS "${CURL_INCLUDE_DIR}/curl/${_curl_version_header}" curl_version_str REGEX "^#define[\t ]+LIBCURL_VERSION[\t ]+\".*\"")
+-
+-        string(REGEX REPLACE "^#define[\t ]+LIBCURL_VERSION[\t ]+\"([^\"]*)\".*" "\\1" CURL_VERSION_STRING "${curl_version_str}")
+-        unset(curl_version_str)
+-        break()
+-      endif()
+-    endforeach()
+-  endif()
+-
+-  include(${CMAKE_CURRENT_LIST_DIR}/FindPackageHandleStandardArgs_SLIC3R.cmake)
+-  FIND_PACKAGE_HANDLE_STANDARD_ARGS_SLIC3R(CURL
+-                                    REQUIRED_VARS CURL_LIBRARY CURL_INCLUDE_DIR
+-                                    VERSION_VAR CURL_VERSION_STRING)
+-
+-  if(CURL_FOUND)
+-    set(CURL_LIBRARIES ${CURL_LIBRARY})
+-    set(CURL_INCLUDE_DIRS ${CURL_INCLUDE_DIR})
+-
+-    if(NOT TARGET CURL::libcurl)
+-      add_library(CURL::libcurl UNKNOWN IMPORTED)
+-      set_target_properties(CURL::libcurl PROPERTIES
+-        INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIRS}")
+-
+-      if(EXISTS "${CURL_LIBRARY}")
+-        set_target_properties(CURL::libcurl PROPERTIES
+-          IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+-          IMPORTED_LOCATION "${CURL_LIBRARY}")
+-      endif()
+-      if(CURL_LIBRARY_RELEASE)
+-        set_property(TARGET CURL::libcurl APPEND PROPERTY
+-          IMPORTED_CONFIGURATIONS RELEASE)
+-        set_target_properties(CURL::libcurl PROPERTIES
+-          IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+-          IMPORTED_LOCATION_RELEASE "${CURL_LIBRARY_RELEASE}")
+-      endif()
+-      if(CURL_LIBRARY_DEBUG)
+-        set_property(TARGET CURL::libcurl APPEND PROPERTY
+-          IMPORTED_CONFIGURATIONS DEBUG)
+-        set_target_properties(CURL::libcurl PROPERTIES
+-          IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+-          IMPORTED_LOCATION_DEBUG "${CURL_LIBRARY_DEBUG}")
+-      endif()
+-    endif()
+-  endif()
+-
+-endif (NOT CURL_FOUND)
+diff --git a/cmake/modules/FindEXPAT.cmake b/cmake/modules/FindEXPAT.cmake
+deleted file mode 100644
+index de204c60f..000000000
+--- a/cmake/modules/FindEXPAT.cmake
++++ /dev/null
+@@ -1,36 +0,0 @@
+-set(_q "")
+-if(EXPAT_FIND_QUIETLY)
+-    set(_q QUIET)
+-endif()
+-find_package(EXPAT ${EXPAT_FIND_VERSION} CONFIG ${_q})
+-
+-if(NOT EXPAT_FIND_QUIETLY)
+-    if (NOT EXPAT_FOUND)
+-        message(STATUS "Falling back to MODULE search for EXPAT...")
+-    else()
+-        message(STATUS "EXPAT found in ${EXPAT_DIR}")
+-    endif()
+-endif()
+-
+-if (NOT EXPAT_FOUND)
+-    set(_modpath ${CMAKE_MODULE_PATH})
+-    set(CMAKE_MODULE_PATH "")
+-    include(FindEXPAT)
+-    set(CMAKE_MODULE_PATH ${_modpath})
+-
+-    if (NOT TARGET EXPAT::EXPAT)
+-        add_library(EXPAT::EXPAT INTERFACE)
+-        target_link_libraries(EXPAT::EXPAT INTERFACE ${EXPAT_LIBRARIES})
+-        target_include_directories(EXPAT::EXPAT INTERFACE ${EXPAT_INCLUDE_DIRS})
+-    endif ()
+-endif()
+-
+-if (EXPAT_FOUND AND NOT TARGET EXPAT::EXPAT)
+-    add_library(libexpat INTERFACE)
+-    add_library(EXPAT::EXPAT ALIAS libexpat)
+-    target_link_libraries(libexpat INTERFACE expat::expat)
+-    if (NOT EXPAT_LIBRARIES)
+-        set(EXPAT_LIBRARIES expat::expat CACHE STRING "")
+-    endif ()
+-endif ()
+-
+diff --git a/cmake/modules/FindEigen3.cmake b/cmake/modules/FindEigen3.cmake
+deleted file mode 100644
+index 1da37619e..000000000
+--- a/cmake/modules/FindEigen3.cmake
++++ /dev/null
+@@ -1,86 +0,0 @@
+-# - Try to find Eigen3 lib
+-#
+-# This module supports requiring a minimum version, e.g. you can do
+-#   find_package(Eigen3 3.1.2)
+-# to require version 3.1.2 or newer of Eigen3.
+-#
+-# Once done this will define
+-#
+-#  EIGEN3_FOUND - system has eigen lib with correct version
+-#  EIGEN3_INCLUDE_DIR - the eigen include directory
+-#  EIGEN3_VERSION - eigen version
+-
+-# Copyright (c) 2006, 2007 Montel Laurent, <montel@kde.org>
+-# Copyright (c) 2008, 2009 Gael Guennebaud, <g.gael@free.fr>
+-# Copyright (c) 2009 Benoit Jacob <jacob.benoit.1@gmail.com>
+-# Redistribution and use is allowed according to the terms of the 2-clause BSD license.
+-
+-if(NOT Eigen3_FIND_VERSION)
+-  if(NOT Eigen3_FIND_VERSION_MAJOR)
+-    set(Eigen3_FIND_VERSION_MAJOR 2)
+-  endif(NOT Eigen3_FIND_VERSION_MAJOR)
+-  if(NOT Eigen3_FIND_VERSION_MINOR)
+-    set(Eigen3_FIND_VERSION_MINOR 91)
+-  endif(NOT Eigen3_FIND_VERSION_MINOR)
+-  if(NOT Eigen3_FIND_VERSION_PATCH)
+-    set(Eigen3_FIND_VERSION_PATCH 0)
+-  endif(NOT Eigen3_FIND_VERSION_PATCH)
+-
+-  set(Eigen3_FIND_VERSION "${Eigen3_FIND_VERSION_MAJOR}.${Eigen3_FIND_VERSION_MINOR}.${Eigen3_FIND_VERSION_PATCH}")
+-endif(NOT Eigen3_FIND_VERSION)
+-
+-macro(_eigen3_check_version)
+-  file(READ "${EIGEN3_INCLUDE_DIR}/Eigen/src/Core/util/Macros.h" _eigen3_version_header)
+-
+-  string(REGEX MATCH "define[ \t]+EIGEN_WORLD_VERSION[ \t]+([0-9]+)" _eigen3_world_version_match "${_eigen3_version_header}")
+-  set(EIGEN3_WORLD_VERSION "${CMAKE_MATCH_1}")
+-  string(REGEX MATCH "define[ \t]+EIGEN_MAJOR_VERSION[ \t]+([0-9]+)" _eigen3_major_version_match "${_eigen3_version_header}")
+-  set(EIGEN3_MAJOR_VERSION "${CMAKE_MATCH_1}")
+-  string(REGEX MATCH "define[ \t]+EIGEN_MINOR_VERSION[ \t]+([0-9]+)" _eigen3_minor_version_match "${_eigen3_version_header}")
+-  set(EIGEN3_MINOR_VERSION "${CMAKE_MATCH_1}")
+-
+-  set(EIGEN3_VERSION ${EIGEN3_WORLD_VERSION}.${EIGEN3_MAJOR_VERSION}.${EIGEN3_MINOR_VERSION})
+-  if(${EIGEN3_VERSION} VERSION_LESS ${Eigen3_FIND_VERSION})
+-    set(EIGEN3_VERSION_OK FALSE)
+-  else(${EIGEN3_VERSION} VERSION_LESS ${Eigen3_FIND_VERSION})
+-    set(EIGEN3_VERSION_OK TRUE)
+-  endif(${EIGEN3_VERSION} VERSION_LESS ${Eigen3_FIND_VERSION})
+-
+-  if(NOT EIGEN3_VERSION_OK)
+-
+-    message(STATUS "Eigen3 version ${EIGEN3_VERSION} found in ${EIGEN3_INCLUDE_DIR}, "
+-                   "but at least version ${Eigen3_FIND_VERSION} is required")
+-  endif(NOT EIGEN3_VERSION_OK)
+-endmacro(_eigen3_check_version)
+-
+-if (EIGEN3_INCLUDE_DIR)
+-
+-  # in cache already
+-  _eigen3_check_version()
+-  set(EIGEN3_FOUND ${EIGEN3_VERSION_OK})
+-
+-else (EIGEN3_INCLUDE_DIR)
+-
+-  # specific additional paths for some OS
+-  if (WIN32)
+-    set(EIGEN_ADDITIONAL_SEARCH_PATHS ${EIGEN_ADDITIONAL_SEARCH_PATHS} "C:/Program Files/Eigen/include" "C:/Program Files (x86)/Eigen/include")
+-  endif(WIN32)
+-
+-  find_path(EIGEN3_INCLUDE_DIR NAMES signature_of_eigen3_matrix_library
+-      PATHS
+-      ${CMAKE_INSTALL_PREFIX}/include
+-      ${EIGEN_ADDITIONAL_SEARCH_PATHS}
+-      ${KDE4_INCLUDE_DIR}
+-      PATH_SUFFIXES eigen3 eigen
+-    )
+-
+-  if(EIGEN3_INCLUDE_DIR)
+-    _eigen3_check_version()
+-  endif(EIGEN3_INCLUDE_DIR)
+-
+-  include(FindPackageHandleStandardArgs)
+-  find_package_handle_standard_args(Eigen3 DEFAULT_MSG EIGEN3_INCLUDE_DIR EIGEN3_VERSION_OK)
+-
+-  mark_as_advanced(EIGEN3_INCLUDE_DIR)
+-
+-endif(EIGEN3_INCLUDE_DIR)
+diff --git a/cmake/modules/FindTBB.cmake b/cmake/modules/FindTBB.cmake
+deleted file mode 100644
+index f91c50895..000000000
+--- a/cmake/modules/FindTBB.cmake
++++ /dev/null
+@@ -1,24 +0,0 @@
+-# This is a wrapper of FindTBB which prefers the config scripts if available in the system
+-# but only if building with dynamic dependencies. The config scripts potentially belong
+-# to TBB >= 2020 which is incompatible with OpenVDB in our static dependency bundle.
+-# This workaround is useful for package maintainers on Linux systems to use newer versions
+-# of intel TBB (renamed to oneTBB from version 2021 up).
+-set(_q "")
+-if(${CMAKE_FIND_PACKAGE_NAME}_FIND_QUIETLY)
+-    set(_q QUIET)
+-endif()
+-
+-
+-find_package(${CMAKE_FIND_PACKAGE_NAME} ${${CMAKE_FIND_PACKAGE_NAME}_FIND_VERSION} CONFIG ${_q})
+-
+-if(NOT ${CMAKE_FIND_PACKAGE_NAME}_FIND_QUIETLY)
+-    if (NOT ${CMAKE_FIND_PACKAGE_NAME}_FOUND)
+-        message(STATUS "Falling back to MODULE search for ${CMAKE_FIND_PACKAGE_NAME}...")
+-    else()
+-        message(STATUS "${CMAKE_FIND_PACKAGE_NAME} found in ${${CMAKE_FIND_PACKAGE_NAME}_DIR}")
+-    endif()
+-endif()
+-
+-if (NOT ${CMAKE_FIND_PACKAGE_NAME}_FOUND)
+-    include(${CMAKE_CURRENT_LIST_DIR}/FindTBB.cmake.in)
+-endif ()
+diff --git a/cmake/modules/OpenVDBUtils.cmake b/cmake/modules/OpenVDBUtils.cmake
+deleted file mode 100644
+index f79862b83..000000000
+--- a/cmake/modules/OpenVDBUtils.cmake
++++ /dev/null
+@@ -1,172 +0,0 @@
+-# Copyright (c) DreamWorks Animation LLC
+-#
+-# All rights reserved. This software is distributed under the
+-# Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+-#
+-# Redistributions of source code must retain the above copyright
+-# and license notice and the following restrictions and disclaimer.
+-#
+-# *     Neither the name of DreamWorks Animation nor the names of
+-# its contributors may be used to endorse or promote products derived
+-# from this software without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-# IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+-# LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+-#
+-#[=======================================================================[.rst:
+-
+-OpenVDBUtils.cmake
+-------------------
+-
+-A utility CMake file which provides helper functions for configuring an
+-OpenVDB installation.
+-
+-Use this module by invoking include with the form::
+-
+-  include ( OpenVDBUtils )
+-
+-
+-The following functions are provided:
+-
+-``OPENVDB_VERSION_FROM_HEADER``
+-
+-  OPENVDB_VERSION_FROM_HEADER ( <header_path>
+-    VERSION [<version>]
+-    MAJOR   [<version>]
+-    MINOR   [<version>]
+-    PATCH   [<version>] )
+-
+-  Parse the provided version file to retrieve the current OpenVDB
+-  version information. The file is expected to be a version.h file
+-  as found in the following path of an OpenVDB repository:
+-    openvdb/version.h
+-
+-  If the file does not exist, variables are unmodified.
+-
+-``OPENVDB_ABI_VERSION_FROM_PRINT``
+-
+-  OPENVDB_ABI_VERSION_FROM_PRINT ( <vdb_print>
+-    [QUIET]
+-    ABI [<version>] )
+-
+-  Retrieve the ABI version that an installation of OpenVDB was compiled
+-  for using the provided vdb_print binary. Parses the result of:
+-    vdb_print --version
+-
+-  If the binary does not exist or fails to launch, variables are
+-  unmodified.
+-
+-#]=======================================================================]
+-
+-
+-function(OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE)
+-  cmake_parse_arguments(_VDB "" "VERSION;MAJOR;MINOR;PATCH" "" ${ARGN})
+-
+-  if(NOT EXISTS ${OPENVDB_VERSION_FILE})
+-    return()
+-  endif()
+-
+-  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*"
+-  )
+-  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+-    _OpenVDB_MAJOR_VERSION "${openvdb_version_str}"
+-  )
+-
+-  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*"
+-  )
+-  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+-    _OpenVDB_MINOR_VERSION "${openvdb_version_str}"
+-  )
+-
+-  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*"
+-  )
+-  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+-    _OpenVDB_PATCH_VERSION "${openvdb_version_str}"
+-  )
+-  unset(openvdb_version_str)
+-
+-  if(_VDB_VERSION)
+-    set(${_VDB_VERSION}
+-      ${_OpenVDB_MAJOR_VERSION}.${_OpenVDB_MINOR_VERSION}.${_OpenVDB_PATCH_VERSION}
+-      PARENT_SCOPE
+-    )
+-  endif()
+-  if(_VDB_MAJOR)
+-    set(${_VDB_MAJOR} ${_OpenVDB_MAJOR_VERSION} PARENT_SCOPE)
+-  endif()
+-  if(_VDB_MINOR)
+-    set(${_VDB_MINOR} ${_OpenVDB_MINOR_VERSION} PARENT_SCOPE)
+-  endif()
+-  if(_VDB_PATCH)
+-    set(${_VDB_PATCH} ${_OpenVDB_PATCH_VERSION} PARENT_SCOPE)
+-  endif()
+-endfunction()
+-
+-
+-########################################################################
+-########################################################################
+-
+-
+-function(OPENVDB_ABI_VERSION_FROM_PRINT OPENVDB_PRINT)
+-  cmake_parse_arguments(_VDB "QUIET" "ABI" "" ${ARGN})
+-
+-  if(NOT EXISTS ${OPENVDB_PRINT})
+-    if(NOT OpenVDB_FIND_QUIETLY)
+-      message(WARNING "vdb_print not found! ${OPENVDB_PRINT}")
+-    endif()
+-    return()
+-  endif()
+-
+-  set(_VDB_PRINT_VERSION_STRING "")
+-  set(_VDB_PRINT_RETURN_STATUS "")
+-
+-  if(${_VDB_QUIET})
+-    execute_process(COMMAND ${OPENVDB_PRINT} "--version"
+-      RESULT_VARIABLE _VDB_PRINT_RETURN_STATUS
+-      OUTPUT_VARIABLE _VDB_PRINT_VERSION_STRING
+-      ERROR_QUIET
+-      OUTPUT_STRIP_TRAILING_WHITESPACE
+-    )
+-  else()
+-    execute_process(COMMAND ${OPENVDB_PRINT} "--version"
+-      RESULT_VARIABLE _VDB_PRINT_RETURN_STATUS
+-      OUTPUT_VARIABLE _VDB_PRINT_VERSION_STRING
+-      OUTPUT_STRIP_TRAILING_WHITESPACE
+-    )
+-  endif()
+-
+-  if(${_VDB_PRINT_RETURN_STATUS})
+-    if(NOT OpenVDB_FIND_QUIETLY)
+-      message(WARNING "vdb_print returned with status ${_VDB_PRINT_RETURN_STATUS}")
+-    endif()
+-    return()
+-  endif()
+-
+-  set(_OpenVDB_ABI)
+-  if (_VDB_PRINT_VERSION_STRING)
+-    string(REGEX REPLACE ".*abi([0-9]*).*" "\\1" _OpenVDB_ABI ${_VDB_PRINT_VERSION_STRING})
+-  endif ()
+-  if(${_OpenVDB_ABI} STREQUAL ${_VDB_PRINT_VERSION_STRING})
+-    set(_OpenVDB_ABI "")
+-  endif()
+-  unset(_VDB_PRINT_RETURN_STATUS)
+-  unset(_VDB_PRINT_VERSION_STRING)
+-
+-  if(_VDB_ABI)
+-    set(${_VDB_ABI} ${_OpenVDB_ABI} PARENT_SCOPE)
+-  endif()
+-endfunction()
+-- 
+2.49.0
+

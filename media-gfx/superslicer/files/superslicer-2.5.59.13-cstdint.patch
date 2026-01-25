@@ -1,0 +1,46 @@
+From eca0a9dbe8a3e30cd12880cde931a6c3c782636b Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 14 Feb 2025 23:10:45 +0100
+Subject: [PATCH 1/4] cstdint
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/libslic3r/CustomGCode.hpp b/src/libslic3r/CustomGCode.hpp
+index 633edc8..e6caecc 100644
+--- a/src/libslic3r/CustomGCode.hpp
++++ b/src/libslic3r/CustomGCode.hpp
+@@ -1,6 +1,7 @@
+ #ifndef slic3r_CustomGCode_hpp_
+ #define slic3r_CustomGCode_hpp_
+ 
++#include <cstdint>
+ #include <string>
+ #include <vector>
+ 
+diff --git a/src/libslic3r/PNGReadWrite.hpp b/src/libslic3r/PNGReadWrite.hpp
+index 01e1f47..ee96930 100644
+--- a/src/libslic3r/PNGReadWrite.hpp
++++ b/src/libslic3r/PNGReadWrite.hpp
+@@ -1,6 +1,7 @@
+ #ifndef PNGREAD_HPP
+ #define PNGREAD_HPP
+ 
++#include <cstdint>
+ #include <vector>
+ #include <string>
+ #include <istream>
+diff --git a/src/slic3r/GUI/BitmapCache.hpp b/src/slic3r/GUI/BitmapCache.hpp
+index 34821c4..587def7 100644
+--- a/src/slic3r/GUI/BitmapCache.hpp
++++ b/src/slic3r/GUI/BitmapCache.hpp
+@@ -1,6 +1,7 @@
+ #ifndef SLIC3R_GUI_BITMAP_CACHE_HPP
+ #define SLIC3R_GUI_BITMAP_CACHE_HPP
+ 
++#include <cstdint>
+ #include <map>
+ #include <vector>
+ 
+-- 
+2.48.1
+

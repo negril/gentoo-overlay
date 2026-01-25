@@ -1,0 +1,36 @@
+From 0d1e479e346e3c26c7cd8a801ad7944d53d5d55d Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sat, 31 May 2025 00:17:05 +0200
+Subject: [PATCH 14/19] libexpat
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 3a89d617e..d098e0e99 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -89,7 +89,7 @@ if (SLIC3R_GUI)
+     string(REGEX MATCH "wxexpat" WX_EXPAT_BUILTIN ${wxWidgets_LIBRARIES})
+     if (EXPAT_FOUND AND NOT WX_EXPAT_BUILTIN)
+         list(FILTER wxWidgets_LIBRARIES EXCLUDE REGEX expat)
+-        list(APPEND wxWidgets_LIBRARIES libexpat)
++        list(APPEND wxWidgets_LIBRARIES expat)
+     endif ()
+     
+     # This is an issue in the new wxWidgets cmake build, doesn't deal with librt
+diff --git a/src/libslic3r/CMakeLists.txt b/src/libslic3r/CMakeLists.txt
+index 1dbc73289..56685e820 100644
+--- a/src/libslic3r/CMakeLists.txt
++++ b/src/libslic3r/CMakeLists.txt
+@@ -604,7 +604,7 @@ target_link_libraries(libslic3r
+     boost_libs
+     clipper
+     nowide
+-    libexpat
++    expat
+     glu-libtess
+     qhull
+     semver
+-- 
+2.49.0
+

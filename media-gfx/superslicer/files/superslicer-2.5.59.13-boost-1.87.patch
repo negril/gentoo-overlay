@@ -1,0 +1,246 @@
+From 543be266be5d3a2a4c48d4b6f4486decc287469f Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 14 Feb 2025 21:38:57 +0100
+Subject: [PATCH 2/2] boost 1.87
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/slic3r/GUI/FirmwareDialog.cpp b/src/slic3r/GUI/FirmwareDialog.cpp
+index 7600ef4..ca2b432 100644
+--- a/src/slic3r/GUI/FirmwareDialog.cpp
++++ b/src/slic3r/GUI/FirmwareDialog.cpp
+@@ -425,7 +425,7 @@ void FirmwareDialog::priv::avr109_wait_for_bootloader(Avr109Pid usb_pid, unsigne
+ 
+ void FirmwareDialog::priv::avr109_reboot(const SerialPortInfo &port)
+ {
+-	asio::io_service io;
++	asio::io_context io;
+ 	Serial serial(io, port.port, 1200);
+ 	std::this_thread::sleep_for(std::chrono::milliseconds(50));
+ }
+diff --git a/src/slic3r/GUI/FreeCADDialog.cpp b/src/slic3r/GUI/FreeCADDialog.cpp
+index a14fb61..c29e18d 100644
+--- a/src/slic3r/GUI/FreeCADDialog.cpp
++++ b/src/slic3r/GUI/FreeCADDialog.cpp
+@@ -64,7 +64,7 @@ namespace GUI {
+     class ExecVar {
+     public:
+         boost::process::opstream pyin;
+-        boost::asio::io_service ios;
++        boost::asio::io_context ios;
+         std::future<std::string> data_out;
+         std::future<std::string> data_err;
+         std::unique_ptr<boost::process::child> process;
+diff --git a/src/slic3r/Utils/Bonjour.cpp b/src/slic3r/Utils/Bonjour.cpp
+index f121e6e..fecede5 100644
+--- a/src/slic3r/Utils/Bonjour.cpp
++++ b/src/slic3r/Utils/Bonjour.cpp
+@@ -629,8 +629,8 @@ void Bonjour::priv::lookup_perform()
+ 	auto self = this;
+ 
+ 	try {
+-		boost::asio::io_service io_service;
+-		udp::socket socket(io_service);
++		boost::asio::io_context io_context;
++		udp::socket socket(io_context);
+ 		socket.open(udp::v4());
+ 		socket.set_option(udp::socket::reuse_address(true));
+ 		udp::endpoint mcast(BonjourRequest::MCAST_IP4, BonjourRequest::MCAST_PORT);
+@@ -638,7 +638,7 @@ void Bonjour::priv::lookup_perform()
+ 
+ 		bool expired = false;
+ 		bool retry = false;
+-		asio::deadline_timer timer(io_service);
++		asio::deadline_timer timer(io_context);
+ 		retries--;
+ 		std::function<void(const error_code &)> timer_handler = [&](const error_code &error) {
+ 			if (retries == 0 || error) {
+@@ -663,7 +663,7 @@ void Bonjour::priv::lookup_perform()
+ 		};
+ 		socket.async_receive_from(asio::buffer(buffer, buffer.size()), recv_from, recv_handler);
+ 
+-		while (io_service.run_one()) {
++		while (io_context.run_one()) {
+ 			if (expired) {
+ 				socket.cancel();
+ 			} else if (retry) {
+diff --git a/src/slic3r/Utils/Serial.cpp b/src/slic3r/Utils/Serial.cpp
+index 4db1acc..b848996 100644
+--- a/src/slic3r/Utils/Serial.cpp
++++ b/src/slic3r/Utils/Serial.cpp
+@@ -278,12 +278,12 @@ std::vector<std::string> scan_serial_ports()
+ namespace asio = boost::asio;
+ using boost::system::error_code;
+ 
+-Serial::Serial(asio::io_service& io_service) :
+-	asio::serial_port(io_service)
++Serial::Serial(asio::io_context& io_context) :
++	asio::serial_port(io_context)
+ {}
+ 
+-Serial::Serial(asio::io_service& io_service, const std::string &name, unsigned baud_rate) :
+-	asio::serial_port(io_service, name)
++Serial::Serial(asio::io_context& io_context, const std::string &name, unsigned baud_rate) :
++	asio::serial_port(io_context, name)
+ {
+ 	set_baud_rate(baud_rate);
+ }
+@@ -386,19 +386,19 @@ void Serial::reset_line_num()
+ 
+ bool Serial::read_line(unsigned timeout, std::string &line, error_code &ec)
+ {
+-	auto& io_service =
++	auto& io_context =
+ #if BOOST_VERSION >= 107000
+ 		//FIXME this is most certainly wrong!
+ 		(boost::asio::io_context&)this->get_executor().context();
+  #else
+ 		this->get_io_service();
+ #endif
+-	asio::deadline_timer timer(io_service);
++	asio::deadline_timer timer(io_context);
+ 	char c = 0;
+ 	bool fail = false;
+ 
+ 	while (true) {
+-		io_service.reset();
++		io_context.restart();
+ 
+ 		asio::async_read(*this, boost::asio::buffer(&c, 1), [&](const error_code &read_ec, size_t size) {
+ 			if (ec || size == 0) {
+@@ -419,7 +419,7 @@ bool Serial::read_line(unsigned timeout, std::string &line, error_code &ec)
+ 			});
+ 		}
+ 
+-		io_service.run();
++		io_context.run();
+ 
+ 		if (fail) {
+ 			return false;
+diff --git a/src/slic3r/Utils/Serial.hpp b/src/slic3r/Utils/Serial.hpp
+index 8bad75b..138c238 100644
+--- a/src/slic3r/Utils/Serial.hpp
++++ b/src/slic3r/Utils/Serial.hpp
+@@ -39,8 +39,8 @@ extern std::vector<SerialPortInfo> 	scan_serial_ports_extended();
+ class Serial : public boost::asio::serial_port
+ {
+ public:
+-	Serial(boost::asio::io_service &io_service);
+-	Serial(boost::asio::io_service &io_service, const std::string &name, unsigned baud_rate);
++	Serial(boost::asio::io_context &io_context);
++	Serial(boost::asio::io_context &io_context, const std::string &name, unsigned baud_rate);
+ 	Serial(const Serial &) = delete;
+ 	Serial &operator=(const Serial &) = delete;
+ 	~Serial();
+diff --git a/src/slic3r/Utils/TCPConsole.cpp b/src/slic3r/Utils/TCPConsole.cpp
+index 3c943cc..0cc5a1e 100644
+--- a/src/slic3r/Utils/TCPConsole.cpp
++++ b/src/slic3r/Utils/TCPConsole.cpp
+@@ -1,4 +1,5 @@
+ #include <boost/asio/buffer.hpp>
++#include <boost/asio/connect.hpp>
+ #include <boost/asio/io_context.hpp>
+ #include <boost/asio/ip/tcp.hpp>
+ #include <boost/asio/read_until.hpp>
+@@ -156,7 +157,7 @@ bool TCPConsole::run_queue()
+ 
+         auto endpoints = m_resolver.resolve(m_host_name, m_port_name);
+ 
+-        m_socket.async_connect(endpoints->endpoint(),
++        boost::asio::async_connect(m_socket, endpoints.begin(), endpoints.end(),
+             boost::bind(&TCPConsole::handle_connect, this, _1)
+         );
+ 
+-- 
+2.48.1
+
+From 604c72aeb554623c625895dddda8aaac36841911 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 15 Feb 2025 00:21:08 +0100
+Subject: [PATCH] boost filesystem
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+---
+ src/hints/HintsToPot.cpp            | 1 +
+ src/slic3r/Config/Snapshot.cpp      | 1 +
+ src/slic3r/Config/Version.cpp       | 1 +
+ src/slic3r/GUI/FreeCADDialog.cpp    | 1 +
+ src/slic3r/GUI/HintNotification.cpp | 1 +
+ src/slic3r/GUI/Tab.cpp              | 1 +
+ 6 files changed, 6 insertions(+)
+
+diff --git a/src/hints/HintsToPot.cpp b/src/hints/HintsToPot.cpp
+index 7c8029c..b818e87 100644
+--- a/src/hints/HintsToPot.cpp
++++ b/src/hints/HintsToPot.cpp
+@@ -2,6 +2,7 @@
+ #include <vector>
+ #include <string>
+ #include <boost/filesystem.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/dll.hpp>
+ #include <boost/property_tree/ini_parser.hpp>
+ #include <boost/nowide/fstream.hpp>
+diff --git a/src/slic3r/Config/Snapshot.cpp b/src/slic3r/Config/Snapshot.cpp
+index 7c18d8f..4257b84 100644
+--- a/src/slic3r/Config/Snapshot.cpp
++++ b/src/slic3r/Config/Snapshot.cpp
+@@ -7,6 +7,7 @@
+ #include <boost/nowide/fstream.hpp>
+ #include <boost/property_tree/ini_parser.hpp>
+ #include <boost/property_tree/ptree_fwd.hpp>
++#include <boost/filesystem/directory.hpp>
+ #include <boost/filesystem/operations.hpp>
+ #include <boost/log/trivial.hpp>
+ 
+diff --git a/src/slic3r/Config/Version.cpp b/src/slic3r/Config/Version.cpp
+index 066f0ef..8b41138 100644
+--- a/src/slic3r/Config/Version.cpp
++++ b/src/slic3r/Config/Version.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include <cctype>
+ 
++#include <boost/filesystem/directory.hpp>
+ #include <boost/filesystem/operations.hpp>
+ #include <boost/nowide/fstream.hpp>
+ 
+diff --git a/src/slic3r/GUI/FreeCADDialog.cpp b/src/slic3r/GUI/FreeCADDialog.cpp
+index 93c78f0..ddfbf94 100644
+--- a/src/slic3r/GUI/FreeCADDialog.cpp
++++ b/src/slic3r/GUI/FreeCADDialog.cpp
+@@ -30,6 +30,7 @@
+ #include "wxExtensions.hpp"
+ 
+ #include <boost/asio.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/locale.hpp>
+ #include <boost/iostreams/device/file_descriptor.hpp>
+ #include <boost/iostreams/stream.hpp>
+diff --git a/src/slic3r/GUI/HintNotification.cpp b/src/slic3r/GUI/HintNotification.cpp
+index 5d5ada8..bca3cb0 100644
+--- a/src/slic3r/GUI/HintNotification.cpp
++++ b/src/slic3r/GUI/HintNotification.cpp
+@@ -16,6 +16,7 @@
+ 
+ #include <boost/algorithm/string/replace.hpp>
+ #include <boost/filesystem.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/nowide/fstream.hpp>
+ #include <boost/log/trivial.hpp>
+ #include <boost/property_tree/ini_parser.hpp>
+diff --git a/src/slic3r/GUI/Tab.cpp b/src/slic3r/GUI/Tab.cpp
+index 7d8d766..9ea6416 100644
+--- a/src/slic3r/GUI/Tab.cpp
++++ b/src/slic3r/GUI/Tab.cpp
+@@ -36,6 +36,7 @@
+ #include <boost/algorithm/string/replace.hpp>
+ #include <boost/algorithm/string/trim.hpp>
+ #include <boost/filesystem.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/filesystem/path.hpp>
+ #include <boost/lexical_cast.hpp>
+ #include <boost/log/trivial.hpp>
+-- 
+2.48.1
+

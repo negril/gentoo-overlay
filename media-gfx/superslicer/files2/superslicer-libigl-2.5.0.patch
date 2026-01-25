@@ -1,0 +1,33 @@
+From 649e7ddabca57461e86730056fc0bae861e333b5 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sat, 31 May 2025 18:52:07 +0200
+Subject: [PATCH 16/19] libigl-2.5.0
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/BranchingTree/PointCloud.cpp b/src/libslic3r/BranchingTree/PointCloud.cpp
+index 13a13f7eb..2951966a4 100644
+--- a/src/libslic3r/BranchingTree/PointCloud.cpp
++++ b/src/libslic3r/BranchingTree/PointCloud.cpp
+@@ -8,6 +8,7 @@
+ #include "libslic3r/SLA/SupportTreeUtils.hpp"
+ 
+ #include <igl/random_points_on_mesh.h>
++#include <igl/random_points_on_mesh_intrinsic.h>
+ 
+ namespace Slic3r { namespace branchingtree {
+ 
+@@ -49,8 +50,9 @@ std::vector<Node> sample_mesh(const indexed_triangle_set &its, double radius)
+     Eigen::MatrixXi FI;
+     Eigen::MatrixXd V;
+     Eigen::MatrixXi F;
++    Eigen::MatrixXd X;
+     to_eigen_mesh(its, V, F);
+-    igl::random_points_on_mesh(N, V, F, B, FI);
++    igl::random_points_on_mesh(N, V, F, B, FI, X);
+ 
+     ret.reserve(size_t(N));
+     for (int i = 0; i < FI.size(); i++) {
+-- 
+2.49.0
+

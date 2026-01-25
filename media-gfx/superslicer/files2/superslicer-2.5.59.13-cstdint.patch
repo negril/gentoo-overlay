@@ -1,0 +1,22 @@
+From c52d64aa096b93718988bd55dfed325c95d928c7 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:35:05 +0200
+Subject: [PATCH 07/19] 2.5.59.13 cstdint
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/slic3r/GUI/BitmapCache.hpp b/src/slic3r/GUI/BitmapCache.hpp
+index b275c6a48..f94e53c9b 100644
+--- a/src/slic3r/GUI/BitmapCache.hpp
++++ b/src/slic3r/GUI/BitmapCache.hpp
+@@ -6,6 +6,7 @@
+ #ifndef SLIC3R_GUI_BITMAP_CACHE_HPP
+ #define SLIC3R_GUI_BITMAP_CACHE_HPP
+ 
++#include <cstdint>
+ #include <map>
+ #include <vector>
+ 
+-- 
+2.49.0
+

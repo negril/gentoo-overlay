@@ -1,0 +1,82 @@
+From 21014b50177751432f0d2f6a2d7a7ac54a255e6d Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:35:04 +0200
+Subject: [PATCH 06/19] 2.5.59.13 boost 1.87
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/hints/HintsToPot.cpp b/src/hints/HintsToPot.cpp
+index 064e1bd9f..24e83a54d 100644
+--- a/src/hints/HintsToPot.cpp
++++ b/src/hints/HintsToPot.cpp
+@@ -2,6 +2,7 @@
+ #include <vector>
+ #include <string>
+ #include <boost/filesystem.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/dll.hpp>
+ #include <boost/property_tree/ini_parser.hpp>
+ #include <boost/nowide/fstream.hpp>
+diff --git a/src/slic3r/Config/Snapshot.cpp b/src/slic3r/Config/Snapshot.cpp
+index 4337cb35d..746bc84f7 100644
+--- a/src/slic3r/Config/Snapshot.cpp
++++ b/src/slic3r/Config/Snapshot.cpp
+@@ -11,6 +11,7 @@
+ #include <boost/nowide/fstream.hpp>
+ #include <boost/property_tree/ini_parser.hpp>
+ #include <boost/property_tree/ptree_fwd.hpp>
++#include <boost/filesystem/directory.hpp>
+ #include <boost/filesystem/operations.hpp>
+ #include <boost/log/trivial.hpp>
+ 
+diff --git a/src/slic3r/Config/Version.cpp b/src/slic3r/Config/Version.cpp
+index 53dc97e57..c1b5f017f 100644
+--- a/src/slic3r/Config/Version.cpp
++++ b/src/slic3r/Config/Version.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include <cctype>
+ 
++#include <boost/filesystem/directory.hpp>
+ #include <boost/filesystem/operations.hpp>
+ #include <boost/nowide/fstream.hpp>
+ 
+diff --git a/src/slic3r/GUI/FreeCADDialog.cpp b/src/slic3r/GUI/FreeCADDialog.cpp
+index 9b7213b55..7ee3c5b64 100644
+--- a/src/slic3r/GUI/FreeCADDialog.cpp
++++ b/src/slic3r/GUI/FreeCADDialog.cpp
+@@ -30,6 +30,7 @@
+ #include "wxExtensions.hpp"
+ 
+ #include <boost/asio.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/locale.hpp>
+ #include <boost/iostreams/device/file_descriptor.hpp>
+ #include <boost/iostreams/stream.hpp>
+diff --git a/src/slic3r/GUI/HintNotification.cpp b/src/slic3r/GUI/HintNotification.cpp
+index 0f2862b3b..64cf72735 100644
+--- a/src/slic3r/GUI/HintNotification.cpp
++++ b/src/slic3r/GUI/HintNotification.cpp
+@@ -23,6 +23,7 @@
+ 
+ #include <boost/algorithm/string/replace.hpp>
+ #include <boost/filesystem.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/nowide/fstream.hpp>
+ #include <boost/log/trivial.hpp>
+ #include <boost/property_tree/ini_parser.hpp>
+diff --git a/src/slic3r/GUI/Tab.cpp b/src/slic3r/GUI/Tab.cpp
+index 9bc529267..eb411015a 100644
+--- a/src/slic3r/GUI/Tab.cpp
++++ b/src/slic3r/GUI/Tab.cpp
+@@ -64,6 +64,7 @@
+ #include <boost/algorithm/string/trim.hpp>
+ #include <boost/exception/diagnostic_information.hpp>
+ #include <boost/filesystem.hpp>
++#include <boost/filesystem/fstream.hpp>
+ #include <boost/filesystem/path.hpp>
+ #include <boost/lexical_cast.hpp>
+ #include <boost/log/trivial.hpp>
+-- 
+2.49.0
+

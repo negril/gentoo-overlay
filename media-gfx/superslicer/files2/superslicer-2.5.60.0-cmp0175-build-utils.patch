@@ -1,0 +1,22 @@
+From df5e742436a90f62b560810f4531976196238537 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:35:05 +0200
+Subject: [PATCH 11/19] 2.5.60.0 cmp0175 build utils
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/build-utils/CMakeLists.txt b/src/build-utils/CMakeLists.txt
+index 464fd9c8f..06d8d9495 100644
+--- a/src/build-utils/CMakeLists.txt
++++ b/src/build-utils/CMakeLists.txt
+@@ -37,6 +37,7 @@ function(encoding_check TARGET)
+         # Add checking of each source file as a subcommand of encoding-check-${TARGET}
+         foreach(file ${T_SOURCES})
+             add_custom_command(TARGET encoding-check-${TARGET}
++                PRE_BUILD
+                 COMMAND $<TARGET_FILE:encoding-check> ${TARGET} ${file}
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+             )
+-- 
+2.49.0
+

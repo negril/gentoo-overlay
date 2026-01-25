@@ -1,0 +1,29 @@
+From fde74f23448b0ae16bc3cf70fe1a41aec563cf6e Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 14 Feb 2025 23:12:01 +0100
+Subject: [PATCH 3/4] header cleanup
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/slic3r/GUI/RemovableDriveManager.cpp b/src/slic3r/GUI/RemovableDriveManager.cpp
+index 2f8ac96..60a4a4d 100644
+--- a/src/slic3r/GUI/RemovableDriveManager.cpp
++++ b/src/slic3r/GUI/RemovableDriveManager.cpp
+@@ -15,14 +15,12 @@
+ 
+ #else
+ // unix, linux & OSX includes
+-#include <errno.h>
+ #include <sys/mount.h>
+ #include <sys/stat.h>
+ #include <glob.h>
+ #include <pwd.h>
+ #include <boost/filesystem.hpp>
+ #include <boost/system/error_code.hpp>
+-#include <boost/filesystem/convenience.hpp>
+ #include <boost/process.hpp>
+ #endif
+ 
+-- 
+2.48.1
+

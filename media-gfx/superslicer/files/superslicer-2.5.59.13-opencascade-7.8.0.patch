@@ -1,0 +1,28 @@
+From 59cc09ede9eb0889b51c3b5abf32624bf0fb56ef Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 14 Feb 2025 21:38:46 +0100
+Subject: [PATCH 1/2] opencascade 7.8.0
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/occt_wrapper/CMakeLists.txt b/src/occt_wrapper/CMakeLists.txt
+index ad983be..66f9a04 100644
+--- a/src/occt_wrapper/CMakeLists.txt
++++ b/src/occt_wrapper/CMakeLists.txt
+@@ -17,11 +17,8 @@ generate_export_header(OCCTWrapper)
+ find_package(OpenCASCADE REQUIRED)
+ 
+ set(OCCT_LIBS
+-    TKXDESTEP
+-    TKSTEP
+-    TKSTEP209
+-    TKSTEPAttr
+-    TKSTEPBase
++    TKDESTEP # TKXSDRAWSTEP
++    TKDESTL # TKDESTEP
+     TKXCAF
+     TKXSBase
+     TKVCAF
+-- 
+2.48.1
+

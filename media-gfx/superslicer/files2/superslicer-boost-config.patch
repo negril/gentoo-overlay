@@ -1,0 +1,23 @@
+From 681cbc4239e6264b7c007210d50f440039c6384c Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sat, 31 May 2025 18:52:27 +0200
+Subject: [PATCH 18/19] boost config
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ac9680f2f..09be64782 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -385,7 +385,7 @@ endif()
+ # boost::beast::detail::base64 was introduced first in version 1.66.0
+ set(MINIMUM_BOOST_VERSION "1.66.0")
+ set(_boost_components "system;filesystem;thread;log;locale;regex;chrono;atomic;date_time;iostreams")
+-find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS ${_boost_components})
++find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS ${_boost_components} CONFIG)
+ # boost compile only in release & debug. We have to force the release version for RELWITHDEBINFO compilation
+ if (MSVC)
+   set_target_properties(${Boost_LIBRARIES} PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
+-- 
+2.49.0
+

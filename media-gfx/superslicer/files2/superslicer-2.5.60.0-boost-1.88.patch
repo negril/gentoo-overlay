@@ -1,0 +1,106 @@
+From c5542bacd9e6ee680172195f67da8d5496e0794d Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:35:06 +0200
+Subject: [PATCH 13/19] 2.5.60.0 boost 1.88
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/libslic3r/GCode/PostProcessor.cpp b/src/libslic3r/GCode/PostProcessor.cpp
+index 8e0304ae9..16db65f8c 100644
+--- a/src/libslic3r/GCode/PostProcessor.cpp
++++ b/src/libslic3r/GCode/PostProcessor.cpp
+@@ -12,6 +12,7 @@
+ #include <boost/algorithm/string.hpp>
+ #include <boost/log/trivial.hpp>
+ #include <boost/format.hpp>
++#include <boost/filesystem.hpp>
+ #include <boost/nowide/convert.hpp>
+ #include <boost/nowide/cenv.hpp>
+ #include <boost/nowide/fstream.hpp>
+@@ -28,7 +29,14 @@
+ #else
+ // POSIX
+ #include <sstream>
++#if BOOST_VERSION >= 108800 // v2 is now default
++#define BOOST_PROCESS_VERSION 1
++#include <boost/process/v1/child.hpp>
++#include <boost/process/v1/io.hpp>
++#include <boost/process/v1/pipe.hpp>
++#else
+ #include <boost/process.hpp>
++#endif
+ #include <unistd.h>     //readlink
+ #endif
+ 
+diff --git a/src/libslic3r/utils.cpp b/src/libslic3r/utils.cpp
+index 96b0b754a..b3c0f2c81 100644
+--- a/src/libslic3r/utils.cpp
++++ b/src/libslic3r/utils.cpp
+@@ -89,7 +89,14 @@
+ #else
+ 	// POSIX
+ #include <sstream>
++#if BOOST_VERSION >= 108800 // v2 is now default
++#define BOOST_PROCESS_VERSION 1
++#include <boost/process/v1/child.hpp>
++#include <boost/process/v1/io.hpp>
++#include <boost/process/v1/pipe.hpp>
++#else
+ #include <boost/process.hpp>
++#endif
+ #include <unistd.h>     //readlink
+ #endif
+ 
+diff --git a/src/slic3r/GUI/FreeCADDialog.cpp b/src/slic3r/GUI/FreeCADDialog.cpp
+index 7ee3c5b64..434095c86 100644
+--- a/src/slic3r/GUI/FreeCADDialog.cpp
++++ b/src/slic3r/GUI/FreeCADDialog.cpp
+@@ -16,6 +16,7 @@
+ #include "MainFrame.hpp"
+ #include "wxExtensions.hpp"
+ 
++#include <boost/format.hpp>
+ #include <iostream>
+ #include <ctime>
+ #include <cstdlib>
+@@ -44,8 +45,16 @@
+ // hack for process.hpp : it uses pid_t to set it as alias of int, but vc_x64_lib (wx thingy) as a '#define pid_t int'
+ // and so boost/process has a line 'typedef int int'instead of 'typedef int pid_t' that makes it crash
+ // note: don't put it in a header, as it can create problems. Here it's safe enough to be used, as it's just applied for the process.hpp file and this source code.
++#if BOOST_VERSION >= 108800 // v2 is now default
+ #define pid_t pid_t
++#define BOOST_PROCESS_VERSION 1
++#include <boost/process/v1/async.hpp>
++#include <boost/process/v1/child.hpp>
++#include <boost/process/v1/io.hpp>
++#include <boost/process/v1/pipe.hpp>
++#else
+ #include <boost/process.hpp>
++#endif
+ 
+ #include <cstdlib>   // getenv()
+ 
+diff --git a/src/slic3r/GUI/RemovableDriveManager.cpp b/src/slic3r/GUI/RemovableDriveManager.cpp
+index 02b2904cb..86640fa9b 100644
+--- a/src/slic3r/GUI/RemovableDriveManager.cpp
++++ b/src/slic3r/GUI/RemovableDriveManager.cpp
+@@ -34,8 +34,16 @@
+ #include <pwd.h>
+ #include <boost/filesystem.hpp>
+ #include <boost/system/error_code.hpp>
++#if BOOST_VERSION >= 108800 // v2 is now default
++#define BOOST_PROCESS_VERSION 1
++#include <boost/process/v1/child.hpp>
++#include <boost/process/v1/io.hpp>
++#include <boost/process/v1/pipe.hpp>
++#include <boost/process/v1/search_path.hpp>
++#else
+ #include <boost/process.hpp>
+ #endif
++#endif
+ 
+ namespace Slic3r {
+ namespace GUI { 
+-- 
+2.49.0
+

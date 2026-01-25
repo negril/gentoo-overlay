@@ -1,0 +1,23 @@
+From 87d9b6053507a7404153f5f014f45271b10f1b96 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 30 May 2025 17:33:06 +0200
+Subject: [PATCH 01/19] 2.5.59.2 dont install angelscript
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 3b39dcf08..6811673f7 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -40,7 +40,7 @@ if (SLIC3R_GUI)
+     include_directories(hidapi/include)
+     add_subdirectory(exif)
+     include_directories(exif/include)
+-    add_subdirectory(angelscript)
++    add_subdirectory(angelscript EXCLUDE_FROM_ALL)
+     # include_directories(angelscript/include)
+ 
+     if(WIN32)
+-- 
+2.49.0
+

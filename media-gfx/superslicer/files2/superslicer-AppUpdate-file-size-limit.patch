@@ -1,0 +1,23 @@
+From a14f38710b868ab23035af6c0b52de50df0e92fb Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sat, 31 May 2025 18:52:39 +0200
+Subject: [PATCH 19/19] AppUpdate file size limit
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/slic3r/Utils/AppUpdater.cpp b/src/slic3r/Utils/AppUpdater.cpp
+index 512b9012b..3ba6f1f63 100644
+--- a/src/slic3r/Utils/AppUpdater.cpp
++++ b/src/slic3r/Utils/AppUpdater.cpp
+@@ -325,7 +325,7 @@ void AppUpdater::priv::version_check(const std::string& version_check_url)
+ {
+ 	assert(!version_check_url.empty());
+ 	std::string error_message;
+-	bool res = http_get_file(version_check_url, 1024
++	bool res = http_get_file(version_check_url, 1024*1024
+ 		// on_progress
+ 		, [](Http::Progress progress) { return true; }
+ 		// on_complete
+-- 
+2.49.0
+
