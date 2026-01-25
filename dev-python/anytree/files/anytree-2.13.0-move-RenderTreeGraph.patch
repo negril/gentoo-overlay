@@ -1,0 +1,70 @@
+From 3430749be931b8c0dc85d6f3631d81b8a3ecdf83 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Tue, 17 Jun 2025 13:06:36 +0200
+Subject: [PATCH] move RenderTreeGraph
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/docs/dotexport.rst b/docs/dotexport.rst
+index 4ebbe7b..f8c14ae 100644
+--- a/docs/dotexport.rst
++++ b/docs/dotexport.rst
+@@ -16,14 +16,14 @@ This tree::
+     >>> s1c = Node("sub1C", parent=s1)
+     >>> s1ca = Node("sub1Ca", parent=s1c)
+ 
+-Can be rendered to a tree by :any:`RenderTreeGraph`::
++Can be rendered to a tree by :any:`DotExporter`::
+ 
+-    >>> from anytree.dotexport import RenderTreeGraph
+-    >>> RenderTreeGraph(root).to_picture("tree.png")  # doctest: +SKIP
++    >>> from anytree.exporter import DotExporter
++    >>> DotExporter(root).to_picture("tree.png")  # doctest: +SKIP
+ 
+ .. image:: static/tree.png
+ 
+-.. automodule:: anytree.dotexport
++.. automodule:: anytree.exporter
+     :inherited-members:
+ 
+ .. _graphviz: http://www.graphviz.org/
+diff --git a/tests/test_dotexport.py b/tests/test_dotexport.py
+index 2190fbd..5087e86 100644
+--- a/tests/test_dotexport.py
++++ b/tests/test_dotexport.py
+@@ -4,7 +4,7 @@ from pytest import mark
+ from test2ref import assert_refdata
+ 
+ from anytree import Node
+-from anytree.dotexport import RenderTreeGraph
++from anytree.exporter import DotExporter
+ 
+ 
+ def test_tree1(tmp_path):
+@@ -19,7 +19,7 @@ def test_tree1(tmp_path):
+     s1c = Node("sub1C", parent=s1)
+     Node(99, parent=s1c)
+ 
+-    RenderTreeGraph(root).to_dotfile(tmp_path / "tree1.dot")
++    DotExporter(root).to_dotfile(tmp_path / "tree1.dot")
+     assert_refdata(test_tree1, tmp_path)
+ 
+ 
+@@ -41,7 +41,7 @@ def test_tree2(tmp_path):
+     def edgeattrfunc(node, child):
+         return f'label="{node.name}:{child.name}"'
+ 
+-    r = RenderTreeGraph(
++    r = DotExporter(
+         root,
+         options=["rankdir=LR;"],
+         nodenamefunc=nodenamefunc,
+@@ -66,4 +66,4 @@ def test_tree_png(tmp_path):
+     s1c = Node("sub1C", parent=s1)
+     Node("sub1Ca", parent=s1c)
+ 
+-    RenderTreeGraph(root).to_picture(tmp_path / "tree1.png")
++    DotExporter(root).to_picture(tmp_path / "tree1.png")
+-- 
+2.49.0
+
