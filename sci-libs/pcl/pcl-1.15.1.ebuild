@@ -13,6 +13,9 @@ if [[ ${PV} == *9999* ]]; then
 else
 	SRC_URI="
 		https://github.com/PointCloudLibrary/pcl/archive/${P}.tar.gz
+		https://github.com/PointCloudLibrary/pcl/commit/99333442ac63971297b4cdd05fab9d2bd2ff57a4.patch -> ${PN}-PR6330.patch
+		https://github.com/PointCloudLibrary/pcl/commit/8dd410058f7acfd825e078dd9ef078677ebd929c.patch -> ${PN}-PR6386.patch
+		https://github.com/PointCloudLibrary/pcl/commit/2d6929bdcd98beaa28fa8ee3a105beb566f16347.patch -> ${PN}-PR6354.patch
 	"
 	S="${WORKDIR}/${PN}-${P}"
 	KEYWORDS="~amd64 ~arm"
@@ -31,7 +34,7 @@ REQUIRED_USE="
 	openni? ( usb )
 	openni2? ( usb )
 	tutorials? ( doc )
-	vtk? ( png )
+	vtk? ( png qt6 )
 "
 
 RESTRICT="!test? ( test )"
@@ -116,6 +119,10 @@ PATCHES=(
 	"${FILESDIR}/${PN}-1.14.1-tests.patch"
 	"${FILESDIR}/${PN}-1.15.1-ASSERT_FLOAT_EQ.patch"
 	"${FILESDIR}/${PN}-1.15.1-update-find-vtk.patch"
+
+	"${DISTDIR}/${PN}-PR6330.patch" # Fix build with Boost 1.89.0
+	"${DISTDIR}/${PN}-PR6386.patch" # Enable compilation with Eigen 5.0.0
+	"${DISTDIR}/${PN}-PR6354.patch" # Fix CUDA 12.9 transform_reduce ambiguity
 )
 
 pkg_pretend() {
@@ -167,31 +174,15 @@ src_configure() {
 		-DBUILD_GPU="$(usex cuda)"
 
 		-DBUILD_apps="$(usex apps)"
-		-DBUILD_apps_3d_rec_framework="$(usex apps "$(usex vtk "$(usex openni)")")"
-		-DBUILD_apps_cloud_composer="$(usex apps)"
-		-DBUILD_apps_in_hand_scanner="$(usex apps "$(usex qt6 "$(usex opengl "$(usex openni)")")")"
-		-DBUILD_apps_modeler="$(usex apps)"
-		-DBUILD_apps_point_cloud_editor="$(usex apps)"
 
 		-DBUILD_benchmarks="no"
 
-		-DBUILD_cuda_apps="$(usex cuda "$(usex apps "$(usex openni)")")" # Requires cuda_io.
-		-DBUILD_cuda_common="$(usex cuda "$(usex apps)")"
-		-DBUILD_cuda_features="$(usex cuda "$(usex apps)")"
-		-DBUILD_cuda_io="$(usex cuda "$(usex apps "$(usex openni)")")" # Requires external library openni.
-		-DBUILD_cuda_sample_consensus="$(usex cuda "$(usex apps)")"
-		-DBUILD_cuda_segmentation="$(usex cuda "$(usex apps)")"
+		-DBUILD_cuda_apps="$(usex cuda "$(usex openni "$(usex vtk)")")" # Requires cuda_io.
+		-DBUILD_cuda_io="$(usex cuda "$(usex openni)")" # Requires external library openni.
 
 		-DBUILD_examples="$(usex examples)"
 		-DBUILD_global_tests="$(usex test)"
 
-		-DBUILD_gpu_features="yes"
-		-DBUILD_gpu_kinfu="no" # uses textures which was removed in CUDA 12
-		-DBUILD_gpu_kinfu_large_scale="no" # uses textures which was removed in CUDA 12
-		-DBUILD_gpu_people="no" # uses textures which was removed in CUDA 12
-
-		-DBUILD_gpu_surface="yes"
-		-DBUILD_gpu_tracking="yes"
 		-DBUILD_simulation="yes"
 		-DBUILD_surface="yes"
 		-DBUILD_surface_on_nurbs="yes"
@@ -232,6 +223,29 @@ src_configure() {
 		# surface/src/on_nurbs/on_nurbs.cmake
 		# -DUSE_UMFPACK=""
 	)
+
+	if use apps; then
+		mycmakeargs+=(
+			-DBUILD_apps_3d_rec_framework="$(usex vtk "$(usex openni)")"
+			-DBUILD_apps_cloud_composer="yes"
+			-DBUILD_apps_in_hand_scanner="$(usex qt6 "$(usex opengl "$(usex openni)")")"
+			-DBUILD_apps_modeler="yes"
+			-DBUILD_apps_point_cloud_editor="yes"
+
+			-DBUILD_cuda_common="$(usex cuda)"
+			-DBUILD_cuda_features="$(usex cuda)"
+			-DBUILD_cuda_sample_consensus="$(usex cuda)"
+			-DBUILD_cuda_segmentation="$(usex cuda)"
+
+			-DBUILD_gpu_features="yes"
+			-DBUILD_gpu_kinfu="no" # uses textures which was removed in CUDA 12
+			-DBUILD_gpu_kinfu_large_scale="no" # uses textures which was removed in CUDA 12
+			-DBUILD_gpu_people="no" # uses textures which was removed in CUDA 12
+
+			-DBUILD_gpu_surface="yes"
+			-DBUILD_gpu_tracking="yes"
+		)
+	fi
 
 	if use cuda; then
 		cuda_add_sandbox
