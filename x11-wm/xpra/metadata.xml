@@ -9,16 +9,12 @@
 	<email>alexxy@gentoo.org</email>
 	<name>Alexey Shvetsov</name>
 </maintainer>
-<maintainer type="person">
-	<email>chewi@gentoo.org</email>
-	<name>James Le Cuirot</name>
-</maintainer>
 <upstream>
 	<remote-id type="pypi">xpra</remote-id>
+	<remote-id type="github">Xpra-org/xpra</remote-id>
 	<bugs-to>https://www.xpra.org/trac/report</bugs-to>
 </upstream>
 <use>
-	<flag name="brotli">Enable brotli compression support</flag>
 	<flag name="client">Build client-side code</flag>
 	<flag name="clipboard">Enable clipboard support</flag>
 	<flag name="csc">Enable csc softscaler support</flag>
@@ -26,7 +22,6 @@
 	<flag name="evdi">Build evdi support via <pkg>x11-drivers/evdi</pkg></flag>
 	<flag name="gtk3">Enable the GTK3 client</flag>
 	<flag name="ibus">Use ibus input method via <pkg>app-i18n/ibus</pkg></flag>
-	<flag name="pillow">Enable pillow support</flag>
 	<flag name="libyuv">Build libyuv support via <pkg>media-libs/libyuv</pkg></flag>
 	<flag name="mdns">Enable Multicast DNS via <pkg>dev-libs/mdns</pkg></flag>
 	<flag name="nvfbc">Enable NVIDIA Capture SDK support</flag>
@@ -39,7 +34,6 @@
 	<flag name="spng">Use <pkg>media-libs/libspng</pkg> for png support</flag>
 	<flag name="trayicon">Enable system tray icon</flag>
 	<flag name="server">Build server-side code</flag>
-	<flag name="vpx">Enable vpx image format support</flag>
 	<flag name="webcam">Enable webcam support via opencv</flag>
 	<flag name="xdg">Enable support for XDG-based menus</flag>
 </use>
