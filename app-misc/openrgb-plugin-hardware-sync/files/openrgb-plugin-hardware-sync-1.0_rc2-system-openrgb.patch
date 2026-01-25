@@ -1,0 +1,34 @@
+From f4346fbc9fb6f2aad14f3efc33bf032e950f5bfd Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 23 Oct 2025 15:06:52 +0200
+Subject: [PATCH] system openrgb
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+---
+ OpenRGBHardwareSyncPlugin.pro | 10 ----------
+ 1 file changed, 10 deletions(-)
+
+diff --git a/OpenRGBHardwareSyncPlugin.pro b/OpenRGBHardwareSyncPlugin.pro
+index 23fe379..7619e07 100644
+--- a/OpenRGBHardwareSyncPlugin.pro
++++ b/OpenRGBHardwareSyncPlugin.pro
+@@ -98,16 +98,6 @@ HEADERS +=
+     OpenRGB/OpenRGBPluginInterface.h                                                            \
+     OpenRGB/ResourceManagerInterface.h                                                          \
+ 
+-SOURCES +=                                                                                      \
+-    OpenRGB/RGBController/RGBController.cpp                                                     \
+-    OpenRGB/RGBController/RGBController_Network.cpp                                             \
+-    OpenRGB/NetworkServer.cpp                                                                   \
+-    OpenRGB/NetworkClient.cpp                                                                   \
+-    OpenRGB/NetworkProtocol.cpp                                                                 \
+-    OpenRGB/LogManager.cpp                                                                      \
+-    OpenRGB/net_port/net_port.cpp                                                               \
+-    OpenRGB/qt/hsv.cpp                                                                          \
+-
+ #-----------------------------------------------------------------------------------------------#
+ # Plugin Files                                                                                  #
+ #-----------------------------------------------------------------------------------------------#
+-- 
+2.51.1
+
