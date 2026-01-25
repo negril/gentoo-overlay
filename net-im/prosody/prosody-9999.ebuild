@@ -12,7 +12,7 @@ if [[ ${PV} == *9999* ]]; then
 		EHG_REPO_URI="http://hg.prosody.im/trunk"
 else
 		SRC_URI="https://prosody.im/downloads/source/${P}.tar.gz"
-		KEYWORDS="amd64 arm x86"
+		KEYWORDS="~amd64 ~arm ~x86"
 fi
 
 LICENSE="MIT"
