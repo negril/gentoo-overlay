@@ -1,26 +1,25 @@
-# Copyright 2022-2024 Gentoo Authors
+# Copyright 2022-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
-inherit meson python-any-r1 vala virtualx
+PYTHON_COMPAT=( python3_{10..13} )
+inherit flag-o-matic meson python-any-r1 vala
 
 DESCRIPTION="Flatpak portal library"
 HOMEPAGE="https://github.com/flatpak/libportal"
 
-if [[ ${PV} == *9999 ]]; then
+if [[ ${PV} == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/flatpak/libportal.git"
 else
-
 	SRC_URI="https://github.com/flatpak/libportal/releases/download/${PV}/${P}.tar.xz"
 	KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~loong ~ppc ~ppc64 ~riscv ~sparc ~x86"
 fi
 
 LICENSE="LGPL-3"
-SLOT="0/1-1-1-1" # soname of libportal{,-gtk3,-gtk4,-qt5}.so
-IUSE="gtk gtk-doc +introspection qt5 qt6 test +vala"
+SLOT="0/1-1-1-1" # soname of libportal{,-gtk3,-gtk4,-qt6}.so
+IUSE="gtk gtk-doc +introspection qt6 test +vala wayland X"
 RESTRICT="!test? ( test )"
 REQUIRED_USE="
 	gtk-doc? ( introspection )
@@ -28,33 +27,23 @@ REQUIRED_USE="
 "
 
 RDEPEND="
-	>=dev-libs/glib-2.58:2
-	introspection? ( dev-libs/gobject-introspection:= )
+	>=dev-libs/glib-2.72:2
+	introspection? ( >=dev-libs/gobject-introspection-1.82.0-r2:= )
 	gtk? (
-		x11-libs/gtk+:3
-		gui-libs/gtk:4
-	)
-	qt5? (
-		dev-qt/qtcore:5=
-		dev-qt/qtgui:5=
-		dev-qt/qtx11extras:5=
-		dev-qt/qtwidgets:5=
+		>=x11-libs/gtk+-3.24.41-r1:3[introspection?,wayland?,X?]
+		>=gui-libs/gtk-4.12.5-r2:4[introspection?,wayland?,X?]
 	)
 	qt6? (
-		dev-qt/qtbase:=[gui,widgets]
+		dev-qt/qtbase[gui,widgets,X?,wayland?]
 	)
 "
 DEPEND="${RDEPEND}
-	qt5? (
-		test? ( dev-qt/qttest:= )
-	)
 "
 BDEPEND="
 	dev-util/glib-utils
 	virtual/pkgconfig
 	gtk-doc? ( dev-util/gi-docgen )
 	test? (
-		qt5? ( dev-qt/linguist-tools )
 		qt6? ( dev-qt/qttools:6[linguist] )
 		${PYTHON_DEPS}
 		$(python_gen_any_dep '
@@ -65,6 +54,10 @@ BDEPEND="
 	)
 	vala? ( $(vala_depend) )
 "
+
+PATCHES=(
+	"${FILESDIR}/${PN}-0.9.1-bogus-qt6widgets.patch"
+)
 
 python_check_deps() {
 	python_has_version \
@@ -85,10 +78,14 @@ src_prepare() {
 }
 
 src_configure() {
+	# defangle automagic dependencies
+	use wayland || append-cflags -DGENTOO_GTK_HIDE_WAYLAND
+	use X || append-cflags -DGENTOO_GTK_HIDE_X11
+
 	local emesonargs=(
 		$(meson_feature gtk backend-gtk3)
 		$(meson_feature gtk backend-gtk4)
-		$(meson_feature qt5 backend-qt5)
+		-Dbackend-qt5=disabled
 		$(meson_feature qt6 backend-qt6)
 		-Dportal-tests=false
 		$(meson_use introspection)
@@ -100,20 +97,16 @@ src_configure() {
 }
 
 src_test() {
-	# Tests only exist for Qt5
-	if use qt5 || use qt6; then
-		virtx meson_src_test
-	else
-		# run meson_src_test to notice if tests are added
-		meson_src_test
-	fi
+	local -x PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+	local -x QT_QPA_PLATFORM=offscreen
+	meson_src_test
 }
 
 src_install() {
 	meson_src_install
 
 	if use gtk-doc; then
-		mkdir -p "${ED}"/usr/share/gtk-doc/html/ || die
-		mv "${ED}"/usr/share/doc/${PN}-1 "${ED}"/usr/share/gtk-doc/html/ || die
+		mkdir -p "${ED}/usr/share/gtk-doc/html/" || die
+		mv "${ED}/usr/share/doc/${PN}-1" "${ED}/usr/share/gtk-doc/html/" || die
 	fi
 }
