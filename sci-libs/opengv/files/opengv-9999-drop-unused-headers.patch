@@ -1,0 +1,34 @@
+From 7fe0a1b1a2bc1403ba61cc4e045b1c141daa7fe8 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 25 Sep 2025 17:23:17 +0200
+Subject: [PATCH] drop unused headers
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/absolute_pose/methods.cpp b/src/absolute_pose/methods.cpp
+index 80f2b7f..6035476 100644
+--- a/src/absolute_pose/methods.cpp
++++ b/src/absolute_pose/methods.cpp
+@@ -42,7 +42,6 @@
+ #include <opengv/math/quaternion.hpp>
+ #include <opengv/math/roots.hpp>
+ 
+-#include <iostream>
+ #include <cassert>
+ 
+ 
+diff --git a/src/relative_pose/methods.cpp b/src/relative_pose/methods.cpp
+index fbc704a..a5915e8 100644
+--- a/src/relative_pose/methods.cpp
++++ b/src/relative_pose/methods.cpp
+@@ -41,7 +41,6 @@
+ #include <opengv/relative_pose/modules/main.hpp>
+ #include <opengv/triangulation/methods.hpp>
+ 
+-#include <iostream>
+ #include <cassert>
+ 
+ 
+-- 
+2.51.0
+

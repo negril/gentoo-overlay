@@ -1,0 +1,20 @@
+From 47a55796e9da7b35e3e6006e8e2fb8122355e59a Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 25 Sep 2025 17:22:10 +0200
+Subject: [PATCH] cmake-4
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5c1bf7e..6c9b4ce 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.1.3)
++cmake_minimum_required(VERSION 3.10)
+ project(opengv VERSION 1.0 LANGUAGES CXX)
+ 
+ # Set the build type.  Options are:
+-- 
+2.51.0
+

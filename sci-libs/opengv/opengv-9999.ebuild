@@ -1,9 +1,11 @@
-# Copyright 2023 Gentoo Authors
+# Copyright 2023-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
+
+# shellcheck disable=SC2329
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+PYTHON_COMPAT=( python3_{12..13} )
 inherit cmake python-r1
 
 DESCRIPTION="A collection of computer vision methods for solving geometric vision problems."
@@ -23,7 +25,7 @@ SLOT="0"
 IUSE="python +shared test"
 
 DEPEND="
-	dev-cpp/eigen
+	dev-cpp/eigen:=
 	${RDEPEND}
 	python? (
 		$(python_gen_any_dep '
@@ -49,6 +51,10 @@ RESTRICT="!test? ( test )"
 PATCHES=(
 	"${FILESDIR}/${PN}-9999-cmake-fix-build-flags.patch"
 	"${FILESDIR}/${PN}-9999-use-system-pybind11.patch"
+	"${FILESDIR}/${PN}-9999-Fix-eigen-lookup.patch"
+	"${FILESDIR}/${PN}-9999-cmake-4.patch"
+	"${FILESDIR}/${PN}-9999-cassert.patch"
+	"${FILESDIR}/${PN}-9999-drop-unused-headers.patch"
 )
 
 src_configure() {
