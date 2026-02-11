@@ -36,21 +36,25 @@ RDEPEND="
 	sci-geosciences/GeographicLib
 	mkl? ( sci-libs/mkl )
 	python? (
+		${PYTHON_DEPS}
+	)
+"
+
+BDEPEND="
+	python? (
+		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
 			dev-python/pybind11[${PYTHON_USEDEP}]
 		')
 	)
 "
+
 DEPEND="${RDEPEND}
 	dev-cpp/eigen:3
 "
 
-python_check_deps() {
-	python_has_version "dev-python/pybind11[${PYTHON_USEDEP}]"
-}
-
 pkg_setup() {
-	use test && python-single-r1_pkg_setup
+	use python && python-single-r1_pkg_setup
 }
 
 src_prepare() {
