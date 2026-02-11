@@ -171,7 +171,8 @@ src_configure() {
 		# Enable Features that use Boost
 		-DGTSAM_USE_BOOST_FEATURES="yes"
 
-		# Enable/Disable using an internal Quaternion representation for rotations instead of rotation matrices. If enable, Rot3::EXPMAP is enforced by default.
+		# Enable/Disable using an internal Quaternion representation for rotations instead of rotation matrices.
+		# If enable, Rot3::EXPMAP is enforced by default.
 		-DGTSAM_USE_QUATERNIONS="$(usex quaternion)"
 
 		# Find and use system-installed Eigen. If 'off', use the one bundled with GTSAM
@@ -188,7 +189,6 @@ src_configure() {
 
 		# Use Intel Threaded Building Blocks (TBB) if available
 		-DGTSAM_WITH_TBB="$(usex tbb)"
-
 	)
 
 	cmake_src_configure

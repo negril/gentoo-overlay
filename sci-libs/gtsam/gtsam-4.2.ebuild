@@ -160,7 +160,8 @@ src_configure() {
 		# Enable/Disable MATLAB wrapper for libgtsam_unstable
 		-DGTSAM_UNSTABLE_INSTALL_MATLAB_TOOLBOX="no"
 
-		# Enable/Disable using an internal Quaternion representation for rotations instead of rotation matrices. If enable, Rot3::EXPMAP is enforced by default.
+		# Enable/Disable using an internal Quaternion representation for rotations instead of rotation matrices.
+		# If enable, Rot3::EXPMAP is enforced by default.
 		-DGTSAM_USE_QUATERNIONS="$(usex quaternion)"
 
 		# Find and use system-installed Eigen. If 'off', use the one bundled with GTSAM
