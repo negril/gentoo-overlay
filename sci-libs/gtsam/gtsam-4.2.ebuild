@@ -42,7 +42,7 @@ RDEPEND="
 	)
 "
 DEPEND="${RDEPEND}
-	dev-cpp/eigen:3
+	dev-cpp/eigen:=
 "
 
 PATCHES=(

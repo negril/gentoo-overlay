@@ -50,7 +50,7 @@ BDEPEND="
 "
 
 DEPEND="${RDEPEND}
-	dev-cpp/eigen:3
+	dev-cpp/eigen:=
 "
 
 pkg_setup() {
