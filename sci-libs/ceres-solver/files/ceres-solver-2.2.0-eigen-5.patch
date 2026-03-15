@@ -1,0 +1,24 @@
+From 4ab1549303e4f758b818f6a121ec20d296b32296 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 25 Sep 2025 22:35:49 +0200
+Subject: [PATCH] eigen 5
+
+Change-Id: I7f4df7846769f9e6b96057262f978f4896679ca3
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 985bedd..6aebbfa 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -182,7 +182,7 @@ unset(CERES_COMPILE_OPTIONS)
+ 
+ # Eigen.
+ # Eigen delivers Eigen3Config.cmake since v3.3.3
+-find_package(Eigen3 3.3 REQUIRED)
++find_package(Eigen3 REQUIRED)
+ if (Eigen3_FOUND)
+   message("-- Found Eigen version ${Eigen3_VERSION}: ${Eigen3_DIR}")
+   if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*)" AND
+-- 
+2.51.0
+

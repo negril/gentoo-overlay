@@ -3,17 +3,21 @@
 
 EAPI=8
 
+# TODO
+# - multilib? Why?
+
 PYTHON_COMPAT=( python3_{12..13} )
 DOCS_BUILDER="sphinx"
 DOCS_DEPEND="dev-python/sphinx-rtd-theme"
 DOCS_DIR="docs/source"
-inherit cmake-multilib cuda flag-o-matic python-any-r1 docs
+inherit cmake-multilib cuda python-any-r1 docs
 
 DESCRIPTION="Nonlinear least-squares minimizer"
 HOMEPAGE="http://ceres-solver.org/ https://github.com/ceres-solver/ceres-solver"
 
 if [[ ${PV} = *9999* ]] ; then
 	inherit git-r3
+	EGIT_SUBMODULES=()
 	EGIT_REPO_URI="https://github.com/ceres-solver/ceres-solver.git"
 else
 	SRC_URI="
@@ -24,21 +28,47 @@ else
 fi
 
 LICENSE="sparse? ( BSD ) !sparse? ( LGPL-2.1 )"
-SLOT="0/1"
-IUSE="examples cuda gflags lapack metis +schur sparse test"
+# SONAME
+SLOT="0/4"
+# TODO openmp? tbb?
+IUSE="+eigen examples cuda cudss lapack metis +schur sparse test"
 
-REQUIRED_USE="test? ( gflags ) sparse? ( lapack ) abi_x86_32? ( !sparse !lapack )"
+REQUIRED_USE="
+	|| ( cudss eigen sparse )
+	sparse? (
+		lapack
+	)
+	abi_x86_32? (
+		!sparse
+		!lapack
+	)
+"
+# 	test? ( gflags )
+# "
+
 RESTRICT="!test? ( test )"
 
 BDEPEND="${PYTHON_DEPS}
-	lapack? ( virtual/pkgconfig )
-	doc? ( <dev-libs/mathjax-3 )
+	lapack? (
+		virtual/pkgconfig
+	)
+	doc? (
+		<dev-libs/mathjax-3
+	)
 "
 RDEPEND="
-	>=dev-cpp/eigen-3.3.4:=
-	dev-cpp/glog[gflags?,${MULTILIB_USEDEP}]
-	cuda? ( dev-util/nvidia-cuda-toolkit:= )
-	lapack? ( virtual/lapack )
+	cuda? (
+		dev-util/nvidia-cuda-toolkit:=
+	)
+	cudss? (
+		dev-libs/cudss:=
+	)
+	eigen? (
+		>=dev-cpp/eigen-3.3.4:=
+		metis? (
+			sci-libs/metis
+		)
+	)
 	sparse? (
 		sci-libs/amd
 		sci-libs/camd
@@ -47,15 +77,18 @@ RDEPEND="
 		sci-libs/colamd
 		sci-libs/spqr
 	)
+	lapack? (
+		virtual/lapack
+	)
 "
+
 DEPEND="${RDEPEND}"
 
-DOCS=( README.md VERSION )
+DOCS=( README.md CITATION.cff )
 
 PATCHES=(
 	"${FILESDIR}/${PN}-2.0.0-system-mathjax.patch"
-	"${FILESDIR}/${PN}-2.2.0-include-algorithm.patch"
-	"${FILESDIR}/${PN}-2.2.0-eigen-5.patch"
+	"${FILESDIR}/${PN}-9999-CUDAARCHS.patch"
 )
 
 # cuda_get_cuda_compiler() {
@@ -113,42 +146,45 @@ PATCHES=(
 src_prepare() {
 	cmake_src_prepare
 
-	filter-lto
-
 	# search paths work for prefix
 	sed -e "s:/usr:${EPREFIX}/usr:g" \
 		-i cmake/*.cmake || die
 
+	# Tries to find ../../data from tests. Which doesn't work with out of source build.
+	# Create symlink to not have to touch the source code
+	ln -rs "${S}/data" "${WORKDIR}/data" || die
+
 	# remove Werror
 	sed \
 		-e 's/-Werror=(all|extra)//g' \
-		-e '/set(CMAKE_CUDA_ARCHITECTURES/s/")/" CACHE STRING "")/' \
 		-i CMakeLists.txt || die
 }
 
 src_configure() {
 	# CUSTOM_BLAS=OFF EIGENSPARSE=OFF MINIGLOG=OFF
 	local mycmakeargs=(
-		-DBUILD_BENCHMARKS=OFF
+		-DBUILD_BENCHMARKS="no"
 		-DBUILD_DOCUMENTATION="$(usex doc)"
 		-DBUILD_EXAMPLES="$(usex examples)"
 		-DBUILD_SHARED_LIBS="yes"
 		-DBUILD_TESTING="$(usex test)"
 
-		-DEIGENMETIS="$(usex metis)"
-		-DEIGENSPARSE="$(usex sparse)"
-		-DGFLAGS="$(usex gflags)"
-		-DLAPACK="$(usex lapack)"
-		-DMINIGLOG="no"
+		-DUSE_CUDA="$(usex cuda)" # USE_CUDA=static
+
+		# TODO sort out the eigen/sparse interaction. Are they exclusive?
+		-DEIGENMETIS="$(usex eigen "$(usex metis)")"
+		-DEIGENSPARSE="$(usex eigen)"
 		-DSUITESPARSE="$(usex sparse)"
+		-Dcudss_DIR="$(usex cuda "$(usex cudss "${CUDNN_PATH:-${ESYSROOT}/opt/cuda}/$(get_libdir)/cmake/cudss" NOTFOUND)")"
+		# --debug-find-pkg="cudss"
 		-DCUSTOM_BLAS="yes"
-		-DEigen3_DIR="${ESYSROOT}/usr/$(get_libdir)/cmake/eigen3"
+
+		-DLAPACK="$(usex lapack)"
 
 		-DSCHUR_SPECIALIZATIONS="$(usex schur)"
-		-DUSE_CUDA="$(usex cuda)"
 	)
 
-	if use cuda; then
+	if use cuda ; then
 		cuda_add_sandbox
 		addpredict "/dev/char/"
 
@@ -158,9 +194,9 @@ src_configure() {
 		export CUDAARCHS
 	fi
 
-	if use !sparse ; then
+	if use eigen ; then
 		mycmakeargs+=(
-			-DEIGENSPARSE="yes"
+			-DEigen3_DIR="${ESYSROOT}/usr/$(get_libdir)/cmake/eigen3"
 		)
 	fi
 
@@ -168,7 +204,9 @@ src_configure() {
 }
 
 src_test() {
-	use cuda && cuda_add_sandbox -w
+	if use cuda ; then
+		cuda_add_sandbox -w
+	fi
 
 	cmake-multilib_src_test
 }
@@ -176,7 +214,7 @@ src_test() {
 src_install() {
 	cmake-multilib_src_install
 
-	if use examples; then
+	if use examples ; then
 		docompress -x "/usr/share/doc/${PF}/examples"
 		dodoc -r examples data
 	fi
