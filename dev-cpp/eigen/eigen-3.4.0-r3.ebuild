@@ -248,6 +248,9 @@ src_configure() {
 	fi
 
 	if use test; then
+		# bug 878987
+		# filter-lto
+
 		mycmakeargs+=(
 			# the OpenGL testsuite is extremely brittle, bug #712808
 			-DOpenGL_GL_PREFERENCE="GLVND"

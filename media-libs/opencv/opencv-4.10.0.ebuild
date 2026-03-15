@@ -296,7 +296,7 @@ COMMON_DEPEND="
 "
 DEPEND="
 	${COMMON_DEPEND}
-	eigen? ( >=dev-cpp/eigen-3.3.8-r1:3 )
+	eigen? ( >=dev-cpp/eigen-3.3.8-r1:3= )
 	java? ( >=virtual/jdk-1.8:* )
 	test? (
 		wayland? ( dev-libs/weston[examples,headless,remoting,screen-sharing,wayland-compositor] )

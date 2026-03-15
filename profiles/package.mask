@@ -1,0 +1,8 @@
+# Copyright 1999-2025 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+# Uses GLEP 84 format
+
+# Paul Zander <negril.nx+gentoo@gmail.com> (2025-10-17)
+# to many breakages
+dev-cpp/eigen:3/5.0

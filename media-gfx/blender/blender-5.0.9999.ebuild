@@ -826,6 +826,15 @@ src_test() {
 		)
 	fi
 
+	if has_version ">=dev-cpp/eigen-5"; then
+		CMAKE_SKIP_TESTS+=(
+			"^blenkernel$"
+			"^modifiers$"
+			"^io_fbx_import$"
+			"^io_gltf_roundtrip$"
+		)
+	fi
+
 	# For debugging, print out all information.
 	local -x VERBOSE="$(usex debug "true" "false")"
 	"${VERBOSE}" && einfo "VERBOSE=${VERBOSE}"

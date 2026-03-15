@@ -1,12 +1,19 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-LLVM_COMPAT=( {19..21} )
+LLVM_COMPAT=( {21..23} )
 LLVM_OPTIONAL="clang-cuda"
-FORTRAN_NEEDED="test"
-inherit cmake cuda flag-o-matic fortran-2 llvm-r2 toolchain-funcs virtualx
+
+PYTHON_COMPAT=( python3_{12..13} )
+
+FORTRAN_NEEDED="no"
+
+LAPACK_ADDONS_PV="3.4.1"
+
+inherit cmake cuda flag-o-matic fortran-2 llvm-r2 python-any-r1 toolchain-funcs
+# inherit virtualx
 
 DESCRIPTION="C++ template library for linear algebra"
 HOMEPAGE="https://eigen.tuxfamily.org/index.php?title=Main_Page"
@@ -14,16 +21,27 @@ HOMEPAGE="https://eigen.tuxfamily.org/index.php?title=Main_Page"
 if [[ ${PV} = *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://gitlab.com/lib${PN}/${PN}.git"
-	if [[ ${PV} = 3.4.9999* ]] ; then
-		EGIT_BRANCH="3.4"
+	if [[ ${PV} = *.9999* ]] ; then
+		EGIT_BRANCH="$(ver_cut 1-2)"
 	fi
 else
+	# we backport two patches from the 3.4 branch
 	SRC_URI="
 		https://gitlab.com/lib${PN}/${PN}/-/archive/${PV}/${P}.tar.bz2
-		test? ( lapack? ( https://downloads.tuxfamily.org/${PN}/lapack_addons_3.4.1.tgz -> ${PN}-lapack_addons-3.4.1.tgz ) )
+		https://gitlab.com/libeigen/eigen/-/commit/0295f81a835ef69e2bacd9e75ab5782eca398720.patch -> ${P}_p1.patch
+		https://gitlab.com/libeigen/eigen/-/commit/28ded8800c26864e537852658428ab44c8399e87.patch -> ${P}_p2.patch
 	"
 	KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~loong ~mips ~ppc ~ppc64 ~riscv ~s390 ~sparc ~x86 ~arm64-macos ~x64-macos"
 fi
+
+SRC_URI+="
+	test? (
+		lapack? (
+			https://downloads.tuxfamily.org/${PN}/lapack_addons_${LAPACK_ADDONS_PV}.tgz
+				-> ${PN}-lapack_addons-${LAPACK_ADDONS_PV}.tgz
+		)
+	)
+"
 
 LICENSE="MPL-2.0"
 SLOT="3/$(ver_cut 1-2)"
@@ -68,31 +86,128 @@ CPU_FEATURES_MAP=(
 )
 
 IUSE_TEST_BACKENDS=(
-	"adolc"
-	"boost"
-	"cholmod"
-	"fftw"
-	"klu"
-	"opengl"
-	"openmp"
-	"pastix"
-	"sparsehash"
-	"spqr"
-	"superlu"
-	"umfpack"
+	"adolc" # Adolc
+	"boost" # Boost.Multiprecision
+	"cholmod" # CHOLMOD
+	# "ducc" # duccfft https://gitlab.mpcdf.mpg.de/mtr/ducc
+	"fftw" # fftw
+	"klu" # KLU
+	"metis" # METIS
+	# "mpreal" # MPFR C++ https://github.com/advanpix/mpreal
+	"opengl" # OpenGL
+	"pocketfft" # pocketfft
+	"pastix" # PaStiX
+	"sparsehash" # GoogleHash
+	"spqr" # SPQR
+	"superlu" # SuperLU
+	"umfpack" # UMFPACK
+	# "qt" # Qt4 support
+	# Accelerate # https://developer.apple.com/documentation/accelerate
 )
 
-IUSE="${CPU_FEATURES_MAP[*]%:*} clang-cuda cuda hip debug doc lapack mathjax test ${IUSE_TEST_BACKENDS[*]}" #zvector
+IUSE="
+	debug
+	blas lapack
+	${CPU_FEATURES_MAP[*]%:*}
+	cuda clang-cuda hip
+	doc mathjax
+	openmp
+	test ${IUSE_TEST_BACKENDS[*]}
+" # zvector
+# IUSE+="
+# 	benchmark
+# 	demos
+# "
 
-REQUIRED_USE="
+RESTRICT_TEST="
 	test? (
-		|| ( ${IUSE_TEST_BACKENDS[*]} )
-		clang-cuda? ( ${LLVM_REQUIRED_USE} )
+		^^ (
+			cuda
+			( cuda clang-cuda )
+			hip
+		)
+		^^ (
+			^^ (
+				${IUSE_TEST_BACKENDS[*]}
+			)
+			(
+				${IUSE_TEST_BACKENDS[*]}
+			)
+		)
+	)
+	|| (
+		( !doc !mathjax )
+		doc
+		( doc mathjax )
+	)
+	|| (
+		( !blas !lapack )
+		blas
+		( blas lapack )
 	)
 "
 
+REQUIRED_USE="
+	test? (
+		clang-cuda? ( ${LLVM_REQUIRED_USE} )
+	)
+	lapack? (
+		blas
+	)
+	clang-cuda? (
+		!openmp
+	)
+"
+# 	test? (
+# 		|| ( ${IUSE_TEST_BACKENDS[*]} )
+# 	${RESTRICT_TEST}
+
+# {{{
+# test
+# }}}
+
+# {{{
+#
+# cuda
+# cuda clang-cuda
+# hip
+# }}}
+
+# {{{
+#
+# doc
+# doc mathjax
+# }}}
+
+# {{{
+#
+# openmp
+# }}}
+
+# {{{
+	# {{{
+	# adolc
+	# boost
+	# cholmod
+	# fftw
+	# klu
+	# metis
+	# opengl
+	# pocketfft
+	# pastix
+	# sparsehash
+	# spqr
+	# superlu
+	# umfpack
+	# }}}
+	# {{{
+	# adolc boost cholmod fftw klu metis opengl pocketfft pastix sparsehash spqr superlu umfpack
+	# }}}
+# }}}
+
 # Tests failing again because of compiler issues; bugs #932646, #943401
 RESTRICT="!test? ( test )"
+FORTRAN_DEPEND="virtual/fortran"
 
 BDEPEND="
 	doc? (
@@ -104,36 +219,63 @@ BDEPEND="
 		dev-texlive/texlive-latexextra
 		mathjax? ( dev-libs/mathjax )
 	)
-	test? ( virtual/pkgconfig )
+	test? (
+		virtual/pkgconfig
+		lapack? (
+			${PYTHON_DEPS}
+		)
+		spqr? (
+			cholmod? (
+				blas? (
+					lapack? (
+						${FORTRAN_DEPEND}
+					)
+				)
+			)
+		)
+		pastix? ( ${FORTRAN_DEPEND} )
+	)
+	blas? ( ${FORTRAN_DEPEND} )
+	lapack? ( ${FORTRAN_DEPEND} )
 "
 
-# METIS
-# MPREAL
-# dev-libs/mpfr:0
-# dev-libs/gmp:0
-
 TEST_BACKENDS="
-		boost? ( dev-libs/boost )
 		adolc? ( sci-libs/adolc[sparse] )
-		cholmod? ( sci-libs/cholmod:= )
-		fftw? ( sci-libs/fftw )
-		spqr? ( sci-libs/spqr )
+		boost? ( dev-libs/boost )
+		cholmod? ( sci-libs/cholmod:=[cuda?] )
+		fftw? ( sci-libs/fftw[openmp?] )
 		klu? ( sci-libs/klu )
+		metis? (
+			sci-libs/metis[openmp?]
+			sci-libs/pastix[metis]
+		)
 		opengl? (
 			media-libs/freeglut
 			media-libs/glew
 			media-libs/libglvnd
 		)
-		pastix? ( sci-libs/pastix[-mpi] )
+		pastix? (
+			sci-libs/pastix[-mpi]
+			|| (
+				sci-libs/pastix[scotch]
+				sci-libs/pastix[metis]
+			)
+		)
+		pocketfft? ( dev-libs/pocketfft )
 		sparsehash? (
 			amd64? ( dev-cpp/sparsehash )
 			arm64? ( dev-cpp/sparsehash )
 			ppc64? ( dev-cpp/sparsehash )
 			x86?   ( dev-cpp/sparsehash )
 		)
+		spqr? ( sci-libs/spqr )
 		superlu? ( sci-libs/superlu )
-		umfpack? ( sci-libs/umfpack )
+		umfpack? ( sci-libs/umfpack:= )
 "
+
+# +find_package(MPFR)
+# +find_package(GMP)
+
 DEPEND="
 	test? (
 		cuda? (
@@ -142,22 +284,43 @@ DEPEND="
 			)
 			clang-cuda? (
 				$(llvm_gen_dep '
-					llvm-core/clang:${LLVM_SLOT}[llvm_targets_NVPTX]
-					llvm-runtimes/clang-runtime:${LLVM_SLOT}[offload,openmp?]
-					=llvm-runtimes/offload-${LLVM_SLOT}*[llvm_targets_NVPTX]
+					llvm-core/clang:${LLVM_SLOT}
+					llvm-runtimes/clang-runtime:${LLVM_SLOT}[llvm_targets_NVPTX,offload,openmp]
 				')
 			)
 		)
 		hip? ( dev-util/hip )
-		lapack? ( virtual/lapacke )
+		!blas? (
+			virtual/blas
+			!lapack? (
+				virtual/lapacke
+			)
+		)
 		${TEST_BACKENDS}
 	)
 "
+# DEPEND+="
+# 	benchmark? (
+# 		dev-cpp/benchmark
+# 	)
+# "
 
 PATCHES=(
 	"${FILESDIR}/${PN}-3.4.0-doc-nocompress.patch" # bug 830064
 	"${FILESDIR}/${PN}-3.4.0-buildstring.patch"
 	"${FILESDIR}/${PN}-3.4.1-cxxstandard-17.patch"
+
+	"${FILESDIR}/${PN}-3.4.1-bug1213-link-with-Eigen3-Eigen.patch"
+	"${FILESDIR}/${PN}-3.4.0-c++-20.patch"
+
+	"${DISTDIR}/${P}_p1.patch"
+	"${DISTDIR}/${P}_p2.patch"
+
+	# "${FILESDIR}/${PN}-3.4.1-error-no-matching-function-for-call-to-get_test_prec.patch"
+	# "${FILESDIR}/${PN}-3.4.1-fix-TriangularSolverMatrix.patch"
+
+	"${FILESDIR}/${PN}-5.0.1-cmake-GNUInstallDirs.patch"
+	"${FILESDIR}/${PN}-5.0.1-Do-not-show-deprecated-CUDA-device-properties-for-CU.patch"
 )
 
 # TODO should be in cuda.eclass
@@ -180,11 +343,7 @@ cuda_set_CUDAHOSTCXX() {
 			break
 		fi
 		CUDAHOSTCXX_test="$(
-# 			dirname "$(
-# 				realpath "$(
-					which "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
-# 				)"
-# 			)"
+			which "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
 		)"
 		version="<${version}"
 	do ! echo "int main(){}" | nvcc "-ccbin ${CUDAHOSTCXX_test}" - -x cu &>/dev/null; done
@@ -194,7 +353,20 @@ cuda_set_CUDAHOSTCXX() {
 }
 
 pkg_setup() {
-	use test && use cuda && use clang-cuda && llvm-r2_pkg_setup
+	if use lapack; then
+		python-any-r1_pkg_setup
+	fi
+
+	if { use test && { use spqr && use cholmod && use blas && use lapack; } || use pastix; } \
+		|| use blas \
+		|| use lapack \
+		; then
+		fortran-2_pkg_setup
+	fi
+
+	if use test; then
+		use cuda && use clang-cuda && llvm-r2_pkg_setup
+	fi
 }
 
 src_unpack() {
@@ -202,26 +374,34 @@ src_unpack() {
 		git-r3_src_unpack
 	else
 		unpack "${P}.tar.bz2"
+	fi
 
-		if use test && use lapack; then
-			cd "${S}/lapack" || die
-			unpack "${PN}-lapack_addons-3.4.1.tgz"
-		fi
+	if use test && use lapack; then
+		pushd "${S}/lapack" > /dev/null || die
+		unpack "${PN}-lapack_addons-${LAPACK_ADDONS_PV}.tgz"
+		popd > /dev/null || die
+
+		pushd "${S}" > /dev/null || die
+		eapply "${FILESDIR}/${PN}-5.0.1-fix-lapack_testing.py.patch"
+		popd > /dev/null || die
 	fi
 }
 
 src_prepare() {
-	sed \
-		-e "/add_subdirectory(bench\/spbench/s/^/#DONOTCOMPILE /g" \
-		-e "/add_subdirectory(demos/s/^/#DONOTCOMPILE /g" \
-		-i CMakeLists.txt || die
+	if ! in_iuse benchmark || ! use benchmark; then
+		rm -r bench || die
+		cmake_comment_add_subdirectory bench/spbench
+	fi
 
-	rm -r bench demos || die
+	if ! in_iuse demos || ! use demos; then
+		rm -r demos || die
+		cmake_comment_add_subdirectory demos
+	fi
 
 	# run patches here as we patch in test/
 	cmake_src_prepare
 
-	if ! use test; then
+	if false && ! use test; then
 		sed \
 			-e "/add_subdirectory(test/s/^/#DONOTCOMPILE /g" \
 			-e "/add_subdirectory(scripts/s/^/#DONOTCOMPILE /g" \
@@ -237,24 +417,55 @@ src_prepare() {
 }
 
 src_configure() {
-	# EIGEN_BUILD_TESTING # "Enable creation of Eigen tests." ${BUILD_TESTING})
-	# EIGEN_LEAVE_TEST_IN_ALL_TARGET # "Leaves tests in the all target, needed by ctest for automatic building." OFF)
-	# EIGEN_BUILD_BLAS # "Toggles the building of the Eigen Blas library" ${PROJECT_IS_TOP_LEVEL})
-	# EIGEN_BUILD_LAPACK # "Toggles the building of the included Eigen LAPACK library" ${PROJECT_IS_TOP_LEVEL})
-	# EIGEN_BUILD_BTL # "Build benchmark suite" OFF)
-	# EIGEN_BUILD_SPBENCH # "Build sparse benchmark suite" OFF)
-	# EIGEN_BUILD_DOC # "Enable creation of Eigen documentation" ${EIGEN_BUILD_DOC_DEFAULT})
-	# EIGEN_BUILD_DEMOS # "Toggles the building of the Eigen demos" ${PROJECT_IS_TOP_LEVEL})
-	# EIGEN_BUILD_PKGCONFIG # "Build pkg-config .pc file for Eigen" ${PROJECT_IS_TOP_LEVEL})
-	# EIGEN_BUILD_CMAKE_PACKAGE # "Enables the creation of EigenConfig.cmake and related files" ${PROJECT_IS_TOP_LEVEL})
+	if use lapack; then
+		# multiple definition of `cgesdd_'
+		filter-lto
+	fi
+
 	local mycmakeargs=(
-		-DBUILD_SHARED_LIBS="yes"
-		-DBUILD_TESTING="$(usex test)"
+		-DCMAKE_CXX_STANDARD="20"
+		-DCMAKE_POSITION_INDEPENDENT_CODE="yes"
+
+		-DEIGEN_BUILD_TESTING="$(usex test)" # Enable creation of Eigen tests.
+
+		-DEIGEN_BUILD_BLAS="$(usex blas)" # Toggles the building of the Eigen Blas library
+		-DEIGEN_BUILD_LAPACK="$(usex blas "$(usex lapack)")" # Toggles the building of the included Eigen LAPACK library
+
+		# -DEIGEN_BUILD_BTL="$(usex benchmark)" # Build benchmark suite # TODO GONE
+		# -DEIGEN_BUILD_SPBENCH="no" # "$(usex spbench)" # Build sparse benchmark suite # TODO GONE
+
+		# -DEIGEN_BUILD_AOCL_BENCH="no" # "$(usex aocl-bench)" # "Build AOCL benchmark" # not in 5.0.0
 
 		-DEIGEN_BUILD_DOC="$(usex doc)" # Enable creation of Eigen documentation
-		-DEIGEN_BUILD_PKGCONFIG="yes" # Build pkg-config .pc file for Eigen
+		# -DEIGEN_BUILD_DEMOS="$(usex demos)" # Toggles the building of the Eigen demos
 	)
-	if use doc || use test; then
+
+	append-cxxflags "-DEIGEN_USE_OPENBLAS_BFLOAT16=0"
+
+	# if use benchmarks; then
+	# 	# TODO in unsupported/benchmarks !?
+	# 	:
+	# fi
+
+	if use blas; then
+		mycmakeargs+=(
+			-DBUILD_SHARED_LIBS="yes"
+			-DEIGEN_BUILD_SHARED_LIBS="yes"
+			-DEIGEN_BUILD_STATIC_LIBS="yes"
+			-DEIGEN_INSTALL_STATIC_LIBS="yes"
+		)
+
+		if use lapack; then
+			mycmakeargs+=(
+				-DCMAKE_POLICY_DEFAULT_CMP0148="OLD" # FindPythonInterp
+				-DEIGEN_ENABLE_LAPACK_TESTS="$(usex test)"
+
+				# -DCMAKE_DISABLE_FIND_PACKAGE_SuperLU=ON # TODO
+			)
+		fi
+	fi
+
+	if use doc || use test; then # || use demos
 		mycmakeargs+=(
 			# needs Qt4
 			-DEIGEN_TEST_NOQT="yes" # Disable Qt support in unit tests
@@ -264,68 +475,87 @@ src_configure() {
 	if use doc; then
 		mycmakeargs+=(
 			-DEIGEN_DOC_USE_MATHJAX="$(usex mathjax)" # Use MathJax for rendering math in HTML docs
-			-DEIGEN_INTERNAL_DOCUMENTATION=no # Build internal documentation
+			-DEIGEN_INTERNAL_DOCUMENTATION="no" # Build internal documentation
 		)
 	fi
 
 	if use test; then
-		append-cppflags "-DEIGEN_COMP_CLANG_STRICT=$(usex debug true false)"
+		# bug 878987
+		# filter-lto
 
-		mycmakeargs+=(
+		# append-cxxflags "-DEIGEN_COMP_CLANG_STRICT=$(usex debug 1 0)"
+		# append-cxxflags "-DEIGEN_NO_STATIC_ASSERT"
+
+		mycmakeargs+=( # {{{
+			-DEIGEN_LEAVE_TEST_IN_ALL_TARGET="yes" # Leaves tests in the all target, needed by ctest for automatic building
+
 			# the OpenGL testsuite is extremely brittle, bug #712808
-			-DOpenGL_GL_PREFERENCE="GLVND"
 			-DEIGEN_TEST_OPENGL="$(usex opengl)" # Enable OpenGL support in unit tests
 			-DEIGEN_TEST_OPENMP="$(usex openmp)" # Enable/Disable OpenMP in tests/examples
 
-			-DCMAKE_DISABLE_FIND_PACKAGE_MPREAL=ON
+			-DEIGEN_TEST_EXTERNAL_BLAS="$(usex !blas)" # Use external BLAS library for testsuite # TODO
 
-			-DEIGEN_TEST_CXX11="yes"
+			# -DEIGEN_TEST_CUSTOM_CXX_FLAGS="-fPIC" # Additional compiler flags when compiling unit tests.
+			# -DEIGEN_TEST_CUSTOM_LINKER_FLAGS="-fPIC" # Additional linker flags when linking unit tests.
+			# -DEIGEN_TEST_BUILD_FLAGS="-fPIC" # Options passed to the build command of unit tests
 
-			# -DEIGEN_TEST_CUSTOM_CXX_FLAGS= # Additional compiler flags when compiling unit tests.
-			# -DEIGEN_TEST_CUSTOM_LINKER_FLAGS= # Additional linker flags when linking unit tests.
-			# -DEIGEN_TEST_BUILD_FLAGS= # Options passed to the build command of unit tests
+			-DEIGEN_TEST_BUILD_DOCUMENTATION="no" # $(usex doc)" # Test building the doxygen documentation
 
-			# -DEIGEN_BUILD_BTL=yes # Build benchmark suite
+			# -DEIGEN_COVERAGE_TESTING="no" # Enable/disable gcov
+			# -DEIGEN_CTEST_ERROR_EXCEPTION="" # Regular expression for build error messages to be filtered out
+			-DEIGEN_DEBUG_ASSERTS="$(usex debug)" # Enable advanced debugging of assertions
+			# -DEIGEN_NO_ASSERTION_CHECKING="no" # Disable checking of assertions using exceptions
+			# -DEIGEN_TEST_NO_EXCEPTIONS="no" # Disables C++ exceptions
+			# -DEIGEN_TEST_NO_EXPLICIT_ALIGNMENT="no" # Disable explicit alignment (hence vectorization) in tests/examples
+			# -DEIGEN_TEST_NO_EXPLICIT_VECTORIZATION="no" # Disable explicit vectorization in tests/examples
 
-			-DEIGEN_TEST_BUILD_DOCUMENTATION="$(usex doc)" # Test building the doxygen documentation
+			# -DEIGEN_DASHBOARD_BUILD_TARGET="buildtests" # Target to be built in dashboard mode, default is buildtests
 
-			# -DEIGEN_COVERAGE_TESTING=no # Enable/disable gcov
-			# -DEIGEN_CTEST_ERROR_EXCEPTION= # Regular expression for build error messages to be filtered out
-			# -DEIGEN_DEBUG_ASSERTS=no # Enable advanced debugging of assertions
-			# -DEIGEN_NO_ASSERTION_CHECKING=no # Disable checking of assertions using exceptions
-			# -DEIGEN_TEST_NO_EXCEPTIONS=no # Disables C++ exceptions
-			# -DEIGEN_TEST_NO_EXPLICIT_ALIGNMENT=no # Disable explicit alignment (hence vectorization) in tests/examples
-			# -DEIGEN_TEST_NO_EXPLICIT_VECTORIZATION=no # Disable explicit vectorization in tests/examples
+			# -DEIGEN_DEFAULT_TO_ROW_MAJOR="no" # Use row-major as default matrix storage order
 
-			# -DEIGEN_DASHBOARD_BUILD_TARGET=buildtests # Target to be built in dashboard mode, default is buildtests
+			# -DEIGEN_TEST_MATRIX_DIR="yes" # Enable testing of realword sparse matrices contained in the specified path
+			# -DEIGEN_TEST_MAX_SIZE="320" # Maximal matrix/vector size, default is 320
+			# we do this so we can skip failing subtests
+			-DEIGEN_SPLIT_LARGE_TESTS="yes" # Split large tests into smaller executables
 
-			# -DEIGEN_DEFAULT_TO_ROW_MAJOR=no # Use row-major as default matrix storage order
+			-DEIGEN_TEST_CUDA="$(usex cuda)" # Enable CUDA support in unit tests
+			-DEIGEN_TEST_CUDA_CLANG="$(usex cuda "$(usex clang-cuda)")" # Use clang instead of nvcc to compile the CUDA tests
 
-			# -DEIGEN_TEST_MATRIX_DIR=yes # Enable testing of realword sparse matrices contained in the specified path
-			# -DEIGEN_TEST_MAX_SIZE=320 # Maximal matrix/vector size, default is 320
-			# -DEIGEN_SPLIT_LARGE_TESTS=no # Split large tests into smaller executables
-		)
+			-DEIGEN_TEST_HIP="$(usex hip)" # Add HIP support.
 
-		use !adolc      && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_Adolc="TRUE" )
-		use !boost      && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_Boost="TRUE" )
-		use !cholmod    && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_CHOLMOD="TRUE" )
-		use !fftw       && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_FFTW="TRUE" )
-		use !sparsehash && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_GoogleHash="TRUE" )
-		use !klu        && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_KLU="TRUE" )
-		use !opengl     && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_OpenGL="TRUE" )
-		use !openmp     && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_OpenMP="TRUE" )
-		use !pastix     && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_PASTIX="TRUE" )
-		use !spqr       && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_SPQR="TRUE" )
-		use !superlu    && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_SuperLU="TRUE" )
-		use !umfpack    && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_UMFPACK="TRUE" )
+			# -DEIGEN_TEST_SYCL="$(usex sycl)" # Add Sycl support.
+			# -DEIGEN_SYCL_TRISYCL="no" # Use the triSYCL Sycl implementation (ComputeCPP by default).
 
-		if use lapack; then
-			mycmakeargs+=(
-				-DEIGEN_ENABLE_LAPACK_TESTS=yes
-				-DEIGEN_TEST_EXTERNAL_BLAS=yes # Use external BLAS library for testsuite
-				-DCMAKE_DISABLE_FIND_PACKAGE_SuperLU=ON
-			)
-		fi
+			$(cmake_use_find_package adolc Adolc)
+			$(cmake_use_find_package boost Boost)
+			$(cmake_use_find_package cholmod CHOLMOD)
+			$(cmake_use_find_package fftw FFTW )
+			$(cmake_use_find_package klu KLU)
+			-DCMAKE_DISABLE_FIND_PACKAGE_MPREAL="yes"
+			# $(cmake_use_find_package opengl OpenGL) # EIGEN_TEST_OPENGL
+			# $(cmake_use_find_package openmp OpenMP) # EIGEN_TEST_OPENMP
+			$(cmake_use_find_package pastix PASTIX)
+			# prevent pastix_nompi.h lookup it no longer exists, we enforce this via deps
+			-DPASTIX_pastix_nompi.h_INCLUDE_DIRS="FOUND"
+
+			$(cmake_use_find_package sparsehash GoogleHash)
+			$(cmake_use_find_package spqr SPQR)
+			$(cmake_use_find_package superlu SuperLU)
+			$(cmake_use_find_package umfpack UMFPACK)
+		) # }}}
+
+		# use !adolc      && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_Adolc="TRUE" )
+		# use !boost      && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_Boost="TRUE" )
+		# use !cholmod    && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_CHOLMOD="TRUE" )
+		# use !fftw       && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_FFTW="TRUE" )
+		# use !klu        && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_KLU="TRUE" )
+		# # use !opengl     && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_OpenGL="TRUE" ) # EIGEN_TEST_OPENGL
+		# # use !openmp     && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_OpenMP="TRUE" ) # EIGEN_TEST_OPENMP
+		# use !pastix     && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_PASTIX="TRUE" )
+		# use !sparsehash && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_GoogleHash="TRUE" )
+		# use !spqr       && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_SPQR="TRUE" )
+		# use !superlu    && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_SuperLU="TRUE" )
+		# use !umfpack    && mycmakeargs+=( -DCMAKE_DISABLE_FIND_PACKAGE_UMFPACK="TRUE" )
 
 		if use arm; then
 			mycmakeargs+=(
@@ -336,13 +566,6 @@ src_configure() {
 		if use arm64; then
 			mycmakeargs+=(
 				-DEIGEN_TEST_NEON64="$(usex cpu_flags_arm_neon)"
-			)
-		fi
-
-		if use ppc || use ppc64; then
-			mycmakeargs+=(
-				-DEIGEN_TEST_ALTIVEC="$(usex cpu_flags_ppc_altivec)"
-				-DEIGEN_TEST_VSX="$(usex cpu_flags_ppc_vsx)"
 			)
 		fi
 
@@ -370,6 +593,13 @@ src_configure() {
 			)
 		fi
 
+		if use ppc || use ppc64; then
+			mycmakeargs+=(
+				-DEIGEN_TEST_ALTIVEC="$(usex cpu_flags_ppc_altivec)"
+				-DEIGEN_TEST_VSX="$(usex cpu_flags_ppc_vsx)"
+			)
+		fi
+
 		if use s390; then
 			mycmakeargs+=(
 				# -DEIGEN_TEST_Z13=no # Enable/Disable S390X(zEC13) ZVECTOR in tests/examples
@@ -377,57 +607,83 @@ src_configure() {
 			)
 		fi
 
-		mycmakeargs+=(
-			-DEIGEN_TEST_CUDA="$(usex cuda)" # Enable CUDA support in unit tests
-			-DEIGEN_TEST_CUDA_CLANG="$(usex cuda "$(usex clang-cuda)")" # Use clang instead of nvcc to compile the CUDA tests
-
-			-DEIGEN_TEST_HIP="$(usex hip)" # Add HIP support.
-
-			# -DEIGEN_TEST_SYCL=no # Add Sycl support.
-			# -DEIGEN_SYCL_TRISYCL=no # Use the triSYCL Sycl implementation (ComputeCPP by default).
-		)
-
 		if use cuda; then
 			cuda_add_sandbox -w
+
 			if use clang-cuda; then
 				local llvm_prefix
 				llvm_prefix="$(get_llvm_prefix -b)"
-				export CC="${llvm_prefix}/bin/clang"
-				export CXX="${llvm_prefix}/bin/clang++"
-				# export LIBRARY_PATH="${ESYSROOT}/usr/$(get_libdir)"
-				export LIBRARY_PATH="${llvm_prefix}/$(get_libdir)"
+
+				# NVCCFLAGS gets injected into CMAKE_CXX_FLAGS, which means we need to use clang as gcc will fail with
+				# error: unrecognized command-line option
+				if ! tc-is-clang; then
+					export CC="${CHOST}-clang-${LLVM_SLOT}"
+					export CXX="${CHOST}-clang++-${LLVM_SLOT}"
+				fi
+
+				NVCCFLAGS="${NVCCFLAGS:+${NVCCFLAGS} }--libomptarget-nvptx-bc-path=${llvm_prefix}/$(get_libdir)/nvptx64-nvidia-cuda/libomptarget-nvptx.bc"
+
 				mycmakeargs+=(
-					-DCUDA_HOST_COMPILER="${llvm_prefix}/bin/clang++"
+					-DCUDA_HOST_COMPILER="${CHOST}-clang++-${LLVM_SLOT}"
 				)
 			else
 				cuda_set_CUDAHOSTCXX
+
 				mycmakeargs+=(
 					-DCUDA_HOST_COMPILER="${CUDAHOSTCXX}"
 				)
+				if [[ -v CUDACXX ]]; then
+					mycmakeargs+=(
+						-DCUDA_NVCC_EXECUTABLE="${CUDACXX}"
+					)
+				fi
 			fi
 
 			if [[ "${CUDA_VERBOSE}" == true ]]; then
 				mycmakeargs+=(
-					-DCUDA_VERBOSE_BUILD=yes
+					-DCUDA_VERBOSE_BUILD="yes"
 				)
 				NVCCFLAGS+=" -v"
 			fi
 
-			export CUDAFLAGS="${NVCCFLAGS}"
-
 			[[ -z "${CUDAARCHS}" ]] && einfo "trying to determine host CUDAARCHS"
 			if use clang-cuda; then
-				: "${CUDAARCHS:=$(nvptx-arch || die)}"
+				: "${CUDAARCHS:=$(nvptx-arch || die "nvptx-arch")}"
 				CUDAARCHS="${CUDAARCHS//sm_/}"
 			else
-				: "${CUDAARCHS:=$(__nvcc_device_query || die )}"
+				: "${CUDAARCHS:=$(__nvcc_device_query || die "__nvcc_device_query")}"
 			fi
 			export CUDAARCHS
 
+			# CUDAFLAGS is used by cmake
+			# NVCCFLAGS is used by cuda.eclass
 			mycmakeargs+=(
-				-DEIGEN_CUDA_COMPUTE_ARCH="${CUDAARCHS}"
+				-DEIGEN_CUDA_COMPUTE_ARCH="${CUDAARCHS}" # TODO this needs to be lowest first
+
+				# TODO
+				# for test/CMakeLists.txt
+				# -DEIGEN_TEST_CUSTOM_CXX_FLAGS="${NVCCFLAGS}"
+
+				# for {,unsupported/}test/CMakeLists.txt
+				# affects nvcc and cuda-clang
 				-DEIGEN_CUDA_CXX_FLAGS="${NVCCFLAGS}"
+				# affects nvcc only
+				# -DCUDA_NVCC_FLAGS=
+
+				# -DCUDA_PROPAGATE_HOST_FLAGS="yes"
 				-DCUDA_USE_STATIC_CUDA_RUNTIME="yes"
+			)
+		fi
+
+		if use opengl; then
+			mycmakeargs+=(
+				-DOpenGL_GL_PREFERENCE="GLVND"
+			)
+		fi
+
+		if use pocketfft; then
+			mycmakeargs+=(
+				-DEIGEN_TEST_CXX11="yes"
 			)
 		fi
 	fi
@@ -438,70 +694,128 @@ src_configure() {
 src_compile() {
 	local targets=()
 
+	if use blas; then
+		targets+=( blas )
+		if use lapack; then
+			targets+=( lapack )
+		fi
+	fi
+
 	if use test; then
 		targets+=( buildtests )
-		if ! use lapack; then
-			targets+=( blas )
-		fi
 
 		# tests generate random data, which obviously fails for some seeds
-		export EIGEN_SEED=712808
+		# export EIGEN_SEED=712808
 	fi
 
 	# we add doc last to capture results for buildtests
 	if use doc; then
 		targets+=( doc )
-		HTML_DOCS=( "${BUILD_DIR}/doc/html/." )
+		# HTML_DOCS=( "${BUILD_DIR}/doc/html/." )
 	fi
 
-	if use doc || use test; then
+	# EIGEN_IS_BUILDING_
+	# if use test || use blas || use lapack || use benchmark || use spbench || use doc || use demos; then
+	if [[ -n "${targets[*]}" ]]; then
 		cmake_src_compile "${targets[@]}"
 	fi
 }
 
 src_test() {
 	local CMAKE_SKIP_TESTS=(
-		"^klu_support_1$" # (Subprocess aborted)
-		"^klu_support_2$" # (Subprocess aborted)
-		"^basicstuff_8$" # (Subprocess aborted)                 Official
-		"^matrix_power_8$" # (Subprocess aborted)               Unsupported
-		"^matrix_power_11$" # (Subprocess aborted)              Unsupported
-		"^matrix_square_root_3$" # (Subprocess aborted)         Unsupported
+		# "^schur_complex$"
 
-		"^ref_8$" #  (Subprocess aborted)                        Official
+		"^basicstuff_8$" # Official # 1
 
-		"^product_small_32$"           #  143 (Subprocess aborted)
-		"^product_small_33$"           #  144 (Subprocess aborted)
+		"^matrix_power_8$" # Unsupported # 1
+		"^matrix_power_11$" # Unsupported # 1
+		"^matrix_square_root_3$" # Unsupported # 1
 
-		"^eigensolver_selfadjoint_13$" #  452 (Subprocess aborted) # Official
+		"^ref$"
+		"^ref_8$" # Official # 1
 
-		"^cholmod_support_21$"         #  726 (Subprocess aborted)
-		"^cholmod_support_22$"         #  727 (Subprocess aborted)
+		"^matrix_square_root_1$"
 
-		"^NonLinearOptimization$"      #  930 (Subprocess aborted)
-		"^openglsupport$"              #  990 (Failed)
-		"^levenberg_marquardt$"        # 1020 (Subprocess aborted)
+		# # smoketest
+		# "^mixingtypes_2$" # Official
+		# "^mixingtypes_3$" # Official
+		# "^mixingtypes_5$" # Official
+		# "^mixingtypes_6$" # Official
 	)
 
-	if use cuda ; then
+	if use cholmod; then
+		CMAKE_SKIP_TESTS+=(
+		"^cholmod_support$"
+		"^cholmod_support_21$" # 1
+		"^cholmod_support_22$" # 1
+		)
+	fi
+
+	if use cuda; then
 		cuda_add_sandbox -w
 
 		CMAKE_SKIP_TESTS+=(
-			# "^cxx11_tensor_cast_float16_gpu$"
-			# "^cxx11_tensor_gpu_5$"
+			"^cxx11_tensor_gpu$"
+			# we rerun these til they pass
+			# "^cxx11_tensor_reduction_gpu_1$" # Unsupported gpu
+			# "^cxx11_tensor_gpu_4$" # Unsupported gpu
+			# "^cxx11_tensor_gpu_6$" # Unsupported gpu
+			# "^cxx11_tensor_gpu_7$" # Unsupported gpu
+		)
+
+		if use boost; then
+			CMAKE_SKIP_TESTS+=(
+				# "^boostmultiprec_6$" # Official # 2
+			)
+		fi
+	fi
+
+	if use lapack; then
+		CMAKE_SKIP_TESTS+=(
+			"^LAPACK-xlintsts_stest_in$" # 1
+			"^LAPACK-xeigtsts_sep_in$" # 1
+			"^LAPACK-xeigtsts_svd_in$" # 1
+			"^LAPACK-xlintstd_dtest_in$" # 1
+			"^LAPACK-xeigtstd_sep_in$" # 1
+			"^LAPACK-xeigtstd_svd_in$" # 1
+			"^LAPACK-xlintstc_ctest_in$" # 1
+			"^LAPACK-xeigtstc_svd_in$" # 1
+			# "^LAPACK_Test_Summary$" # 1
 		)
 	fi
 
-	if use lapack ; then
+	if use klu; then
 		CMAKE_SKIP_TESTS+=(
-			# "^LAPACK-.*$"
+			"^klu_support$"
+			"^klu_support_1$" # 1
+			"^klu_support_2$" # 1
 		)
+	fi
+
+	if [[ -v CMAKE_SKIP_TESTS ]]; then
+		eqawarn "tests skipped:"
+		eqawarn "${CMAKE_SKIP_TESTS[@]}"
 	fi
 
 	local myctestargs=(
-		# slowdowns?
 		-j1 # otherwise breaks due to cmake reruns
+		--repeat until-pass:15
+		# --repeat until-fail:10
+		# --output-on-failure
+		# -LE '(gpu|smoketest)'
 	)
 
-	virtx cmake_src_test
+	# virtx \
+		cmake_src_test
+}
+
+src_install() {
+	local DOCS=()
+	cmake_src_install
+
+	if use doc; then
+		pushd "${BUILD_DIR}/doc" > /dev/null || die
+		dodoc -r html
+		popd > /dev/null || die
+	fi
 }

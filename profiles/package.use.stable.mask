@@ -1,0 +1,9 @@
+# Copyright 1999-2026 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+# New entries go on top.
+
+# Paul Zander <negril.nx+gentoo@gmail.com> (2026-03-13)
+# Not intended for general use.
+# The tests are wired up so we can test compilers.
+dev-cpp/eigen test
