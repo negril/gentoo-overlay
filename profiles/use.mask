@@ -1,0 +1,8 @@
+# Copyright 1999-2025 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+# New entries go on top.
+
+# Paul Zander <negril.nx+gentoo@gmail.com> (2025-12-17)
+# no dev-util/emscripten
+javascript
