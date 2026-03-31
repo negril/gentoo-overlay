@@ -52,7 +52,7 @@ RDEPEND="
 	opencl? ( virtual/opencl )
 	openmp? ( || (
 		sys-devel/gcc:*[openmp]
-		sys-libs/libomp
+		llvm-runtimes/openmp
 	) )
 	tbb? ( dev-cpp/tbb:= )
 "

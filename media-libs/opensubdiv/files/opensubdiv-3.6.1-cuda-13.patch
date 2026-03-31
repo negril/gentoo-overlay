@@ -1,0 +1,23 @@
+From 071f427833b6a6ba844ef92288477f8f521887d1 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Tue, 16 Sep 2025 14:57:45 +0200
+Subject: [PATCH] cuda 13
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/opensubdiv/osd/cudaEvaluator.cpp b/opensubdiv/osd/cudaEvaluator.cpp
+index 57b3f91..f212e01 100644
+--- a/opensubdiv/osd/cudaEvaluator.cpp
++++ b/opensubdiv/osd/cudaEvaluator.cpp
+@@ -376,7 +376,7 @@ CudaEvaluator::EvalPatches(
+ /* static */
+ void
+ CudaEvaluator::Synchronize(void * /*deviceContext*/) {
+-    cudaThreadSynchronize();
++    cudaDeviceSynchronize();
+ }
+ 
+ }  // end namespace Osd
+-- 
+2.51.0
+

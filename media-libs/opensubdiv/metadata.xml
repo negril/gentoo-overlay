@@ -10,11 +10,8 @@
 		<name>Proxy Maintainers</name>
 	</maintainer>
 	<use>
-		<flag name="glew">
-			Enable support for OpenGL Extension Wrangler Library (<pkg>media-libs/glew</pkg>)
-		</flag>
 		<flag name="glfw">
-			Enable support for OpenGL FrameWork (<pkg>media-libs/glfw</pkg>)
+			Build all example files that uses (<pkg>media-libs/glfw</pkg>)
 		</flag>
 		<flag name="ptex">
 			Adds support for faster per-face texture mapping through
