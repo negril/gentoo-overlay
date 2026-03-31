@@ -1,0 +1,30 @@
+From 2474092add1c1fc52e9516bd7ec431436c6013ab Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 24 Jan 2026 18:42:19 +0100
+Subject: [PATCH] use prefetched test data
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 539ca4f..bcd0a60 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -13,6 +13,7 @@ set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+ option(INSTALL_GTEST "Enable installation of googletest." OFF)
+ FetchContent_MakeAvailable(googletest)
+ 
++if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/jp2k_test_codestreams)
+ # Fetch test files
+ FetchContent_Declare(
+   jp2k_test_codestreams
+@@ -20,6 +21,7 @@ FetchContent_Declare(
+   SOURCE_DIR        jp2k_test_codestreams/
+ )
+ FetchContent_MakeAvailable(jp2k_test_codestreams)
++endif()
+ 
+ # create the mse_pae executable
+ include(mse_pae.cmake)
+-- 
+2.52.0
+

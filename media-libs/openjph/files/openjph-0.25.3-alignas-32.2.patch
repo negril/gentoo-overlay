@@ -1,0 +1,116 @@
+From 35a123e14c18d127ee34eeec4cf6633799edc1cf Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sat, 24 Jan 2026 15:46:56 +0100
+Subject: [PATCH] alignas(32)
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/apps/others/ojph_img_io.cpp b/src/apps/others/ojph_img_io.cpp
+index a8c356b..aac6035 100644
+--- a/src/apps/others/ojph_img_io.cpp
++++ b/src/apps/others/ojph_img_io.cpp
+@@ -409,7 +409,8 @@ namespace ojph {
+ 
+       fprintf(fh, "P5\n%d %d\n%d\n", width, height, (1 << bit_depth) - 1);
+       buffer_size = (size_t)width * bytes_per_sample;
+-      buffer = (ui8*)malloc(buffer_size);
++      buffer = new ui8[buffer_size];
++
+     }
+     else
+     {
+@@ -436,7 +437,8 @@ namespace ojph {
+       if (result == 0)
+         OJPH_ERROR(0x03000027, "error writing to file %s", filename);
+       buffer_size = (size_t)width * num_components * (size_t)bytes_per_sample;
+-      buffer = (ui8*)malloc(buffer_size);
++      buffer = new ui8[buffer_size];
++
+     }
+     fname = filename;
+     cur_line = 0;
+@@ -736,7 +738,7 @@ namespace ojph {
+     if (result == 0)
+       OJPH_ERROR(0x03000072, "error writing to file %s", filename);
+     buffer_size = (size_t)width * num_components * sizeof(float);
+-    buffer = (float*)malloc(buffer_size);
++    buffer = new float[buffer_size];
+     fname = filename;
+     cur_line = 0;
+     start_of_data = ojph_ftell(fh);
+@@ -850,7 +852,7 @@ namespace ojph {
+       bytes_per_line = TIFFScanlineSize64(tiff_handle);
+     }
+     // allocate linebuffer to hold a line of image data
+-    line_buffer = malloc(bytes_per_line);
++    line_buffer = new ui8[bytes_per_line];
+     if (NULL == line_buffer)
+       OJPH_ERROR(0x03000092, "Unable to allocate %d bytes for line_buffer[] "
+         "for file %s", bytes_per_line, filename);
+@@ -1090,7 +1092,7 @@ namespace ojph {
+     }
+ 
+     buffer_size = width * (size_t)num_components * (size_t)bytes_per_sample;
+-    buffer = (ui8*)malloc(buffer_size);
++    buffer = new ui8[buffer_size];
+     fname = filename;
+     cur_line = 0;
+ 
+@@ -1313,7 +1315,7 @@ namespace ojph {
+       comp_address[i] += width[i-1] * height[i-1] * bytes_per_sample[i-1];
+       max_byte_width = ojph_max(max_byte_width, width[i]*bytes_per_sample[i]);
+     }
+-    temp_buf = malloc(max_byte_width);
++    temp_buf = new ui8[max_byte_width];
+     fname = filename;
+   }
+ 
+@@ -1403,7 +1405,7 @@ namespace ojph {
+     close();
+     if (buffer)
+     {
+-      free(buffer);
++      delete[] buffer;
+       buffer = NULL;
+       buffer_size = 0;
+     }
+@@ -1440,7 +1442,7 @@ namespace ojph {
+     }
+     this->width = tw;
+     buffer_size = tw * (bit_depth > 8 ? 2 : 1);
+-    buffer = (ui8*)malloc(buffer_size);
++    buffer = new ui8[buffer_size];
+   }
+ 
+   ////////////////////////////////////////////////////////////////////////////
+@@ -1502,7 +1504,7 @@ namespace ojph {
+     cur_line = 0;
+     bytes_per_sample = (bit_depth + 7) >> 3;
+     buffer_size = (size_t)width * bytes_per_sample;
+-    buffer = (ui8*)malloc(buffer_size);
++    buffer = new ui8[buffer_size];
+     fname = filename;
+   }
+ 
+@@ -1612,7 +1614,7 @@ namespace ojph {
+     close();
+     if (buffer)
+     {
+-      free(buffer);
++      delete[] buffer;
+       buffer = NULL;
+       buffer_size = 0;
+     }
+@@ -1646,7 +1648,8 @@ namespace ojph {
+ 
+     bytes_per_sample = (bit_depth + 7) >> 3;
+     buffer_size = width * bytes_per_sample;
+-    buffer = (ui8*)malloc(buffer_size);
++    buffer = new ui8[buffer_size];
++
+   }
+ 
+   ////////////////////////////////////////////////////////////////////////////
+-- 
+2.52.0
+

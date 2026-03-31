@@ -1,0 +1,48 @@
+From d4a1fcbe86d60337aabc6b72034bd3154ec94fdc Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 24 Jan 2026 17:39:28 +0100
+Subject: [PATCH] -Warray-bounds=
+
+In member function ‘ojph::ui8* ojph::local::tag_tree::get(ojph::ui32, ojph::ui32, ojph::ui32)’,
+    inlined from ‘ojph::ui32 ojph::local::precinct::prepare_precinct(int, ojph::ui32*, ojph::mem_elastic_allocator*)’ at /var/tmp/paludis/media-libs-openjph-9999/work/openjph-9999/src/core/codestream/ojph_precinct.cpp:163:28:
+/var/tmp/paludis/media-libs-openjph-9999/work/openjph-9999/src/core/codestream/ojph_precinct.cpp:80:24: warning: array subscript 32 is above array bounds of ‘ojph::ui8* [16]’ {aka ‘unsigned char* [16]’} [-Warray-bounds=]
+   80 |         return levs[lev] + (x + y * ((width + (1 << lev) - 1) >> lev));
+      |                ~~~~~~~~^
+/var/tmp/paludis/media-libs-openjph-9999/work/openjph-9999/src/core/codestream/ojph_precinct.cpp: In member function ‘ojph::ui32 ojph::local::precinct::prepare_precinct(int, ojph::ui32*, ojph::mem_elastic_allocator*)’:
+/var/tmp/paludis/media-libs-openjph-9999/work/openjph-9999/src/core/codestream/ojph_precinct.cpp:84:12: note: while referencing ‘ojph::local::tag_tree::levs’
+   84 |       ui8* levs[16]; // you cannot have this high number of levels
+      |            ^~~~
+
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/core/codestream/ojph_precinct.cpp b/src/core/codestream/ojph_precinct.cpp
+index 97cd829..a2e7856 100644
+--- a/src/core/codestream/ojph_precinct.cpp
++++ b/src/core/codestream/ojph_precinct.cpp
+@@ -36,6 +36,7 @@
+ //***************************************************************************/
+ 
+ 
++#include <cassert>
+ #include <climits>
+ #include <cmath>
+ 
+@@ -76,6 +77,7 @@ namespace ojph {
+ 
+       ui8* get(ui32 x, ui32 y, ui32 lev)
+       {
++        assert(lev < (sizeof(levs)/sizeof(ui8*)));
+         return levs[lev] + (x + y * ((width + (1 << lev) - 1) >> lev));
+       }
+ 
+@@ -573,4 +575,4 @@ namespace ojph {
+     }
+ 
+   }
+-}
+\ No newline at end of file
++}
+-- 
+2.52.0
+
