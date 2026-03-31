@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -8,12 +8,17 @@ inherit cmake
 MY_PN="OpenTimelineIO"
 
 DESCRIPTION="Open Source API and interchange format for editorial timeline information"
-HOMEPAGE="https://github.com/AcademySoftwareFoundation/OpenTimelineIO"
+HOMEPAGE="
+	https://opentimeline.io
+	https://github.com/AcademySoftwareFoundation/OpenTimelineIO
+"
 
 if [[ "${PV}" == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/OpenTimelineIO.git"
-	EGIT_SUBMODULES=( 'src/deps/rapidjson' )
+	EGIT_SUBMODULES=(
+		'src/deps/rapidjson'
+	)
 else
 	# Rapidjson hasn't had a release since 2016. OpenTimelineIO builds against rapidjson HEAD.
 	RAPIDJSON_COMMIT="24b5e7a8b27f42fa16b96fc70aade9106cf7102f"
@@ -33,10 +38,10 @@ SLOT="0/$(ver_cut 1-2)"
 IUSE="test"
 RESTRICT="!test? ( test )"
 
-# Check on update
-# https://github.com/AcademySoftwareFoundation/OpenTimelineIO/pull/1852
+# QA
+# imath - we want to rebuild on subslot changes
 RDEPEND="
-	dev-libs/imath:3=
+	dev-libs/imath:=
 "
 DEPEND="${RDEPEND}"
 
@@ -50,8 +55,6 @@ src_prepare() {
 	fi
 
 	sed \
-		-e "s/\(find_package(Imath \)QUIET/\1REQUIRED/" \
-		-e "s/\(find_package(IlmBase \)QUIET/\1REQUIRED/" \
 		-e "s|\(set(OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR \"\${CMAKE_INSTALL_PREFIX}/\)lib\")|\1$(get_libdir)\")|" \
 		-i CMakeLists.txt || die
 
@@ -68,7 +71,7 @@ src_configure() {
 		-DOTIO_AUTOMATIC_SUBMODULES="no"
 
 		-DOTIO_FIND_IMATH="yes"
-		-DOTIO_IMATH_LIBS=""
+		-DOTIO_FIND_RAPIDJSON="no" # needs newer rapidjson then packaged
 		-DOTIO_SHARED_LIBS="yes"
 
 		-DOTIO_CXX_COVERAGE="no"

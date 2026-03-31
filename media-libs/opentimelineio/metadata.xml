@@ -14,5 +14,6 @@
 	</upstream>
 	<use>
 		<flag name="cli">Install the OTIO command line tool</flag>
+		<flag name="system-rapidjson">Use system <pkg>dev-libs/rapidjson</pkg></flag>
 	</use>
 </pkgmetadata>
