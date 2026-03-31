@@ -34,7 +34,7 @@ DEPEND="${RDEPEND}"
 PATCHES=(
 	"${FILESDIR}/${PN}-5.2.5-gtest.patch"
 	"${FILESDIR}/${PN}-5.2.5-float-comparison.patch"
-	"${FILESDIR}/${PN}-6.0.2-optional-collada-tests.patch"
+	"${FILESDIR}/${PN}-6.0.4-zlib-1.3.2.patch"
 )
 
 DOCS=( CodeConventions.md Readme.md )
