@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -20,7 +20,7 @@ S="${WORKDIR}/${MY_P}"
 
 LICENSE="NCSA-HDF"
 SLOT="0/311"
-KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~loong ~ppc ~ppc64 ~riscv ~s390 ~sparc ~x86 ~amd64-linux ~x86-linux ~arm64-macos ~x64-macos"
+KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~loong ~ppc ~ppc64 ~riscv ~s390 ~sparc ~x86 ~arm64-macos ~x64-macos"
 IUSE="cxx debug examples fortran +hl mpi szip test threads unsupported zlib"
 RESTRICT="!test? ( test )"
 REQUIRED_USE="
@@ -156,11 +156,7 @@ src_prepare() {
 	fi
 
 	# Enable shared libs by default for h5cc config utility
-	sed -i -e "s/SHLIB:-no/SHLIB:-yes/g" \
-		bin/h5cc.in \
-		c++/src/h5c++.in \
-		fortran/src/h5fc.in \
-		|| die
+	sed -i -e "s/SHLIB:-no/SHLIB:-yes/g" bin/h5cc.in || die
 	hprefixify m4/libtool.m4
 
 	eautoreconf
@@ -176,7 +172,7 @@ src_configure() {
 		--enable-deprecated-symbols
 		--enable-build-mode=$(usex debug debug production)
 		--with-default-plugindir="${EPREFIX}/usr/$(get_libdir)/${PN}/plugin"
-		--with-examplesdir="${EPREFIX}/usr/share/doc/${PF}/examples"
+		--with-examplesdir="\${datarootdir}/doc/${PF}/examples" \
 		$(use_enable cxx)
 		$(use_enable fortran)
 		$(use_enable hl)
