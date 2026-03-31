@@ -28,7 +28,6 @@ BDEPEND="
 	virtual/pkgconfig
 "
 
-
 PATCHES=(
 	"${FILESDIR}/${P}-fix-null-conversion.patch"
 	"${FILESDIR}/${P}-cmake-fixes.patch"
