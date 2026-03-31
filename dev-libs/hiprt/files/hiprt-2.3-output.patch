@@ -1,0 +1,52 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5dd3008..30f816c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -321,6 +321,8 @@
+ set(BASE_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/dist/bin)
+ file(MAKE_DIRECTORY "${BASE_OUTPUT_DIR}/Debug")
+ file(MAKE_DIRECTORY "${BASE_OUTPUT_DIR}/Release")
++file(MAKE_DIRECTORY "${BASE_OUTPUT_DIR}/RelWithDebInfo")
++file(MAKE_DIRECTORY "${BASE_OUTPUT_DIR}/MinSizeRel")
+ 
+ # Set output directories for each build configuration
+ foreach(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} Debug Release RelWithDebInfo MinSizeRel)
+@@ -568,29 +573,32 @@
+ # install script
+ #
+ 
+-install(TARGETS ${HIPRT_NAME} DESTINATION bin)
++install(TARGETS ${HIPRT_NAME} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ 
+ # add header files
+ file(GLOB HIPRT_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/hiprt/*.h")
+ install(FILES ${HIPRT_HEADERS}
+-		DESTINATION include/hiprt)
++		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiprt/${version_str_}/hiprt)
+ 
+ # add header files from implementation folder
+ file(GLOB HIPRT_IMPL_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/hiprt/impl/*.h")
+ install(FILES ${HIPRT_IMPL_HEADERS}
+-		DESTINATION include/hiprt/impl)
++		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiprt/${version_str_}/hiprt/impl)
+ 		
+ # add some header files from Orochi
+ file(GLOB HIPRT_ORO_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/contrib/Orochi/ParallelPrimitives/*.h")
+ install(FILES ${HIPRT_ORO_HEADERS}
+-		DESTINATION include/contrib/Orochi/ParallelPrimitives)
++		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiprt/${version_str_}/contrib/Orochi/ParallelPrimitives)
+ 
+ # add hipfb files
+ file(GLOB HIPRT_HIPFB_FILES "${BASE_OUTPUT_DIR}/${CMAKE_BUILD_TYPE}/*.hipfb")
+ install(FILES ${HIPRT_HIPFB_FILES}
+-		DESTINATION bin)
+-
++		DESTINATION ${HIPRT_DATA_DIRECTORY})
+ 
++# add bc files
++file(GLOB HIPRT_BC_FILES "${BASE_OUTPUT_DIR}/${CMAKE_BUILD_TYPE}/*.bc")
++install(FILES ${HIPRT_BC_FILES}
++		DESTINATION ${HIPRT_DATA_DIRECTORY})
+ 
+ 
+ # Project: Unit Test

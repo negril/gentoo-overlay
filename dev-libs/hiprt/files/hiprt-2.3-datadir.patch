@@ -1,0 +1,45 @@
+diff --git a/contrib/Orochi/ParallelPrimitives/RadixSort.cpp b/contrib/Orochi/ParallelPrimitives/RadixSort.cpp
+index b12d768..d48918b 100644
+--- a/contrib/Orochi/ParallelPrimitives/RadixSort.cpp
++++ b/contrib/Orochi/ParallelPrimitives/RadixSort.cpp
+@@ -151,17 +151,7 @@ void RadixSort::compileKernels( const std::string& kernelPath, const std::string
+ 
+ 	const auto getCurrentDir = []() noexcept
+ 	{
+-#if !defined( __GNUC__ )
+-		HMODULE hm = GetCurrentModule();
+-		char buff[MAX_PATH];
+-		GetModuleFileName( hm, buff, MAX_PATH );
+-#else
+-		Dl_info info;
+-		dladdr( (const void*)GetCurrentModule1, &info );
+-		const char* buff = info.dli_fname;
+-#endif
+-		std::string::size_type position = std::string( buff ).find_last_of( "\\/" );
+-		return std::string( buff ).substr( 0, position ) + "/";
++		return HIPRT_DATA_DIRECTORY;
+ 	};
+ 
+ 	std::string binaryPath{};
+diff --git a/hiprt/impl/Utility.cpp b/hiprt/impl/Utility.cpp
+index e961114..88d6e54 100644
+--- a/hiprt/impl/Utility.cpp
++++ b/hiprt/impl/Utility.cpp
+@@ -58,16 +58,7 @@ void getCurrentModule() {}
+ 
+ std::filesystem::path Utility::getCurrentDir()
+ {
+-#if !defined( __GNUC__ )
+-	char buff[MAX_PATH];
+-	GetModuleFileName( getCurrentModule(), buff, MAX_PATH );
+-#else
+-	Dl_info info;
+-	dladdr( (const void*)getCurrentModule, &info );
+-	const char* buff = info.dli_fname;
+-#endif
+-	std::string::size_type position = std::string( buff ).find_last_of( "\\/" );
+-	return std::string( buff ).substr( 0, position ) + "/";
++	return HIPRT_DATA_DIRECTORY;
+ }
+ 
+ uint32_t Utility::hashString( const std::string& str )
