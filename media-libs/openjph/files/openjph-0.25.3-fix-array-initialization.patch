@@ -1,0 +1,188 @@
+From 0c8f0854527f9c2170d14b0565d8fa213f80bf64 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sat, 29 Nov 2025 15:11:12 +0100
+Subject: [PATCH] use memset for array initialization
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/core/coding/ojph_block_decoder32.cpp b/src/core/coding/ojph_block_decoder32.cpp
+index daf2312..4cb41ca 100644
+--- a/src/core/coding/ojph_block_decoder32.cpp
++++ b/src/core/coding/ojph_block_decoder32.cpp
+@@ -834,6 +834,7 @@ namespace ojph {
+       // One extra row to handle the case of SPP propagating downwards
+       // when codeblock width is 4
+       ui16 scratch[8 * 513] = {0};       // 8 kB
++      memset(scratch, 0, sizeof(scratch));
+ 
+       // We need an extra two entries (one inf and one u_q) beyond
+       // the last column. 
+@@ -1098,6 +1099,7 @@ namespace ojph {
+         // a multipled of 16 bytes.
+         const int v_n_size = 512 + 4;
+         ui32 v_n_scratch[v_n_size] = {0};  // 2+ kB
++        memset(v_n_scratch, 0, sizeof(v_n_scratch));
+ 
+         frwd_struct32 magsgn;
+         frwd_init<0xFF>(&magsgn, coded_data, lcup - scup);
+@@ -1367,6 +1369,7 @@ namespace ojph {
+           // which is equivalent to 256 of ui16, since each stores 4 columns.
+           // We add an extra 8 entries, just in case we need more
+           ui16 prev_row_sig[256 + 8] = {0}; // 528 Bytes
++          memset(prev_row_sig, 0, sizeof(prev_row_sig));
+ 
+           frwd_struct32 sigprop;
+           frwd_init<0>(&sigprop, coded_data + lengths1, (int)lengths2);
+diff --git a/src/core/coding/ojph_block_decoder64.cpp b/src/core/coding/ojph_block_decoder64.cpp
+index bce5b9e..cf9ab20 100644
+--- a/src/core/coding/ojph_block_decoder64.cpp
++++ b/src/core/coding/ojph_block_decoder64.cpp
+@@ -858,6 +858,7 @@ namespace ojph {
+       // One extra row to handle the case of SPP propagating downwards
+       // when codeblock width is 4
+       ui16 scratch[8 * 513] = {0};       // 8 kB
++      memset(scratch, 0, sizeof(scratch));
+ 
+       // We need an extra two entries (one inf and one u_q) beyond
+       // the last column. 
+@@ -1146,6 +1147,7 @@ namespace ojph {
+         // a multipled of 16 bytes.
+         const int v_n_size = 512 + 4;
+         ui64 v_n_scratch[v_n_size] = {0};  // 4+ kB
++        memset(v_n_scratch, 0, sizeof(v_n_scratch));
+ 
+         frwd_struct64 magsgn;
+         frwd_init8<0xFF>(&magsgn, coded_data, lcup - scup);
+@@ -1414,6 +1416,7 @@ namespace ojph {
+           // which is equivalent to 256 of ui16, since each stores 4 columns.
+           // We add an extra 8 entries, just in case we need more
+           ui16 prev_row_sig[256 + 8] = {0}; // 528 Bytes
++          memset(prev_row_sig, 0, sizeof(prev_row_sig));
+ 
+           frwd_struct64 sigprop;
+           frwd_init<0>(&sigprop, coded_data + lengths1, (int)lengths2);
+diff --git a/src/core/coding/ojph_block_decoder_avx2.cpp b/src/core/coding/ojph_block_decoder_avx2.cpp
+index cccb4fd..3a0c6a1 100644
+--- a/src/core/coding/ojph_block_decoder_avx2.cpp
++++ b/src/core/coding/ojph_block_decoder_avx2.cpp
+@@ -1160,6 +1160,7 @@ namespace ojph {
+       // One extra row to handle the case of SPP propagating downwards
+       // when codeblock width is 4
+       ui16 scratch[8 * 513] = {0};          // 8+ kB
++      memset(scratch, 0, sizeof(scratch));
+ 
+       // We need an extra two entries (one inf and one u_q) beyond
+       // the last column.
+@@ -1436,6 +1437,7 @@ namespace ojph {
+         // row is used to store processed entries.
+         const int v_n_size = 512 + 16;
+         ui32 v_n_scratch[2 * v_n_size] = {0}; // 4+ kB
++        memset(v_n_scratch, 0, sizeof(v_n_scratch));
+ 
+         frwd_struct_avx2 magsgn;
+         frwd_init<0xFF>(&magsgn, coded_data, lcup - scup);
+@@ -1551,7 +1553,9 @@ namespace ojph {
+         // row is used to store processed entries.
+         const int v_n_size = 512 + 16;
+         ui16 v_n_scratch[v_n_size] = {0}; // 1+ kB
++        memset(v_n_scratch, 0, sizeof(v_n_scratch));
+         ui32 v_n_scratch_32[v_n_size] = {0}; // 2+ kB
++        memset(v_n_scratch_32, 0, sizeof(v_n_scratch_32));
+ 
+         frwd_struct_avx2 magsgn;
+         frwd_init<0xFF>(&magsgn, coded_data, lcup - scup);
+@@ -1728,6 +1732,7 @@ namespace ojph {
+           // which is equivalent to 256 of ui16, since each stores 4 columns.
+           // We add an extra 8 entries, just in case we need more
+           ui16 prev_row_sig[256 + 8] = {0}; // 528 Bytes
++          memset(prev_row_sig, 0, sizeof(prev_row_sig));
+ 
+           frwd_struct_avx2 sigprop;
+           frwd_init<0>(&sigprop, coded_data + lengths1, (int)lengths2);
+diff --git a/src/core/coding/ojph_block_decoder_ssse3.cpp b/src/core/coding/ojph_block_decoder_ssse3.cpp
+index 3e3e00e..0fcf5ba 100644
+--- a/src/core/coding/ojph_block_decoder_ssse3.cpp
++++ b/src/core/coding/ojph_block_decoder_ssse3.cpp
+@@ -1116,6 +1116,7 @@ namespace ojph {
+       // One extra row to handle the case of SPP propagating downwards
+       // when codeblock width is 4
+       ui16 scratch[8 * 513] = {0};          // 8+ kB
++      memset(scratch, 0, sizeof(scratch));
+ 
+       // We need an extra two entries (one inf and one u_q) beyond
+       // the last column. 
+@@ -1390,6 +1391,7 @@ namespace ojph {
+         // row is used to store processed entries.
+         const int v_n_size = 512 + 8;
+         ui32 v_n_scratch[2 * v_n_size] = {0}; // 4+ kB
++        memset(v_n_scratch, 0, sizeof(v_n_scratch));
+ 
+         frwd_struct_ssse3 magsgn;
+         frwd_init<0xFF>(&magsgn, coded_data, lcup - scup);
+@@ -1541,6 +1543,7 @@ namespace ojph {
+         // row is used to store processed entries.
+         const int v_n_size = 512 + 8;
+         ui16 v_n_scratch[2 * v_n_size] = {0}; // 2+ kB
++        memset(v_n_scratch, 0, sizeof(v_n_scratch));
+ 
+         frwd_struct_ssse3 magsgn;
+         frwd_init<0xFF>(&magsgn, coded_data, lcup - scup);
+@@ -1754,6 +1757,7 @@ namespace ojph {
+           // which is equivalent to 256 of ui16, since each stores 4 columns.
+           // We add an extra 8 entries, just in case we need more
+           ui16 prev_row_sig[256 + 8] = {0}; // 528 Bytes
++          memset(prev_row_sig, 0, sizeof(prev_row_sig));
+ 
+           frwd_struct_ssse3 sigprop;
+           frwd_init<0>(&sigprop, coded_data + lengths1, (int)lengths2);
+diff --git a/src/core/coding/ojph_block_decoder_wasm.cpp b/src/core/coding/ojph_block_decoder_wasm.cpp
+index 42a04b5..3f75b91 100644
+--- a/src/core/coding/ojph_block_decoder_wasm.cpp
++++ b/src/core/coding/ojph_block_decoder_wasm.cpp
+@@ -1143,6 +1143,7 @@ namespace ojph {
+       // One extra row to handle the case of SPP propagating downwards
+       // when codeblock width is 4
+       ui16 scratch[8 * 513] = {0};          // 8+ kB
++      memset(scratch, 0, sizeof(scratch));
+ 
+       // We need an extra two entries (one inf and one u_q) beyond
+       // the last column. 
+@@ -1417,6 +1418,7 @@ namespace ojph {
+         // row is used to store processed entries.
+         const int v_n_size = 512 + 8;
+         ui32 v_n_scratch[2 * v_n_size] = {0}; // 4+ kB
++        memset(v_n_scratch, 0, sizeof(v_n_scratch));
+ 
+         frwd_struct magsgn;
+         frwd_init<0xFF>(&magsgn, coded_data, lcup - scup);
+@@ -1570,6 +1572,7 @@ namespace ojph {
+         // row is used to store processed entries.
+         const int v_n_size = 512 + 8;
+         ui16 v_n_scratch[2 * v_n_size] = {0}; // 2+ kB
++        memset(v_n_scratch, 0, sizeof(v_n_scratch));
+ 
+         frwd_struct magsgn;
+         frwd_init<0xFF>(&magsgn, coded_data, lcup - scup);
+@@ -1784,6 +1787,7 @@ namespace ojph {
+           // which is equivalent to 256 of ui16, since each stores 4 columns.
+           // We add an extra 8 entries, just in case we need more
+           ui16 prev_row_sig[256 + 8] = {0}; // 528 Bytes
++          memset(prev_row_sig, 0, sizeof(prev_row_sig));
+ 
+           frwd_struct sigprop;
+           frwd_init<0>(&sigprop, coded_data + lengths1, (int)lengths2);
+diff --git a/src/core/coding/ojph_block_encoder_avx512.cpp b/src/core/coding/ojph_block_encoder_avx512.cpp
+index 6de1f3b..9ffaba9 100644
+--- a/src/core/coding/ojph_block_encoder_avx512.cpp
++++ b/src/core/coding/ojph_block_encoder_avx512.cpp
+@@ -488,6 +488,7 @@ namespace ojph {
+ static void print_epi32(const char *msg, __m512i &val)
+ {
+     uint32_t A[16] = {0};
++    memset(A, 0, sizeof(A));
+ 
+     _mm512_store_epi32(A, val);
+ 
+-- 
+2.52.0
+

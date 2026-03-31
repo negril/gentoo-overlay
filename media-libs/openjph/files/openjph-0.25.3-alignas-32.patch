@@ -1,0 +1,245 @@
+From c7f9581135e034e5f8560e60821e406382ce8f59 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 24 Jan 2026 15:04:19 +0100
+Subject: [PATCH] alignas(32)
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/apps/common/ojph_img_io.h b/src/apps/common/ojph_img_io.h
+index c18ee76..ac5ee39 100644
+--- a/src/apps/common/ojph_img_io.h
++++ b/src/apps/common/ojph_img_io.h
+@@ -620,7 +620,7 @@ namespace ojph {
+     const char *fname;
+     ui32 width, height, num_components;
+     ui32 bit_depth, bytes_per_sample;
+-    ui8* buffer;
++    alignas(512) ui8* buffer;
+     size_t buffer_size;
+     ui32 cur_line, samples_per_line, bytes_per_line;
+     conversion_fun converter;
+@@ -682,7 +682,7 @@ namespace ojph {
+     ui32 width, height, num_components;
+     ui32 bit_depth_of_data[4]; 
+     ui32 bytes_per_sample;
+-    ui8* buffer;
++    alignas(512) ui8* buffer;
+     size_t buffer_size;
+     ui32 cur_line, samples_per_line;
+   };
+@@ -723,7 +723,7 @@ namespace ojph {
+     ui32 num_components;
+     ui32 bit_depth;
+     ui32 *comp_width;
+-    ui8 *buffer;
++    alignas(512) ui8 *buffer;
+     ui32 buffer_size;
+   };
+ 
+diff --git a/src/apps/others/ojph_img_io_avx2.cpp b/src/apps/others/ojph_img_io_avx2.cpp
+index 30ba5a2..2aeaeda 100644
+--- a/src/apps/others/ojph_img_io_avx2.cpp
++++ b/src/apps/others/ojph_img_io_avx2.cpp
+@@ -131,7 +131,7 @@ namespace ojph {
+     const __m256i* sp0 = (__m256i*)ln0->i32;
+     const __m256i* sp1 = (__m256i*)ln1->i32;
+     const __m256i* sp2 = (__m256i*)ln2->i32;
+-    ui8* p = (ui8*)dp;
++    alignas(256)ui8* p = (ui8*)dp;
+     for ( ; count >= 32; count -= 32, sp0 += 4, sp1 += 4, sp2 += 4, p += 96)
+     {
+       __m256i a, t, u, v, w;
+diff --git a/src/core/codestream/ojph_codeblock.h b/src/core/codestream/ojph_codeblock.h
+index 4d6fbe4..c699553 100644
+--- a/src/core/codestream/ojph_codeblock.h
++++ b/src/core/codestream/ojph_codeblock.h
+@@ -118,7 +118,7 @@ namespace ojph {
+       ui32 num_passes;       // number of passes to be decoded
+       ui32 Kmax;
+       ui32 missing_msbs;
+-      coded_lists *next_coded;
++      alignas(512) coded_lists *next_coded;
+ 
+       static const int prefix_buf_size = 8;
+       static const int suffix_buf_size = 16;
+diff --git a/src/core/coding/ojph_block_decoder32.cpp b/src/core/coding/ojph_block_decoder32.cpp
+index 0151e8d..caad119 100644
+--- a/src/core/coding/ojph_block_decoder32.cpp
++++ b/src/core/coding/ojph_block_decoder32.cpp
+@@ -315,7 +315,8 @@ namespace ojph {
+       if (vlcp->size > 3)  // if there are more than 3 bytes left in VLC
+       {
+         // (vlcp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        // val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        memcpy(&val, (vlcp->data - 3), 4); // copy 32 bits
+         vlcp->data -= 4;          // move data pointer back by 4
+         vlcp->size -= 4;          // reduce available byte by 4
+       }
+@@ -1613,4 +1614,4 @@ namespace ojph {
+       return true;
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/core/coding/ojph_block_decoder_avx2.cpp b/src/core/coding/ojph_block_decoder_avx2.cpp
+index fd9fb89..aad8fb8 100644
+--- a/src/core/coding/ojph_block_decoder_avx2.cpp
++++ b/src/core/coding/ojph_block_decoder_avx2.cpp
+@@ -318,7 +318,8 @@ namespace ojph {
+       if (vlcp->size > 3)  // if there are more than 3 bytes left in VLC
+       {
+         // (vlcp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        // val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        memcpy(&val, (vlcp->data - 3), 4); // copy 32 bits
+         vlcp->data -= 4;          // move data pointer back by 4
+         vlcp->size -= 4;          // reduce available byte by 4
+       }
+diff --git a/src/core/coding/ojph_block_decoder_ssse3.cpp b/src/core/coding/ojph_block_decoder_ssse3.cpp
+index 6c78383..11b982f 100644
+--- a/src/core/coding/ojph_block_decoder_ssse3.cpp
++++ b/src/core/coding/ojph_block_decoder_ssse3.cpp
+@@ -319,7 +319,8 @@ namespace ojph {
+       if (vlcp->size > 3)  // if there are more than 3 bytes left in VLC
+       {
+         // (vlcp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        // val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        memcpy(&val, (vlcp->data - 3), 4); // copy 32 bits
+         vlcp->data -= 4;          // move data pointer back by 4
+         vlcp->size -= 4;          // reduce available byte by 4
+       }
+diff --git a/src/core/coding/ojph_block_decoder_wasm.cpp b/src/core/coding/ojph_block_decoder_wasm.cpp
+index 4e9894b..a491471 100644
+--- a/src/core/coding/ojph_block_decoder_wasm.cpp
++++ b/src/core/coding/ojph_block_decoder_wasm.cpp
+@@ -325,7 +325,8 @@ namespace ojph {
+       if (vlcp->size > 3)  // if there are more than 3 bytes left in VLC
+       {
+         // (vlcp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        // val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        memcpy(&val, (vlcp->data - 3), 4); // copy 32 bits
+         vlcp->data -= 4;          // move data pointer back by 4
+         vlcp->size -= 4;          // reduce available byte by 4
+       }
+diff --git a/src/core/coding/ojph_block_encoder.cpp b/src/core/coding/ojph_block_encoder.cpp
+index f9c8d89..3dbb53b 100644
+--- a/src/core/coding/ojph_block_encoder.cpp
++++ b/src/core/coding/ojph_block_encoder.cpp
+@@ -272,7 +272,7 @@ namespace ojph {
+     /////////////////////////////////////////////////////////////////////////
+     struct mel_struct {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(512) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+@@ -351,7 +351,7 @@ namespace ojph {
+     /////////////////////////////////////////////////////////////////////////
+     struct vlc_struct {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(512) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+@@ -445,7 +445,7 @@ namespace ojph {
+     /////////////////////////////////////////////////////////////////////////
+     struct ms_struct {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(512) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+diff --git a/src/core/coding/ojph_block_encoder_avx2.cpp b/src/core/coding/ojph_block_encoder_avx2.cpp
+index 1bc7a43..1209542 100644
+--- a/src/core/coding/ojph_block_encoder_avx2.cpp
++++ b/src/core/coding/ojph_block_encoder_avx2.cpp
+@@ -239,7 +239,7 @@ namespace ojph {
+     /////////////////////////////////////////////////////////////////////////
+     struct mel_struct {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(256) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+@@ -310,7 +310,7 @@ namespace ojph {
+     /////////////////////////////////////////////////////////////////////////
+     struct vlc_struct_avx2 {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(256) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+@@ -418,7 +418,7 @@ namespace ojph {
+ /////////////////////////////////////////////////////////////////////////
+     struct ms_struct {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(256) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+diff --git a/src/core/coding/ojph_block_encoder_avx512.cpp b/src/core/coding/ojph_block_encoder_avx512.cpp
+index 6de1f3b..0bd57be 100644
+--- a/src/core/coding/ojph_block_encoder_avx512.cpp
++++ b/src/core/coding/ojph_block_encoder_avx512.cpp
+@@ -238,7 +238,7 @@ namespace ojph {
+     /////////////////////////////////////////////////////////////////////////
+     struct mel_struct {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(512) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+@@ -309,7 +309,7 @@ namespace ojph {
+     /////////////////////////////////////////////////////////////////////////
+     struct vlc_struct_avx512 {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(512) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+@@ -417,7 +417,7 @@ namespace ojph {
+ /////////////////////////////////////////////////////////////////////////
+     struct ms_struct {
+       //storage
+-      ui8* buf;      //pointer to data buffer
++      alignas(512) ui8* buf;      //pointer to data buffer
+       ui32 pos;      //position of next writing within buf
+       ui32 buf_size; //size of buffer, which we must not exceed
+ 
+diff --git a/src/core/openjph/ojph_mem.h b/src/core/openjph/ojph_mem.h
+index bc04a14..abb36be 100644
+--- a/src/core/openjph/ojph_mem.h
++++ b/src/core/openjph/ojph_mem.h
+@@ -209,7 +209,7 @@ namespace ojph {
+     coded_lists* next_list;
+     ui32 buf_size;
+     ui32 avail_size;
+-    ui8* buf;
++    alignas(512) ui8* buf;
+   };
+ 
+   /////////////////////////////////////////////////////////////////////////////
+@@ -261,7 +261,7 @@ namespace ojph {
+         return available_bytes + (ui32)sizeof(stores_list);
+       }
+       stores_list *next_store;
+-      ui8 *orig_data, *data;
++      alignas(512) ui8 *orig_data, *data;
+       ui32 orig_size, available;
+     };
+ 
+-- 
+2.52.0
+

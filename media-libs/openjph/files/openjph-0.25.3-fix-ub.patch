@@ -1,0 +1,361 @@
+From ef26d7d96fb0b6839fd9ed5c6076ae194756517c Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 29 Nov 2025 19:36:59 +0100
+Subject: [PATCH] use memcpy to avoid unaligned access
+
+Reading 32 bit from a 16 bit pointer can be unaligned and thus undefined
+behaviour.
+In combination with lifetime dse for `-O2` or `-O3` using gcc-15 this allows 
+the elimination of the original intialized object. Using memcpy instead does
+not break this connection.
+
+See-also: https://github.com/aous72/OpenJPH/issues/186
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/core/coding/ojph_block_decoder32.cpp b/src/core/coding/ojph_block_decoder32.cpp
+index daf2312..0151e8d 100644
+--- a/src/core/coding/ojph_block_decoder32.cpp
++++ b/src/core/coding/ojph_block_decoder32.cpp
+@@ -1408,7 +1408,8 @@ namespace ojph {
+               // We need data for at least 5 columns out of 8.
+               // Therefore loading 32 bits is easier than loading 16 bits
+               // twice.
+-              ui32 ps = *(ui32*)prev_sig;
++              ui32 ps;
++              memcpy(&ps, prev_sig, sizeof(ps));
+               ui32 ns = *(ui32*)(cur_sig + mstr);
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+diff --git a/src/core/coding/ojph_block_decoder64.cpp b/src/core/coding/ojph_block_decoder64.cpp
+index bce5b9e..62ffb0f 100644
+--- a/src/core/coding/ojph_block_decoder64.cpp
++++ b/src/core/coding/ojph_block_decoder64.cpp
+@@ -1455,7 +1455,8 @@ namespace ojph {
+               // We need data for at least 5 columns out of 8.
+               // Therefore loading 32 bits is easier than loading 16 bits
+               // twice.
+-              ui32 ps = *(ui32*)prev_sig;
++              ui32 ps;
++              memcpy(&ps, prev_sig, sizeof(ps));
+               ui32 ns = *(ui32*)(cur_sig + mstr);
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+diff --git a/src/core/coding/ojph_block_decoder_avx2.cpp b/src/core/coding/ojph_block_decoder_avx2.cpp
+index cccb4fd..fd9fb89 100644
+--- a/src/core/coding/ojph_block_decoder_avx2.cpp
++++ b/src/core/coding/ojph_block_decoder_avx2.cpp
+@@ -1769,7 +1769,8 @@ namespace ojph {
+               // We need data for at least 5 columns out of 8.
+               // Therefore loading 32 bits is easier than loading 16 bits
+               // twice.
+-              ui32 ps = *(ui32*)prev_sig;
++              ui32 ps;
++              memcpy(&ps, prev_sig, sizeof(ps));
+               ui32 ns = *(ui32*)(cur_sig + mstr);
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+diff --git a/src/core/coding/ojph_block_decoder_ssse3.cpp b/src/core/coding/ojph_block_decoder_ssse3.cpp
+index 3e3e00e..6c78383 100644
+--- a/src/core/coding/ojph_block_decoder_ssse3.cpp
++++ b/src/core/coding/ojph_block_decoder_ssse3.cpp
+@@ -1795,7 +1795,8 @@ namespace ojph {
+               // We need data for at least 5 columns out of 8.
+               // Therefore loading 32 bits is easier than loading 16 bits
+               // twice.
+-              ui32 ps = *(ui32*)prev_sig;
++              ui32 ps;
++              memcpy(&ps, prev_sig, sizeof(ps));
+               ui32 ns = *(ui32*)(cur_sig + mstr);
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+diff --git a/src/core/coding/ojph_block_decoder_wasm.cpp b/src/core/coding/ojph_block_decoder_wasm.cpp
+index 42a04b5..4e9894b 100644
+--- a/src/core/coding/ojph_block_decoder_wasm.cpp
++++ b/src/core/coding/ojph_block_decoder_wasm.cpp
+@@ -1825,7 +1825,8 @@ namespace ojph {
+               // We need data for at least 5 columns out of 8.
+               // Therefore loading 32 bits is easier than loading 16 bits
+               // twice.
+-              ui32 ps = *(ui32*)prev_sig;
++              ui32 ps;
++              memcpy(&ps, prev_sig, sizeof(ps));
+               ui32 ns = *(ui32*)(cur_sig + mstr);
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+-- 
+2.52.0
+
+
+From 68b981fc33fcf80ac1fa9024aff500a83de67a3b Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 24 Jan 2026 17:16:49 +0100
+Subject: [PATCH] use memcpy to avoid unaligned access part2
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/core/coding/ojph_block_decoder32.cpp b/src/core/coding/ojph_block_decoder32.cpp
+index 96b3f2c..dfa9a95 100644
+--- a/src/core/coding/ojph_block_decoder32.cpp
++++ b/src/core/coding/ojph_block_decoder32.cpp
+@@ -97,7 +97,7 @@ namespace ojph {
+ 
+       ui32 val = 0xFFFFFFFF;       // feed in 0xFF if buffer is exhausted
+       if (melp->size > 4) {        // if there is data in the MEL segment
+-        val = *(ui32*)melp->data;  // read 32 bits from MEL data
++        memcpy(&val, melp->data, sizeof(val));  // read 32 bits from MEL data
+         melp->data += 4;           // advance pointer
+         melp->size -= 4;           // reduce counter
+       }
+@@ -315,7 +315,7 @@ namespace ojph {
+       if (vlcp->size > 3)  // if there are more than 3 bytes left in VLC
+       {
+         // (vlcp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        memcpy(&val, (vlcp->data - 3), sizeof(val));  // then read 32 bits
+         vlcp->data -= 4;          // move data pointer back by 4
+         vlcp->size -= 4;          // reduce available byte by 4
+       }
+@@ -458,7 +458,7 @@ namespace ojph {
+       ui32 val = 0;
+       if (mrp->size > 3) // If there are 3 byte or more
+       { // (mrp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(mrp->data - 3); // read 32 bits
++        memcpy(&val, (mrp->data - 3), sizeof(val));  // read 32 bits
+         mrp->data -= 4;                // move back pointer
+         mrp->size -= 4;                // reduce count
+       }
+@@ -612,7 +612,7 @@ namespace ojph {
+ 
+       ui32 val = 0;
+       if (msp->size > 3) {
+-        val = *(ui32*)msp->data;  // read 32 bits
++        memcpy(&val, msp->data, sizeof(val));  // read 32 bits
+         msp->data += 4;           // increment pointer
+         msp->size -= 4;           // reduce size
+       }
+@@ -1410,12 +1410,14 @@ namespace ojph {
+               // twice.
+               ui32 ps;
+               memcpy(&ps, prev_sig, sizeof(ps));
+-              ui32 ns = *(ui32*)(cur_sig + mstr);
++              ui32 ns;
++              memcpy(&ns, (cur_sig + mstr), sizeof(ns));
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+                 u |= (ns & 0x11111111) << 3;   // the row below
+ 
+-              ui32 cs = *(ui32*)cur_sig;
++              ui32 cs;
++              memcpy(&cs, cur_sig, sizeof(cs));
+               // vertical integration
+               ui32 mbr =  cs;                // this sig. info.
+               mbr |= (cs & 0x77777777) << 1; //above neighbors
+@@ -1614,4 +1616,4 @@ namespace ojph {
+       return true;
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/core/coding/ojph_block_decoder64.cpp b/src/core/coding/ojph_block_decoder64.cpp
+index 0399266..60bfe31 100644
+--- a/src/core/coding/ojph_block_decoder64.cpp
++++ b/src/core/coding/ojph_block_decoder64.cpp
+@@ -97,7 +97,7 @@ namespace ojph {
+ 
+       ui32 val = 0xFFFFFFFF;       // feed in 0xFF if buffer is exhausted
+       if (melp->size > 4) {        // if there is data in the MEL segment
+-        val = *(ui32*)melp->data;  // read 32 bits from MEL data
++        memcpy(&val, melp->data, sizeof(val));  // read 32 bits from MEL data
+         melp->data += 4;           // advance pointer
+         melp->size -= 4;           // reduce counter
+       }
+@@ -410,7 +410,7 @@ namespace ojph {
+       ui32 val = 0;
+       if (mrp->size > 3) // If there are 3 byte or more
+       { // (mrp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(mrp->data - 3); // read 32 bits
++        memcpy(&val, (mrp->data - 3), sizeof(val));  // read 32 bits
+         mrp->data -= 4;                // move back pointer
+         mrp->size -= 4;                // reduce count
+       }
+@@ -564,7 +564,7 @@ namespace ojph {
+ 
+       ui32 val = 0;
+       if (msp->size > 3) {
+-        val = *(ui32*)msp->data;  // read 32 bits
++        memcpy(&val, msp->data, sizeof(val));  // read 32 bits
+         msp->data += 4;           // increment pointer
+         msp->size -= 4;           // reduce size
+       }
+@@ -1457,12 +1457,14 @@ namespace ojph {
+               // twice.
+               ui32 ps;
+               memcpy(&ps, prev_sig, sizeof(ps));
+-              ui32 ns = *(ui32*)(cur_sig + mstr);
++              ui32 ns;
++              memcpy(&ns, (cur_sig + mstr), sizeof(ns));
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+                 u |= (ns & 0x11111111) << 3;   // the row below
+ 
+-              ui32 cs = *(ui32*)cur_sig;
++              ui32 cs;
++              memcpy(&cs, cur_sig, sizeof(cs));
+               // vertical integration
+               ui32 mbr =  cs;                // this sig. info.
+               mbr |= (cs & 0x77777777) << 1; //above neighbors
+@@ -1661,4 +1663,4 @@ namespace ojph {
+       return true;
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/core/coding/ojph_block_decoder_avx2.cpp b/src/core/coding/ojph_block_decoder_avx2.cpp
+index b003abd..2914bc0 100644
+--- a/src/core/coding/ojph_block_decoder_avx2.cpp
++++ b/src/core/coding/ojph_block_decoder_avx2.cpp
+@@ -100,7 +100,7 @@ namespace ojph {
+ 
+       ui32 val = 0xFFFFFFFF;       // feed in 0xFF if buffer is exhausted
+       if (melp->size > 4) {        // if there is data in the MEL segment
+-        val = *(ui32*)melp->data;  // read 32 bits from MEL data
++        memcpy(&val, melp->data, sizeof(val));  // read 32 bits from MEL data
+         melp->data += 4;           // advance pointer
+         melp->size -= 4;           // reduce counter
+       }
+@@ -318,7 +318,7 @@ namespace ojph {
+       if (vlcp->size > 3)  // if there are more than 3 bytes left in VLC
+       {
+         // (vlcp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        memcpy(&val, (vlcp->data - 3), sizeof(val));  // then read 32 bits
+         vlcp->data -= 4;          // move data pointer back by 4
+         vlcp->size -= 4;          // reduce available byte by 4
+       }
+@@ -465,7 +465,7 @@ namespace ojph {
+       ui32 val = 0;
+       if (mrp->size > 3) // If there are 3 byte or more
+       { // (mrp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(mrp->data - 3); // read 32 bits
++        memcpy(&val, (mrp->data - 3), sizeof(val));  // read 32 bits
+         mrp->data -= 4;                // move back pointer
+         mrp->size -= 4;                // reduce count
+       }
+@@ -1771,12 +1771,14 @@ namespace ojph {
+               // twice.
+               ui32 ps;
+               memcpy(&ps, prev_sig, sizeof(ps));
+-              ui32 ns = *(ui32*)(cur_sig + mstr);
++              ui32 ns;
++              memcpy(&ns, (cur_sig + mstr), sizeof(ns));
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+                 u |= (ns & 0x11111111) << 3;   // the row below
+ 
+-              ui32 cs = *(ui32*)cur_sig;
++              ui32 cs;
++              memcpy(&cs, cur_sig, sizeof(cs));
+               // vertical integration
+               ui32 mbr =  cs;                // this sig. info.
+               mbr |= (cs & 0x77777777) << 1; //above neighbors
+diff --git a/src/core/coding/ojph_block_decoder_ssse3.cpp b/src/core/coding/ojph_block_decoder_ssse3.cpp
+index d8e2ecd..3c02498 100644
+--- a/src/core/coding/ojph_block_decoder_ssse3.cpp
++++ b/src/core/coding/ojph_block_decoder_ssse3.cpp
+@@ -101,7 +101,7 @@ namespace ojph {
+ 
+       ui32 val = 0xFFFFFFFF;       // feed in 0xFF if buffer is exhausted
+       if (melp->size > 4) {        // if there is data in the MEL segment
+-        val = *(ui32*)melp->data;  // read 32 bits from MEL data
++        memcpy(&val, melp->data, sizeof(val));  // read 32 bits from MEL data
+         melp->data += 4;           // advance pointer
+         melp->size -= 4;           // reduce counter
+       }
+@@ -319,7 +319,7 @@ namespace ojph {
+       if (vlcp->size > 3)  // if there are more than 3 bytes left in VLC
+       {
+         // (vlcp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        memcpy(&val, (vlcp->data - 3), sizeof(val));  // then read 32 bits
+         vlcp->data -= 4;          // move data pointer back by 4
+         vlcp->size -= 4;          // reduce available byte by 4
+       }
+@@ -462,7 +462,7 @@ namespace ojph {
+       ui32 val = 0;
+       if (mrp->size > 3) // If there are 3 byte or more
+       { // (mrp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(mrp->data - 3); // read 32 bits
++        memcpy(&val, (mrp->data - 3), sizeof(val));  // read 32 bits
+         mrp->data -= 4;                // move back pointer
+         mrp->size -= 4;                // reduce count
+       }
+@@ -1797,12 +1797,14 @@ namespace ojph {
+               // twice.
+               ui32 ps;
+               memcpy(&ps, prev_sig, sizeof(ps));
+-              ui32 ns = *(ui32*)(cur_sig + mstr);
++              ui32 ns;
++              memcpy(&ns, (cur_sig + mstr), sizeof(ns));
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+                 u |= (ns & 0x11111111) << 3;   // the row below
+ 
+-              ui32 cs = *(ui32*)cur_sig;
++              ui32 cs;
++              memcpy(&cs, cur_sig, sizeof(cs));
+               // vertical integration
+               ui32 mbr =  cs;                // this sig. info.
+               mbr |= (cs & 0x77777777) << 1; //above neighbors
+diff --git a/src/core/coding/ojph_block_decoder_wasm.cpp b/src/core/coding/ojph_block_decoder_wasm.cpp
+index ba9fa37..1f9c701 100644
+--- a/src/core/coding/ojph_block_decoder_wasm.cpp
++++ b/src/core/coding/ojph_block_decoder_wasm.cpp
+@@ -107,7 +107,7 @@ namespace ojph {
+ 
+       ui32 val = 0xFFFFFFFF;       // feed in 0xFF if buffer is exhausted
+       if (melp->size > 4) {        // if there is data in the MEL segment
+-        val = *(ui32*)melp->data;  // read 32 bits from MEL data
++        memcpy(&val, melp->data, sizeof(val));  // read 32 bits from MEL data
+         melp->data += 4;           // advance pointer
+         melp->size -= 4;           // reduce counter
+       }
+@@ -325,7 +325,7 @@ namespace ojph {
+       if (vlcp->size > 3)  // if there are more than 3 bytes left in VLC
+       {
+         // (vlcp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(vlcp->data - 3); // then read 32 bits
++        memcpy(&val, (vlcp->data - 3), sizeof(val));  // then read 32 bits
+         vlcp->data -= 4;          // move data pointer back by 4
+         vlcp->size -= 4;          // reduce available byte by 4
+       }
+@@ -468,7 +468,7 @@ namespace ojph {
+       ui32 val = 0;
+       if (mrp->size > 3) // If there are 3 byte or more
+       { // (mrp->data - 3) move pointer back to read 32 bits at once
+-        val = *(ui32*)(mrp->data - 3); // read 32 bits
++        memcpy(&val, (mrp->data - 3), sizeof(val));  // read 32 bits
+         mrp->data -= 4;                // move back pointer
+         mrp->size -= 4;                // reduce count
+       }
+@@ -1827,12 +1827,14 @@ namespace ojph {
+               // twice.
+               ui32 ps;
+               memcpy(&ps, prev_sig, sizeof(ps));
+-              ui32 ns = *(ui32*)(cur_sig + mstr);
++              ui32 ns;
++              memcpy(&ns, (cur_sig + mstr), sizeof(ns));
+               ui32 u = (ps & 0x88888888) >> 3; // the row on top
+               if (!stripe_causal)
+                 u |= (ns & 0x11111111) << 3;   // the row below
+ 
+-              ui32 cs = *(ui32*)cur_sig;
++              ui32 cs;
++              memcpy(&cs, cur_sig, sizeof(cs));
+               // vertical integration
+               ui32 mbr =  cs;                // this sig. info.
+               mbr |= (cs & 0x77777777) << 1; //above neighbors
+-- 
+2.52.0
+
