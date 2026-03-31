@@ -6,7 +6,7 @@ EAPI=8
 PYTHON_COMPAT=( python3_{10..12} )
 
 # Check this on updates
-LLVM_COMPAT=( {15..18} )
+LLVM_COMPAT=( {18..19} )
 
 inherit cmake cuda flag-o-matic llvm-r1 toolchain-funcs python-single-r1
 
@@ -205,7 +205,7 @@ src_configure() {
 			-DCUDA_FIND_QUIETLY="no"
 
 			-DOPTIXHOME="${EPREFIX}/opt/optix"
-			-DCUDA_TOOLKIT_ROOT_DIR="${EPREFIX}/opt/cuda"
+			-DCUDA_TOOLKIT_ROOT_DIR="${CUDA_PATH:-${ESYSROOT}/opt/cuda}"
 
 			-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
 			-DOSL_EXTRA_NVCC_ARGS="--compiler-bindir;$(cuda_gccdir)"
