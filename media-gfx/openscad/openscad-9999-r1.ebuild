@@ -1,19 +1,25 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
+
+# verify QT_XCB_GL_INTEGRATION= breakage via alaric/SeanFenian
 
 EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
-inherit cmake flag-o-matic optfeature python-any-r1 virtualx xdg
+inherit cmake flag-o-matic optfeature python-single-r1 virtualx-r1 xdg
 
 DESCRIPTION="The Programmers Solid 3D CAD Modeller"
 HOMEPAGE="https://openscad.org/"
+
+# TODO
+# NOTE the build system sets up a venv for tests, we could use imagemagick with -DUSE_IMAGE_COMPARE_PY="no"
 
 if [[ ${PV} = *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/openscad/openscad.git"
 	EGIT_SUBMODULES=(
 		'*'
+		'-Clipper2'
 		'-mimalloc'
 		'-submodules/manifold'
 		'-OpenCSG'
@@ -46,15 +52,17 @@ fi
 LICENSE="GPL-3+ LGPL-2.1"
 SLOT="0"
 
-IUSE="+cgal dbus +egl experimental glx +gui hidapi +manifold mimalloc pdf spacenav test"
+IUSE="+cgal dbus +egl experimental glx +gui hidapi +manifold mimalloc pdf +python spacenav test"
 RESTRICT="!test? ( test )"
+# ?? ( glad glew )
 REQUIRED_USE="
 	|| ( cgal manifold )
+	|| ( egl glx )
 	dbus? ( gui )
 	hidapi? ( gui )
-	spacenav? ( gui )
-	|| ( egl glx )
 	manifold? ( cgal )
+	python? ( ${PYTHON_REQUIRED_USE} )
+	spacenav? ( gui )
 "
 
 RDEPEND="
@@ -90,6 +98,10 @@ RDEPEND="
 	)
 	mimalloc? ( dev-libs/mimalloc:= )
 	pdf? ( x11-libs/cairo )
+	python? (
+		${PYTHON_DEPS}
+		dev-libs/nettle:=
+	)
 	spacenav? ( dev-libs/libspnav )
 "
 DEPEND="
@@ -103,12 +115,18 @@ BDEPEND="
 	sys-devel/gettext
 	virtual/pkgconfig
 	test? (
-		$(python_gen_any_dep '
+		$(python_gen_cond_dep '
 			dev-python/numpy[${PYTHON_USEDEP}]
 			dev-python/pillow[${PYTHON_USEDEP}]
 			dev-python/pip[${PYTHON_USEDEP}]
 		')
 		gui-wm/tinywl
+		python? (
+			${PYTHON_DEPS}
+		)
+		!python? (
+			media-gfx/imagemagick
+		)
 	)
 "
 
@@ -121,16 +139,18 @@ DOCS=(
 	doc/translation.txt
 )
 
-# NOTE the build system sets up a venv for tests, we could use imagemagick with -DUSE_IMAGE_COMPARE_PY="no"
-python_check_deps() {
-	python_has_version -b \
-		"dev-python/numpy[${PYTHON_USEDEP}]" \
-		"dev-python/pillow[${PYTHON_USEDEP}]" \
-		"dev-python/pip[${PYTHON_USEDEP}]"
-}
+# # NOTE the build system sets up a venv for tests, we could use imagemagick with -DUSE_IMAGE_COMPARE_PY="no"
+# python_check_deps() {
+# 	python_has_version -b \
+# 		"dev-python/numpy[${PYTHON_USEDEP}]" \
+# 		"dev-python/pillow[${PYTHON_USEDEP}]" \
+# 		"dev-python/pip[${PYTHON_USEDEP}]"
+# }
 
 pkg_setup() {
-	use test && python-any-r1_pkg_setup
+	if use python || use test ; then
+		python-single-r1_pkg_setup
+	fi
 }
 
 src_prepare() {
@@ -153,23 +173,36 @@ src_configure() {
 	filter-lto
 
 	local mycmakeargs=(
+		-DINFO="yes"
+		-DUSE_MANIFOLD_TRIANGULATOR="$(usex manifold)"
+		-DUSE_MANIFOLD_MINKOWSKI="$(usex manifold "no")" # experimental
+		-DBUILD_SHARED_LIBS="yes"
+
 		-DCLANG_TIDY="no"
 		-DENABLE_CAIRO="$(usex pdf)"
 		-DENABLE_CGAL="$(usex cgal)"
 		-DENABLE_EGL="$(usex egl)"
+		-DENABLE_GAMEPAD="no"
 		-DENABLE_GLX="$(usex glx)"
 		-DENABLE_MANIFOLD="$(usex manifold)"
-		-DENABLE_PYTHON="no"
+		-DENABLE_PYTHON="$(usex python)"
 		-DENABLE_TESTS="$(usex test)"
 
 		-DEXPERIMENTAL="$(usex experimental)"
 
-		-DHEADLESS="$(usex !gui)"
 		-DUSE_BUILTIN_CLIPPER2="no"
 		-DUSE_BUILTIN_MANIFOLD="no"
+		-DUSE_BUILTIN_OPENCSG="no"
+
 		-DUSE_CCACHE="no"
-		-DUSE_GLAD="yes"
+
+		# For now, we'll default to whatever OpenCSG uses (>=1.6 -> GLAD, <1.6 -> GLEW)
+		-DUSE_GLAD="$(usex gui)"
 		-DUSE_GLEW="no"
+		-DHEADLESS="$(usex !gui)"
+		-DNULLGL="$(usex !gui)"
+
+		-DUSE_IMAGE_COMPARE_PY="$(usex python)"
 		-DUSE_MIMALLOC="$(usex mimalloc)"
 		-DUSE_QT6="$(usex gui)"
 		-DOFFLINE_DOCS="no" # TODO
@@ -179,6 +212,7 @@ src_configure() {
 	if use gui; then
 		mycmakeargs+=(
 			-DENABLE_HIDAPI="$(usex hidapi)"
+			-DENABLE_GUI_TESTS="$(usex gui)"
 			-DENABLE_QTDBUS="$(usex dbus)"
 			-DENABLE_SPNAV="$(usex spacenav)"
 		)
@@ -326,8 +360,6 @@ virtwl() {
 }
 
 src_test() {
-	# xdg_environment_reset
-
 	hardware_add_gpu_sandbox
 
 	sed \
@@ -342,6 +374,12 @@ src_test() {
 	ln -s "${CMAKE_USE_DIR}/shaders" . || die
 
 	local CMAKE_SKIP_TESTS=(
+		# just skip all issue tests all together
+		# "_issue[0-9]*$"
+
+		# fails
+		"_spec-paths-arcs01$"
+		"_issue6607$"
 	)
 
 	if ! has_version app-text/ghostscript-gpl ; then
@@ -352,7 +390,18 @@ src_test() {
 		)
 	fi
 
-	virtwl cmake_src_test -j1
+	local myctestargs=(
+		# -j1
+	)
+
+	local -x GIT_DIR="${CMAKE_USE_DIR}/.git"
+
+	if use egl; then
+		xdg_environment_reset
+		virtwl cmake_src_test
+	else
+		virtx cmake_src_test
+	fi
 }
 
 src_install() {
