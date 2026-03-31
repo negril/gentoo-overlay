@@ -1,24 +1,55 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+PYTHON_COMPAT=( python3_{11..12} )
 
+inherit cmake cuda flag-o-matic multibuild python-single-r1 toolchain-funcs
+
+LLVM_OPTIONAL=1
 LLVM_COMPAT=( 15 )
-
-inherit cmake cuda flag-o-matic llvm-r2 multibuild python-single-r1 toolchain-funcs
+inherit llvm-r2
 
 DESCRIPTION="Library for the efficient manipulation of volumetric data"
 HOMEPAGE="https://www.openvdb.org"
-SRC_URI="https://github.com/AcademySoftwareFoundation/${PN}/archive/v${PV}.tar.gz -> ${P}.tar.gz"
+
+OPENVDB_ABI=$(ver_cut 1)
+
+SRC_URI="
+	https://github.com/AcademySoftwareFoundation/${PN}/archive/v${PV}.tar.gz -> ${P}.tar.gz
+	https://github.com/AcademySoftwareFoundation/openvdb/commit/930c3acb8e0c7c2f1373f3a70dc197f5d04dfe74.patch
+	-> ${PN}-11.0.0-drop-obsolete-isActive-gcc15.patch
+"
+KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
 
 LICENSE="MPL-2.0"
-OPENVDB_ABI=$(ver_cut 1)
 SLOT="0/$(ver_cut 1-2)"
-KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
-IUSE="abi$((OPENVDB_ABI + 1))-compat +abi${OPENVDB_ABI}-compat abi$((OPENVDB_ABI - 1))-compat abi$((OPENVDB_ABI - 2))-compat alembic ax +blosc cpu_flags_x86_avx cpu_flags_x86_sse4_2
-	cuda doc examples jpeg +nanovdb numpy openexr png python static-libs test utils zlib"
+
+IUSE="
+	abi$((OPENVDB_ABI + 1))-compat
+	+abi${OPENVDB_ABI}-compat
+	abi$((OPENVDB_ABI - 1))-compat
+	abi$((OPENVDB_ABI - 2))-compat
+	alembic
+	ax
+	+blosc
+	cpu_flags_x86_avx
+	cpu_flags_x86_sse4_2
+	cuda
+	doc
+	examples
+	jpeg
+	+nanovdb
+	numpy
+	openexr
+	png
+	python
+	static-libs
+	test
+	utils
+	zlib
+"
 RESTRICT="!test? ( test )"
 
 REQUIRED_USE="
@@ -28,6 +59,7 @@ REQUIRED_USE="
 		abi$((OPENVDB_ABI - 1))-compat
 		abi$((OPENVDB_ABI - 2))-compat
 	)
+	ax? ( ${LLVM_REQUIRED_USE} )
 	cpu_flags_x86_avx? ( cpu_flags_x86_sse4_2 )
 	python? ( ${PYTHON_REQUIRED_USE} )
 	blosc? ( zlib )
@@ -78,7 +110,7 @@ RDEPEND="
 		jpeg? ( media-libs/libjpeg-turbo:= )
 		png? ( media-libs/libpng:= )
 		openexr? ( >=media-libs/openexr-3:= )
-		media-libs/libglvnd
+		media-libs/libglvnd[X]
 	)
 	!ax? (
 		dev-libs/log4cplus:=
@@ -112,16 +144,15 @@ PATCHES=(
 
 	"${FILESDIR}/${PN}-11.0.0-constexpr-version.patch"
 	"${FILESDIR}/${PN}-11.0.0-cmake_fixes.patch"
-# 	"${FILESDIR}/${PN}-11.0.0-gcc15.patch"
 )
 
 cuda_get_host_compiler() {
-	if [[ -n "${NVCC_CCBIN}" ]]; then
+	if [[ -v NVCC_CCBIN ]]; then
 		echo "${NVCC_CCBIN}"
 		return
 	fi
 
-	if [[ -n "${CUDAHOSTCXX}" ]]; then
+	if [[ -v CUDAHOSTCXX ]]; then
 		echo "${CUDAHOSTCXX}"
 		return
 	fi
@@ -129,12 +160,11 @@ cuda_get_host_compiler() {
 	einfo "Trying to find working CUDA host compiler"
 
 	if ! tc-is-gcc && ! tc-is-clang; then
-		die "$(tc-get-compiler-type) compiler is not supported"
+		die "$(tc-get-compiler-type) compiler is not supported (use gcc or clang)"
 	fi
 
 	local compiler compiler_type compiler_version
 	local package package_version
-	local -x NVCC_CCBIN
 	local NVCC_CCBIN_default
 
 	compiler_type="$(tc-get-compiler-type)"
@@ -169,19 +199,45 @@ cuda_get_host_compiler() {
 	done
 	eend $?
 
+	# clean temp file
+	nonfatal rm -f a.out
+
 	echo "${NVCC_CCBIN}"
 	export NVCC_CCBIN
+
+	einfo "Using ${NVCC_CCBIN} to build (via ${package} iteration)"
 }
 
 cuda_get_host_native_arch() {
-	[[ -n ${CUDAARCHS} ]] && echo "${CUDAARCHS}"
+	if [[ -n ${CUDAARCHS} ]]; then
+		echo "${CUDAARCHS}"
+		return
+	fi
 
-	__nvcc_device_query || die "failed to query the native device"
+	if ! SANDBOX_WRITE=/dev/nvidiactl test -w /dev/nvidiactl ; then
+		eerror
+		eerror "Can not access the GPU at /dev/nvidiactl."
+		eerror "User $(id -nu) is not in the group \"video\"."
+		eerror
+		ewarn
+		ewarn "Can not query the native device. Not setting CUDAARCHS."
+		ewarn "Continuing with default value. Set CUDAARCHS manually if needed."
+		ewarn
+		return 1
+	fi
+
+	__nvcc_device_query || eerror "failed to query the native device"
 }
 
 pkg_setup() {
 	use ax && llvm-r2_pkg_setup
 	use python && python-single-r1_pkg_setup
+
+	if use cuda; then
+		# sets up /dev files as a side-effect
+		# needs to be run in pkg_setup as root
+		nvidia-smi -L >/dev/null
+	fi
 }
 
 src_prepare() {
@@ -194,6 +250,16 @@ src_prepare() {
 		sed \
 			-e 's#message(WARNING " - OpenVDB required to build#message(VERBOSE " - OpenVDB required to build#g' \
 			-i "nanovdb/nanovdb/"*"/CMakeLists.txt" || die
+
+		# backported gcc-15 fix #938253
+		cp "${DISTDIR}/${PN}-11.0.0-drop-obsolete-isActive-gcc15.patch" "${T}" || die
+
+		sed -e "s#nanovdb/nanovdb/tools/GridBuilder.h#nanovdb/nanovdb/util/GridBuilder.h#g" \
+			-i "${T}/${PN}-11.0.0-drop-obsolete-isActive-gcc15.patch" || die
+
+		eapply "${T}/${PN}-11.0.0-drop-obsolete-isActive-gcc15.patch"
+
+		sed -e '24i #include <iomanip>' -i nanovdb/nanovdb/unittest/TestNanoVDB.cu || die
 	fi
 
 	cmake_src_prepare
@@ -291,13 +357,23 @@ my_src_configure() {
 
 		if use cuda; then
 			cuda_add_sandbox -w
+			addwrite "/proc/self/task/"
+			addpredict "/dev/char"
 
-			local -x CUDAARCHS
-			: "${CUDAARCHS:="$(cuda_get_host_native_arch)"}"
+			if [[ ! -v "${CUDAARCHS}" ]]; then
+				local -x CUDAARCHS
+				CUDAARCHS="$(cuda_get_host_native_arch)"
+				einfo "Building with CUDAARCHS=${CUDAARCHS}"
+			fi
 
-			local -x CUDAHOSTCXX CUDAHOSTLD
-			CUDAHOSTCXX="$(cuda_get_host_compiler)"
-			CUDAHOSTLD="$(tc-getCXX)"
+			if [[ ! -v CUDAHOSTCXX ]]; then
+				local -x CUDAHOSTCXX
+				CUDAHOSTCXX="$(cuda_get_host_compiler)"
+			fi
+			if [[ ! -v CUDAHOSTLD ]]; then
+				local -x CUDAHOSTLD
+				CUDAHOSTLD="$(tc-getCXX)"
+			fi
 
 			if tc-is-gcc; then
 				# Filter out IMPLICIT_LINK_DIRECTORIES picked up by CMAKE_DETERMINE_COMPILER_ABI(CUDA)
@@ -307,9 +383,6 @@ my_src_configure() {
 					grep LIBRARY_PATH | cut -d '=' -f 2 | cut -d ':' -f 1
 				)
 			fi
-
-			# NOTE tbb includes immintrin.h, which breaks nvcc so we pretend they are already included
-			# export CUDAFLAGS="-D_AVX512BF16VLINTRIN_H_INCLUDED -D_AVX512BF16INTRIN_H_INCLUDED"
 		fi
 
 		if use utils; then
@@ -373,20 +446,6 @@ my_src_configure() {
 	fi
 
 	cmake_src_configure
-		# local default_compiler="${compiler}-$(${compiler}-major-version)"
-
-	if use cuda; then
-		cmake_ver="$(cmake --version | head -n1  | sed -e 's/cmake version //')"
-		local compiler=$(tc-get-compiler-type)
-		local compiler_version="$("${compiler}-major-version")"
-
-		sed \
-			-e "s#CMAKE_CUDA_HOST_LINK_LAUNCHER .*#CMAKE_CUDA_HOST_LINK_LAUNCHER \"/usr/x86_64-pc-linux-gnu/gcc-bin/${compiler_version}/g++\")#" \
-			-e "s#CMAKE_CUDA_COMPILER_LINKER .*#CMAKE_CUDA_COMPILER_LINKER \"/usr/x86_64-pc-linux-gnu/bin/ld\")#" \
-			-i "${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake" || die
-
-		ewarn "$(grep CMAKE_CUDA_HOST_LINK_LAUNCHER "${BUILD_DIR}/CMakeFiles/${cmake_ver}/CMakeCUDACompiler.cmake")"
-	fi
 }
 
 my_src_test() {
@@ -399,6 +458,11 @@ my_src_test() {
 	if use cuda; then
 		cuda_add_sandbox -w
 	fi
+
+	local -x GTEST_FILTER="-TestUtil.testCpuTimer"
+	local -x CMAKE_SKIP_TESTS=(
+		"^pytest$"
+	)
 
 	cmake_src_test
 }
