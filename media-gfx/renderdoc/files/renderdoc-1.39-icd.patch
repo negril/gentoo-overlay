@@ -1,0 +1,83 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9671ba5..92f4335 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -106,6 +106,7 @@ set(RENDERDOC_APK_PATH "" CACHE STRING "Path to RenderDoc .apk files after insta
+ set(LIB_SUFFIX "" CACHE STRING "Suffix for 'lib' folder in target directory structure. E.g. set to '64' to use /usr/local/lib64 instead of /usr/local/lib.")
+ set(LIB_SUBFOLDER "" CACHE STRING "Subfolder under the 'lib' folder in target directory structure. E.g. set to 'renderdoc' to use /usr/local/lib/renderdoc instead of /usr/local/lib.")
+ set(VULKAN_JSON_SUFFIX "" CACHE STRING "Suffix for the vulkan implicit_layer json file. E.g. set to '.x86_64' to use renderdoc_capture.x86_64.json instead of renderdoc_capture.json")
++set(VULKAN_LAYER_NAME "VK_LAYER_RENDERDOC_Capture" CACHE STRING "Vulkan Implicit Layer Name")
+ 
+ option(INSTALL_SHARED_FILES "" OFF)
+ option(INTERNAL_SELF_CAPTURE "Internal option: enable self-capture" OFF)
+diff --git a/renderdoc/common/globalconfig.h b/renderdoc/common/globalconfig.h
+index 920d162..9490c34 100644
+--- a/renderdoc/common/globalconfig.h
++++ b/renderdoc/common/globalconfig.h
+@@ -150,8 +150,13 @@ enum
+   RenderDoc_ForwardPortStride = 10,
+ };
+ 
++#ifndef RENDERDOC_VULKAN_LAYER_NAME
+ #define RENDERDOC_VULKAN_LAYER_NAME "VK_LAYER_RENDERDOC_Capture"
++#endif
++
++#ifndef RENDERDOC_VULKAN_LAYER_VAR
+ #define RENDERDOC_VULKAN_LAYER_VAR "ENABLE_VULKAN_RENDERDOC_CAPTURE"
++#endif
+ 
+ #define RENDERDOC_ANDROID_LIBRARY "libVkLayer_GLES_RenderDoc.so"
+ 
+diff --git a/renderdoc/driver/vulkan/CMakeLists.txt b/renderdoc/driver/vulkan/CMakeLists.txt
+index 32208c1..6544476 100644
+--- a/renderdoc/driver/vulkan/CMakeLists.txt
++++ b/renderdoc/driver/vulkan/CMakeLists.txt
+@@ -117,6 +117,9 @@ elseif(UNIX)
+     set(VULKAN_LAYER_MODULE_PATH "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}/${LIB_SUBFOLDER_TRAIL_SLASH}lib${RDOC_BASE_NAME}.so")
+     set(VULKAN_ENABLE_VAR "ENABLE_VULKAN_${RDOC_BASE_NAME_UPPER}_CAPTURE")
+ 
++    add_definitions(-DRENDERDOC_VULKAN_LAYER_NAME="${VULKAN_LAYER_NAME}")
++    add_definitions(-DRENDERDOC_VULKAN_LAYER_VAR="${VULKAN_LAYER_NAME}")
++
+     set(json_in ${CMAKE_CURRENT_SOURCE_DIR}/renderdoc.json)
+     set(json_out ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${RDOC_BASE_NAME}_capture${VULKAN_JSON_SUFFIX}.json)
+     
+diff --git a/renderdoc/driver/vulkan/renderdoc.json b/renderdoc/driver/vulkan/renderdoc.json
+index f0e7a52..b8c5a5c 100644
+--- a/renderdoc/driver/vulkan/renderdoc.json
++++ b/renderdoc/driver/vulkan/renderdoc.json
+@@ -1,7 +1,7 @@
+ {
+   "file_format_version" : "1.1.2",
+   "layer" : {
+-    "name": "VK_LAYER_RENDERDOC_Capture",
++    "name": "@VULKAN_LAYER_NAME@",
+     "type": "GLOBAL",
+     "library_path": "@VULKAN_LAYER_MODULE_PATH@",
+     "api_version": "1.3.131",
+diff --git a/renderdoc/driver/vulkan/vk_posix.cpp b/renderdoc/driver/vulkan/vk_posix.cpp
+index 2a7894b..c6ce8ef 100644
+--- a/renderdoc/driver/vulkan/vk_posix.cpp
++++ b/renderdoc/driver/vulkan/vk_posix.cpp
+@@ -34,6 +34,8 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
++#include "common/globalconfig.h"
++
+ extern "C" const rdcstr VulkanLayerJSONBasename;
+ 
+ bool VulkanReplay::IsOutputWindowVisible(uint64_t id)
+@@ -247,6 +249,12 @@ static rdcstr GenerateJSON(const rdcstr &sopath)
+ 
+   json = json.substr(0, idx) + sopath + json.substr(idx + sizeof(modulePathString) - 1);
+ 
++  const char moduleNameString[] = "@VULKAN_LAYER_NAME@";
++
++  idx = json.find(moduleNameString);
++
++  json = json.substr(0, idx) + RENDERDOC_VULKAN_LAYER_NAME + json.substr(idx + sizeof(moduleNameString) - 1);
++
+   const char majorString[] = "@RENDERDOC_VERSION_MAJOR@";
+ 
+   idx = json.find(majorString);
