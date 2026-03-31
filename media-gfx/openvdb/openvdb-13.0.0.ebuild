@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -7,53 +7,65 @@ EAPI=8
 # drop OPENVDB_SIMD
 # split out nanovdb
 
+
+# remove outdated
+CMAKE_REMOVE_MODULES_LIST=(
+	"OpenEXR"
+	"TBB"
+)
+
 PYTHON_COMPAT=( python3_{11..13} )
 
 inherit cmake cuda flag-o-matic python-single-r1 toolchain-funcs
+
+LLVM_COMPAT=( 21 )
+inherit llvm-r2
 
 DESCRIPTION="Library for the efficient manipulation of volumetric data"
 HOMEPAGE="https://www.openvdb.org"
 
 if [[ "${PV}" == *9999* ]] ; then
-	LLVM_COMPAT=( 15 )
-	inherit llvm-r2
 	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/${PN}.git"
 else
 	SRC_URI="
 		https://github.com/AcademySoftwareFoundation/${PN}/archive/v${PV}.tar.gz -> ${P}.tar.gz
+		https://github.com/AcademySoftwareFoundation/${PN}/commit/f18950db05615abd9639f637d7efbe4b7f98a72e.patch
+			-> ${PN}-PR2138.patch
+		https://github.com/AcademySoftwareFoundation/${PN}/commit/a0a789ef8f963c5fcc1143b114025f73fed4627e.patch
+			-> ${PN}-PR2148.patch
 	"
+	# needs CCCL patched
+	# requires nccl
 	KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
 fi
 
 LICENSE="MPL-2.0"
+# this is weird with 9999 so we use x.y.9999
 OPENVDB_ABI=$(ver_cut 1)
 SLOT="0/$(ver_cut 1-2)"
-
-CPU_FEATURES_X86=(
-	avx:avx
-	sse4_2:sse4_2
-)
-CPU_FEATURES_ARM=(
-	neon:neon
-)
-CPU_FEATURES=(
-	"${CPU_FEATURES_X86[@]/#/cpu_flags_x86_}"
-	"${CPU_FEATURES_ARM[@]/#/cpu_flags_arm_}"
-)
 
 IUSE="
 	abi$((OPENVDB_ABI + 1))-compat
 	+abi${OPENVDB_ABI}-compat
 	abi$((OPENVDB_ABI - 1))-compat
 	abi$((OPENVDB_ABI - 2))-compat
-
-	${CPU_FEATURES[*]%:*}
-	alembic +blosc cuda doc examples jpeg +nanovdb numpy openexr pdal png python static-libs test utils +zlib
+	ax
+	alembic +blosc cuda doc examples jpeg +nanovdb openexr pdal png python static-libs test utils +zlib
 "
 
-if [[ "${PV}" == *9999* ]] ; then
-IUSE+=" ax"
-fi
+declare -rgA CPU_FEATURES=(
+	[avx]="x86"
+	[sse4_2]="x86"
+	[neon]="arm"
+)
+add_cpu_features_use() {
+	for flag in "${!CPU_FEATURES[@]}"; do
+		IFS=$';' read -r arch use <<< "${CPU_FEATURES[${flag}]}"
+		IUSE+=" cpu_flags_${arch}_${use:-${flag,,}}"
+	done
+}
+add_cpu_features_use
+
 RESTRICT="!test? ( test )"
 
 REQUIRED_USE="
@@ -80,31 +92,39 @@ REQUIRED_USE="
 RDEPEND="
 	>=dev-cpp/tbb-2020.3:=
 	dev-libs/boost:=
-	dev-cpp/tbb:=
+	>=dev-cpp/tbb-2021:=
+	ax? (
+		$(llvm_gen_dep '
+			llvm-core/llvm:${LLVM_SLOT}=
+		')
+	)
+	!ax? (
+		>=dev-libs/log4cplus-2.0:=
+	)
 	blosc? (
-		dev-libs/c-blosc:=
+		>=dev-libs/c-blosc-1.17.0:=
 	)
 	nanovdb? (
 		cuda? (
-			dev-util/nvidia-cuda-toolkit
+			dev-util/nvidia-cuda-toolkit:=
 		)
 		python? ( ${PYTHON_DEPS}
 			$(python_gen_cond_dep '
-				dev-python/nanobind[${PYTHON_USEDEP}]
+				>=dev-python/nanobind-2.5.0[${PYTHON_USEDEP}]
 			')
 		)
 	)
-	openexr? ( >=media-libs/openexr-3:= )
+	openexr? (
+		>=media-libs/openexr-3.2:=
+	)
 	python? (
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
-			dev-libs/boost:=[numpy?,${PYTHON_USEDEP}]
 			dev-python/nanobind[${PYTHON_USEDEP}]
-			numpy? ( dev-python/numpy[${PYTHON_USEDEP}] )
 		')
 	)
 	utils? (
-		media-libs/glfw
+		>=media-libs/glfw-2.5.0
 		media-libs/glu
 		alembic? ( media-gfx/alembic )
 		jpeg? ( media-libs/libjpeg-turbo:= )
@@ -114,38 +134,21 @@ RDEPEND="
 		media-libs/libglvnd[X]
 	)
 	zlib? (
-		virtual/zlib:=
+		>=virtual/zlib-1.2.7:=
 	)
 "
-
-if [[ "${PV}" == *9999* ]] ; then
-RDEPEND+="
-	ax? (
-		$(llvm_gen_dep '
-			llvm-core/llvm:${LLVM_SLOT}=
-		')
-	)
-	!ax? (
-		dev-libs/log4cplus:=
-	)
-"
-else
-	RDEPEND+="
-		dev-libs/log4cplus:=
-	"
-fi
 
 DEPEND="${RDEPEND}
 	utils? (
 		openexr? (
-			dev-libs/imath:=
+			>=dev-libs/imath-3.2:=
 		)
 	)
 "
 BDEPEND="
 	virtual/pkgconfig
 	doc? (
-		app-text/doxygen
+		>=app-text/doxygen-1.8.8
 		dev-texlive/texlive-bibtexextra
 		dev-texlive/texlive-fontsextra
 		dev-texlive/texlive-fontutils
@@ -165,11 +168,18 @@ PATCHES=(
 
 	"${FILESDIR}/${PN}-10.0.1-log4cplus-version.patch"
 
-	"${FILESDIR}/${PN}-11.0.0-cmake_fixes.patch"
+	# "${FILESDIR}/${PN}-11.0.0-cmake_fixes.patch"
 
 	"${FILESDIR}/${PN}-12.0.0-fix-linking-of-vdb_tool-with-OpenEXR.patch"
 	"${FILESDIR}/${PN}-12.0.0-loosen-float-equality-tolerances.patch"
-	"${FILESDIR}/${PN}-12.0.0-remove-c-style-casts.patch"
+	# "${FILESDIR}/${PN}-12.0.0-remove-c-style-casts.patch"
+
+	"${FILESDIR}/${PN}-13.0.0-nanovdb-make-building-CCCL-optional.patch"
+	"${FILESDIR}/${PN}-13.0.0-nanovdb-support-gtest-with-cmake-3.20.patch"
+	"${FILESDIR}/${PN}-13.0.0-nanovdb-fix-variable-names.patch"
+
+	"${DISTDIR}/${PN}-PR2138.patch"
+	"${DISTDIR}/${PN}-PR2148.patch"
 )
 
 cuda_get_host_compiler() {
@@ -260,9 +270,7 @@ cuda_get_host_native_arch() {
 }
 
 pkg_setup() {
-	if [[ "${PV}" == *9999* ]] ; then
-		use ax && llvm-r2_pkg_setup
-	fi
+	use ax && llvm-r2_pkg_setup
 	use python && python-single-r1_pkg_setup
 
 	if use cuda; then
@@ -273,16 +281,14 @@ pkg_setup() {
 }
 
 src_prepare() {
-	# remove outdated
-	rm "cmake/Find"{OpenEXR,TBB}".cmake" || die
-
 	if use nanovdb; then
 		sed \
 			-e 's#message(WARNING " - OpenVDB required to build#message(VERBOSE " - OpenVDB required to build#g' \
 			-i "nanovdb/nanovdb/"*"/CMakeLists.txt" || die
 
+		# TODO for cuda-13
 		sed \
-			-e '/CMAKE_CUDA_ARCHITECTURES/s/75/all/g' \
+			-e '/CMAKE_CUDA_ARCHITECTURES/s/75/80/g' \
 			-e 's/sm_75/sm_80/g' \
 			-i nanovdb/nanovdb/CMakeLists.txt || die
 	fi
@@ -361,13 +367,11 @@ src_configure() {
 		"-DOPENVDB_USE_FUTURE_ABI_$(( version + 1 ))=$(usex "abi$(( version + 1 ))-compat")"
 		"-DOPENVDB_USE_DEPRECATED_ABI_$(( version - 1 ))=$(usex "abi$(( version - 1 ))-compat")"
 		"-DOPENVDB_USE_DEPRECATED_ABI_$(( version - 2 ))=$(usex "abi$(( version - 2 ))-compat")"
-	)
 
-	if [[ "${PV}" == *9999* ]] ; then
-	mycmakeargs+=(
 		-DOPENVDB_BUILD_AX="$(usex ax)"
 		-DUSE_LOG4CPLUS="$(usex !ax)"
 	)
+
 	if use ax; then
 	# NOTE Certain tests expect bit equality and don't set tolerance violating the C standard
 	# 6.5 8)
@@ -382,21 +386,12 @@ src_configure() {
 		mycmakeargs+=(
 			-DOPENVDB_AX_STATIC="$(usex static-libs)"
 			# due to multibuild # TODO
-			-DOPENVDB_AX_TEST_CMD="$(usex test)"
-			-DOPENVDB_AX_TEST_CMD_DOWNLOADS="$(usex test)"
+			-DOPENVDB_AX_TEST_CMD="$(usex test)" # TODO unused
+			-DOPENVDB_AX_TEST_CMD_DOWNLOADS="$(usex test)"  # TODO unused
 			-DOPENVDB_BUILD_AX_UNITTESTS="$(usex test)" # FIXME: log4cplus init and other errors
 			-DOPENVDB_BUILD_VDB_AX="$(usex utils)"
-			-DOPENVDB_DOXYGEN_AX="$(usex doc)"
+			-DOPENVDB_DOXYGEN_AX="$(usex doc)"  # TODO unused
 		)
-	fi
-	else
-	# stuck on llvm-15
-	# #934813
-	# https://github.com/AcademySoftwareFoundation/openvdb/issues/1804
-	mycmakeargs+=(
-		-DOPENVDB_BUILD_AX="no"
-		-DUSE_LOG4CPLUS="yes"
-	)
 	fi
 
 	if use doc; then
@@ -414,7 +409,7 @@ src_configure() {
 			-DNANOVDB_ALLOW_FETCHCONTENT="yes"
 			-DNANOVDB_BUILD_EXAMPLES="$(usex examples)"
 			-DNANOVDB_BUILD_TOOLS="$(usex utils)"
-			-DNANOVDB_BUILD_UNITTESTS="$(usex test OFF)"
+			-DNANOVDB_BUILD_UNITTESTS="$(usex test)"
 			-DNANOVDB_USE_BLOSC="$(usex blosc)"
 			-DNANOVDB_USE_CUDA="$(usex cuda)"
 			-DNANOVDB_USE_ZLIB="$(usex zlib)"
@@ -457,6 +452,11 @@ src_configure() {
 					grep LIBRARY_PATH | cut -d '=' -f 2 | cut -d ':' -f 1
 				)
 			fi
+
+			# TODO We need to explicitly set it it seems?
+			mycmakeargs+=(
+				-DCMAKE_CUDA_ARCHITECTURES="${CUDAARCHS}"
+			)
 		fi
 
 		if use python; then
@@ -474,7 +474,7 @@ src_configure() {
 	if use python; then
 		mycmakeargs+=(
 			-DOPENVDB_BUILD_PYTHON_MODULE="yes"
-			-DUSE_NUMPY="$(usex numpy)"
+			-DOPENVDB_PYTHON_USE_AX="$(usex ax)"
 			-DVDB_PYTHON_INSTALL_DIRECTORY="$(python_get_sitedir)"
 			-DPython_INCLUDE_DIR="$(python_get_includedir)"
 			-Dnanobind_DIR="$(python_get_sitedir)/nanobind/cmake"
@@ -534,13 +534,11 @@ src_configure() {
 }
 
 src_test() {
-	if [[ "${PV}" == *9999* ]] ; then
 	if use ax; then
 		ln -sr "${CMAKE_USE_DIR}/openvdb_ax/openvdb_ax/test" "${BUILD_DIR}/test" || die
 		local CMAKE_SKIP_TESTS=(
 			"^vdb_ax_unit_test$"
 		)
-	fi
 	fi
 
 	if use cuda; then
@@ -548,7 +546,7 @@ src_test() {
 		addwrite "/proc/self/task/"
 		addpredict "/dev/char/"
 
-		local -x GTEST_FILTER='-TestNanoVDBCUDA.CudaIndexGridToGrid_basic'
+		local -x GTEST_FILTER='-TestNanoVDBCUDA.CudaIndexGridToGrid_basic:TestNanoVDB.GridBlindMetaData'
 	fi
 
 	cmake_src_test

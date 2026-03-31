@@ -1,0 +1,60 @@
+From 36136307b0bfb84da6388a2beb29db9783cf2833 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 19 Mar 2026 00:06:20 +0100
+Subject: nanovdb: support gtest with cmake 3.20
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/nanovdb/nanovdb/unittest/CMakeLists.txt b/nanovdb/nanovdb/unittest/CMakeLists.txt
+index 9bc211c6..8bf079f6 100644
+--- a/nanovdb/nanovdb/unittest/CMakeLists.txt
++++ b/nanovdb/nanovdb/unittest/CMakeLists.txt
+@@ -20,7 +20,14 @@ message(STATUS "----------------------------------------------------")
+ 
+ ###############################################################################
+ # TODO: Benchmark should probably not require gtest.
+-if(NOT TARGET GTest::GTest)
++if(TARGET GTest::gtest_main)
++  # New gtest targets as of CMake 3.20. Defined by both the Config and Module
++  # find modes
++  list(APPEND NANOVDB_TEST_DEPENDENT_LIBS GTest::gtest_main)
++elseif(TARGET GTest::Main)
++  # Older targets, only defined by the Module find_package calls
++  list(APPEND NANOVDB_TEST_DEPENDENT_LIBS GTest::GTest GTest::Main)
++else()
+   message(WARNING " - GTest required to build unittests. Skipping.")
+   return()
+ endif()
+@@ -42,19 +49,19 @@ endif()
+ # -----------------------------------------------------------------------------
+ 
+ add_executable(nanovdb_test_nanovdb "TestNanoVDB.cc")
+-target_link_libraries(nanovdb_test_nanovdb PRIVATE nanovdb GTest::GTest GTest::Main)
++target_link_libraries(nanovdb_test_nanovdb PRIVATE nanovdb ${NANOVDB_TEST_DEPENDENT_LIBS})
+ add_test(nanovdb_unit_test nanovdb_test_nanovdb)
+ 
+ # -----------------------------------------------------------------------------
+ 
+ if(NANOVDB_USE_CUDA)
+   add_executable(nanovdb_test_cuda "TestNanoVDB.cu")
+-  target_link_libraries(nanovdb_test_cuda PRIVATE nanovdb GTest::GTest GTest::Main)
++  target_link_libraries(nanovdb_test_cuda PRIVATE nanovdb ${NANOVDB_TEST_DEPENDENT_LIBS})
+   set_target_properties(nanovdb_test_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+   add_test(nanovdb_cuda_unit_test nanovdb_test_cuda)
+ 
+   add_executable(nanovdb_test_mgpu "TestMultiGPU.cu")
+-  target_link_libraries(nanovdb_test_mgpu PRIVATE nanovdb GTest::GTest GTest::Main)
++  target_link_libraries(nanovdb_test_mgpu PRIVATE nanovdb ${NANOVDB_TEST_DEPENDENT_LIBS})
+   set_target_properties(nanovdb_test_mgpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+   add_test(nanovdb_mgpu_unit_test nanovdb_test_mgpu)
+ endif()
+@@ -67,5 +74,5 @@ if(NOT (NANOVDB_USE_TBB AND NANOVDB_USE_OPENVDB))
+ endif()
+ 
+ add_executable(nanovdb_test_openvdb "TestOpenVDB.cc")
+-target_link_libraries(nanovdb_test_openvdb PRIVATE nanovdb GTest::GTest GTest::Main)
++target_link_libraries(nanovdb_test_openvdb PRIVATE nanovdb ${NANOVDB_TEST_DEPENDENT_LIBS})
+ add_test(nanovdb_openvdb_unit_test nanovdb_test_openvdb)
+-- 
+2.53.0
+
