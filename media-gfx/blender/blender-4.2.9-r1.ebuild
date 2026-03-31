@@ -213,9 +213,14 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-CUDA_NVCC_FLAGS.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
-	"${FILESDIR}/${PN}-4.2.9-python3.13.patch"
-
+	"${FILESDIR}/${PN}-4.2.9-python3.12.patch"
+# 	"${FILESDIR}/${PN}-4.2.9-python3.13.patch"
+# 	"${FILESDIR}/${PN}-4.2.9-python3.12_1.patch"
+	"${FILESDIR}/${PN}-4.3.2-ffmpeg7.patch"
 	"${FILESDIR}/${PN}-4.3.2-openvdb-12.patch"
+	"${FILESDIR}/${PN}-4.3.2-optix-8.1.0.patch"
+	"${FILESDIR}/${PN}-4.3.2-system-glog.patch"
+	"${FILESDIR}/${PN}-4.4.0-optix-compile-flags.patch"
 )
 
 blender_check_requirements() {
@@ -342,8 +347,6 @@ src_prepare() {
 
 		sed '1i #include <cstdint>' -i extern/gtest/src/gtest-death-test.cc || die
 	fi
-
-	unset info_file test_file
 
 	if use vulkan; then
 		sed -e "s/extern_vulkan_memory_allocator/extern_vulkan_memory_allocator\nSPIRV-Tools-opt\nSPIRV-Tools\nSPIRV-Tools-link\nglslang\nSPIRV\nSPVRemapper/" -i source/blender/gpu/CMakeLists.txt || die
