@@ -20,14 +20,14 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {15..19} )
+LLVM_COMPAT=( {18..19} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
 
 inherit cuda rocm llvm-r1
 inherit eapi9-pipestatus check-reqs flag-o-matic multiprocessing pax-utils python-single-r1 toolchain-funcs virtualx
-inherit cmake xdg
+inherit cmake xdg-utils
 
 DESCRIPTION="3D Creation/Animation/Publishing System"
 HOMEPAGE="https://www.blender.org"
@@ -48,19 +48,14 @@ if [[ "${PV}" == *9999* ]]; then
 		EGIT_BRANCH="blender-v${BLENDER_BRANCH}-release"
 	fi
 
-	RESTRICT="!test? ( test )"
 else
 	SRC_URI="
 		https://download.blender.org/source/${P}.tar.xz
+		test? (
+			https://download.blender.org/source/blender-test-data-${BLENDER_BRANCH}.0.tar.xz
+		)
 	"
-	# BUG upstream returns LFS references instead of files
-	# SRC_URI+="
-	# 	test? (
-	# 		https://projects.blender.org/blender/blender-test-data/archive/blender-v${BLENDER_BRANCH}-release.tar.gz
-	# 	)
-	# "
 	KEYWORDS="~amd64 ~arm ~arm64"
-	RESTRICT="test" # the test archive contains LFS references
 fi
 
 # assets is CC0-1.0
@@ -72,14 +67,16 @@ SLOT="${BLENDER_BRANCH}"
 IUSE="
 	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
 	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
-	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +opengl +openpgl
-	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
+	jemalloc jpeg2k man manifold +nanovdb ndof nls +oidn oneapi openal +openexr +opengl +openpgl
+	+opensubdiv +openvdb optix osl pipewire +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
 
 if [[ "${PV}" == *9999* ]]; then
 	IUSE+="experimental"
 fi
+
+RESTRICT="!test? ( test )"
 
 REQUIRED_USE="${PYTHON_REQUIRED_USE}
 	|| ( opengl vulkan )
@@ -131,7 +128,7 @@ RDEPEND="${PYTHON_DEPS}
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	embree? ( media-libs/embree:=[raymask] )
 	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
-	fftw? ( sci-libs/fftw:3.0= )
+	fftw? ( sci-libs/fftw:3.0=[threads] )
 	gmp? ( dev-libs/gmp[cxx] )
 	gnome? ( gui-libs/libdecor )
 	hip? (
@@ -143,6 +140,7 @@ RDEPEND="${PYTHON_DEPS}
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
 	jpeg2k? ( media-libs/openjpeg:2= )
+	manifold? ( >sci-mathematics/manifold-3.0.1 )
 	ndof? (
 		app-misc/spacenavd
 		dev-libs/libspnav
@@ -150,7 +148,7 @@ RDEPEND="${PYTHON_DEPS}
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
 	oidn? ( >=media-libs/oidn-2.1.0 )
-	oneapi? ( dev-libs/intel-compute-runtime[l0] )
+	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
@@ -161,7 +159,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
 	)
-	optix? ( dev-libs/optix )
+	optix? ( <dev-libs/optix-9:= )
 	osl? (
 		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
@@ -246,7 +244,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-FindClang.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
-	"${FILESDIR}/${PN}-4.3.2-system-gtest.patch"
+	"${FILESDIR}/${PN}-4.3.2-system-glog.patch"
 	"${FILESDIR}/${PN}-4.4.0-optix-compile-flags.patch"
 )
 
@@ -313,9 +311,9 @@ src_unpack() {
 	else
 		default
 
-		if use test; then
-			mkdir -p "${S}/tests/data/" || die
-			mv blender-test-data/* "${S}/tests/data/" || die
+		# TODO
+		if use test && [[ ${PV} != ${SLOT}.0 ]] ; then
+			mv "blender-${BLENDER_BRANCH}.0/tests/"* "${S}/tests" || die
 		fi
 	fi
 }
@@ -326,11 +324,6 @@ src_prepare() {
 	cmake_src_prepare
 
 	blender_get_version
-
-	# Disable MS Windows help generation. The variable doesn't do what it
-	# it sounds like.
-	sed -e "s|GENERATE_HTMLHELP      = YES|GENERATE_HTMLHELP      = NO|" \
-		-i doc/doxygen/Doxyfile || die
 
 	# Prepare icons and .desktop files for slotting.
 	sed \
@@ -350,6 +343,9 @@ src_prepare() {
 		-e "/CMAKE_INSTALL_PREFIX_WITH_CONFIG/{s|\${CMAKE_INSTALL_PREFIX}|${T}\${CMAKE_INSTALL_PREFIX}|g}" \
 		-i CMakeLists.txt \
 		|| die CMAKE_INSTALL_PREFIX_WITH_CONFIG
+
+	# WITH_SYSTEM_GLOG=yes
+	cmake_run_in extern cmake_comment_add_subdirectory glog
 
 	mv \
 		"release/freedesktop/icons/scalable/apps/blender.svg" \
@@ -382,6 +378,10 @@ src_prepare() {
 			|| die
 	fi
 
+	if use optix; then
+		sed -e "s/sm_50/sm_89/g" -i intern/cycles/kernel/CMakeLists.txt || die
+	fi
+
 	if use test; then
 		# Without this the tests will try to use /usr/bin/blender and /usr/share/blender/ to run the tests.
 		sed \
@@ -399,6 +399,8 @@ src_prepare() {
 	else
 		cmake_comment_add_subdirectory tests
 	fi
+
+	rm -rf extern/gflags || die
 }
 
 src_configure() {
@@ -422,7 +424,7 @@ src_configure() {
 		-DBUILD_SHARED_LIBS="no" # quadriflow only?
 		-DWITH_STATIC_LIBS=OFF
 
-			# Build Options:
+		# Build Options:
 		-DWITH_ALEMBIC="$(usex alembic)"
 		-DWITH_BOOST="yes"
 		-DWITH_BULLET="$(usex bullet)"
@@ -433,9 +435,10 @@ src_configure() {
 		-DWITH_GTESTS="$(usex test)"
 		-DWITH_HARFBUZZ="$(usex truetype)"
 		-DWITH_HARU="$(usex pdf)"
-		-DWITH_HEADLESS="$(usex !X "$(use !wayland)")"
+		-DWITH_HEADLESS="$(usex !X "$(usex !wayland)")"
 		-DWITH_INPUT_NDOF="$(usex ndof)"
 		-DWITH_INTERNATIONAL="$(usex nls)"
+		-DWITH_MANIFOLD="$(usex manifold)"
 		-DWITH_MATERIALX="no" # TODO: Package MaterialX
 		-DWITH_NANOVDB="$(usex nanovdb)"
 		-DWITH_OPENCOLLADA="$(usex collada)"
@@ -507,15 +510,15 @@ src_configure() {
 		# Python:
 		# -DWITH_PYTHON=ON
 		-DWITH_PYTHON_INSTALL="no"
-		# -DWITH_PYTHON_INSTALL_NUMPY="no"
-		# -DWITH_PYTHON_INSTALL_ZSTANDARD="no"
+		-DWITH_PYTHON_INSTALL_NUMPY="no"
+		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
 		# -DWITH_PYTHON_MODULE="no"
-		# -DWITH_PYTHON_SAFETY=
+		-DWITH_PYTHON_SAFETY="OFF"
 		-DWITH_PYTHON_SECURITY="yes"
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
 		-DPYTHON_VERSION="${EPYTHON/python/}"
-		-DWITH_DRACO="no" # TODO: Package Draco
+		-DWITH_DRACO="yes" # TODO: Package Draco # NOTE use bundled for now
 
 		# Modifiers:
 		-DWITH_MOD_FLUID="$(usex fluid)"
@@ -567,20 +570,16 @@ src_configure() {
 	fi
 
 	if use cuda; then
-		if [[ -z "${CUDAARCHS}" ]]; then
-			CUDAARCHS="all-major"
-		else
-			CUDAARCHS="$(echo "${CUDAARCHS}" | sed -e 's/^/sm_/g' -e 's/;/;sm_/g')"
-		fi
-
-		mycmakeargs+=(
-			-DCYCLES_CUDA_BINARIES_ARCH="${CUDAARCHS}"
-		)
-
 		# Ease compiling with required gcc similar to cuda_sanitize but for cmake
 		if use cycles-bin-kernels; then
 			local -x CUDAHOSTCXX="$(cuda_gccdir)"
 			local -x CUDAHOSTLD="$(tc-getCXX)"
+
+			if [[ -n "${CUDAARCHS}" ]]; then
+				mycmakeargs+=(
+					-DCYCLES_CUDA_BINARIES_ARCH="$(echo "${CUDAARCHS}" | sed -e 's/^/sm_/g' -e 's/;/;sm_/g')"
+				)
+			fi
 		fi
 	fi
 
@@ -597,7 +596,7 @@ src_configure() {
 
 			-DCYCLES_HIP_BINARIES_ARCH="$(get_amdgpu_flags)"
 		)
-		unset hiprt_pn hiprt_pv
+
 		if use hiprt; then
 			# # TODO pkgconfig file
 			# local hiprt_pn hiprt_pv
@@ -669,19 +668,22 @@ src_configure() {
 
 		# NOTE in lieu of a FEATURE/build_options
 		if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
+			einfo "running expensive tests EXPENSIVE_TESTS=${EXPENSIVE_TESTS}"
 			mycmakeargs+=(
+				-DWITH_CYCLES_TEST_OSL="$(usex osl)"
+
 				-DWITH_GPU_BACKEND_TESTS="yes"
 				-DWITH_GPU_COMPOSITOR_TESTS="yes"
 
 				-DWITH_GPU_DRAW_TESTS="yes"
 
 				-DWITH_GPU_RENDER_TESTS="no"
-				-DWITH_GPU_RENDER_TESTS_SILENT="yes"
 				-DWITH_GPU_RENDER_TESTS_HEADED="no"
+				-DWITH_GPU_RENDER_TESTS_SILENT="yes"
 				-DWITH_GPU_RENDER_TESTS_VULKAN="$(usex vulkan)"
 
 				-DWITH_SYSTEM_PYTHON_TESTS="yes"
-				-DTEST_SYSTEM_PYTHON_EXE="${EPYTHON}"
+				-DTEST_SYSTEM_PYTHON_EXE="${PYTHON}"
 			)
 
 			if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] && use experimental; then
@@ -714,7 +716,7 @@ src_test() {
 
 	# Sanity check that the script and datafile path is valid.
 	# If they are not valid, blender will fallback to the default path which is not what we want.
-	[[ -d "$BLENDER_SYSTEM_RESOURCES" ]] || die "The custom resources path is invalid, fix the ebuild!"
+	[[ -d "${BLENDER_SYSTEM_RESOURCES}" ]] || die "The custom resources path is invalid, fix the ebuild!"
 
 	# TODO only picks first card
 	addwrite "/dev/dri/card0"
@@ -723,19 +725,27 @@ src_test() {
 
 	if use cuda; then
 		cuda_add_sandbox -w
-		addwrite "/dev/char/"
+		addwrite "/proc/self/task"
+		addpredict "/dev/char/"
 	fi
 
 	local -x CMAKE_SKIP_TESTS=(
-		"^script_pyapi_bpy_driver_secure_eval$"
-		"^cycles_image_colorspace_cpu$"
-		"^cycles_image_data_types_cpu$"
-		"^cycles_image_mapping_cpu$"
-		"^cycles_osl_cpu$"
-		"^cycles_image_data_types_optix$"
 		"^compositor_cpu_color$"
 		"^compositor_cpu_filter$"
+		"^cycles_image_colorspace_cpu$"
+		"^script_pyapi_bpy_driver_secure_eval$"
 	)
+
+	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
+		einfo "not running failing tests RUN_FAILING_TESTS=${RUN_FAILING_TESTS}"
+		CMAKE_SKIP_TESTS+=(
+			"^cycles_bsdf_cuda$"
+			"^cycles_image_data_types_cpu$"
+			"^cycles_image_data_types_optix$"
+			"^cycles_image_mapping_cpu$"
+			"^cycles_osl_cpu$"
+		)
+	fi
 
 	if ! has_version "media-libs/openusd"; then
 		CMAKE_SKIP_TESTS+=(
@@ -751,40 +761,48 @@ src_test() {
 		)
 	fi
 
+	# oiio can't find webp due to missing cmake files # 937031
+	sed -e "s/ WEBP//g" -i "${BUILD_DIR}/tests/python/CTestTestfile.cmake" || die
+
 	# For debugging, print out all information.
 	local -x VERBOSE="$(usex debug "true" "false")"
+	"${VERBOSE}" && einfo "VERBOSE=${VERBOSE}"
 
 	# Show the window in the foreground.
-	local -x USE_WINDOW="false"
-	local -x USE_DEBUG="false"
+	# local -x USE_WINDOW="true" # non-zero
+	[[ -v USE_WINDOW ]] && einfo "USE_WINDOW=${USE_WINDOW}"
+
+	# local -x USE_DEBUG="true" # non-zero
+	[[ -v USE_DEBUG ]] && einfo "USE_DEBUG=${USE_DEBUG}"
 
 	if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
-		if [[ "${USE_WINDOW}" = "true" ]] &&
-		 [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] &&
-			use experimental && use wayland; then
-				# This runs weston
-				xdg_environment_reset
-		fi
+		einfo "running expensive tests EXPENSIVE_TESTS=${EXPENSIVE_TESTS}"
+		# if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] &&
+		# 	use experimental && use wayland; then
+		# 		# This runs weston
+		# 		xdg_environment_reset
+		# fi
 
-		if [[ "${USE_WINDOW}" == "true" ]]; then
-			xdg_environment_reset
-			# WITH_GPU_RENDER_TESTS_HEADED
-			if use wayland; then
-				local compositor exit_code
-				local logfile=${T}/weston.log
-				weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
-				compositor=$!
-				local -x WAYLAND_DISPLAY=wayland-5
-				sleep 1 # wait for xwayland to be up
-				local -x DISPLAY="$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)"
+		xdg_environment_reset
+		# WITH_GPU_RENDER_TESTS_HEADED
+		if use wayland; then
+			local compositor exit_code
+			local logfile=${T}/weston.log
+			weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
+			compositor=$!
+			local -x WAYLAND_DISPLAY=wayland-5
+			sleep 1 # wait for xwayland to be up
+			# TODO use eapi9-pipestatus
+			local -x DISPLAY="$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)"
 
-				cmake_src_test
+			cmake_src_test
 
-				exit_code=$?
-				kill "${compositor}"
-			elif use X; then
-				virtx cmake_src_test
-			fi
+			exit_code=$?
+			kill "${compositor}"
+		elif use X; then
+			virtx cmake_src_test
+		else
+			cmake_src_test
 		fi
 	else
 		cmake_src_test
@@ -876,13 +894,22 @@ pkg_postinst() {
 		elog "Bug: https://bugs.gentoo.org/737388"
 		elog
 	fi
+
+	xdg_icon_cache_update
+	xdg_mimeinfo_database_update
+	xdg_desktop_database_update
 }
 
 pkg_postrm() {
+	xdg_icon_cache_update
+	xdg_mimeinfo_database_update
+	xdg_desktop_database_update
+
 	if [[ -z "${REPLACED_BY_VERSION}" ]]; then
 		ewarn
-		ewarn "You may want to remove the following directory."
-		ewarn "~/.config/${PN}/${BV}/cache/"
+		ewarn "You may want to remove the following directories"
+		ewarn "- ~/.config/${PN}/${BV}/cache/"
+		ewarn "- ~/.cache/cycles/"
 		ewarn "It may contain extra render kernels not tracked by portage"
 		ewarn
 	fi

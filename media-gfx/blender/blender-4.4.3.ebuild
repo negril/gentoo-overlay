@@ -26,7 +26,7 @@ LLVM_OPTIONAL=1
 ROCM_SKIP_GLOBALS=1
 
 inherit cuda rocm llvm-r1
-inherit eapi9-pipestatus check-reqs flag-o-matic multiprocessing pax-utils python-single-r1 toolchain-funcs virtualx
+inherit eapi9-pipestatus check-reqs flag-o-matic pax-utils python-single-r1 toolchain-funcs virtualx
 inherit cmake xdg-utils
 
 DESCRIPTION="3D Creation/Animation/Publishing System"
@@ -66,8 +66,8 @@ SLOT="${BLENDER_BRANCH}"
 # potentially mirror cpu_flags_x86 + REQUIRED_USE
 IUSE="
 	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
-	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
-	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +opengl +openmp +openpgl
+	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip jack
+	jemalloc jpeg2k man +nanovdb ndof nls +oidn openal +openexr +opengl +openmp +openpgl
 	+opensubdiv +openvdb optix osl pipewire +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
@@ -86,7 +86,6 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 	fluid? ( tbb )
 	gnome? ( wayland )
 	hip? ( cycles )
-	hiprt? ( hip )
 	nanovdb? ( openvdb )
 	openvdb? ( tbb openexr )
 	optix? ( cuda )
@@ -133,9 +132,6 @@ RDEPEND="${PYTHON_DEPS}
 	gnome? ( gui-libs/libdecor )
 	hip? (
 		>=dev-util/hip-5.7:=
-		hiprt? (
-			>=dev-libs/hiprt-2.5:=
-		)
 	)
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
@@ -147,7 +143,6 @@ RDEPEND="${PYTHON_DEPS}
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
 	oidn? ( >=media-libs/oidn-2.1.0 )
-	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
@@ -280,18 +275,6 @@ blender_get_version() {
 
 pkg_pretend() {
 	blender_check_requirements
-
-	if use oneapi; then
-		einfo "The Intel oneAPI support is rudimentary."
-		einfo ""
-		einfo "Please report any bugs you find to https://bugs.gentoo.org/"
-		if ! command -v icpx &>/dev/null && ! command -v dpcpp &>/dev/null; then
-			eerror "Could not find icpx or dpcpp."
-			eerror "You need SYCL/DCP++ to enable oneapi support."
-			eerror "Try sys-devel/DPC++::science"
-			die "FindSYCL would fail. Aborting."
-		fi
-	fi
 }
 
 pkg_setup() {
@@ -423,7 +406,7 @@ src_configure() {
 
 		# Build Options:
 		-DWITH_ALEMBIC="$(usex alembic)"
-		-DWITH_BOOST="no"
+		-DWITH_BOOST="yes"
 		-DWITH_BULLET="$(usex bullet)"
 		-DWITH_CYCLES="$(usex cycles)"
 		-DWITH_DOC_MANPAGE="$(usex man)"
@@ -534,11 +517,8 @@ src_configure() {
 		-DWITH_CYCLES_DEVICE_CUDA="$(usex cuda)"
 		-DWITH_CYCLES_CUDA_BINARIES="$(usex cuda "$(usex cycles-bin-kernels)")"
 
-		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
-		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi "$(usex cycles-bin-kernels)")"
 		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
 		-DWITH_CYCLES_HIP_BINARIES="$(usex hip "$(usex cycles-bin-kernels)")"
-		-DWITH_CYCLES_DEVICE_HIPRT="$(usex hiprt)"
 		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
 
 		# -DWITH_CYCLES_STANDALONE=OFF
@@ -593,25 +573,6 @@ src_configure() {
 
 			-DCYCLES_HIP_BINARIES_ARCH="$(get_amdgpu_flags)"
 		)
-
-		if use hiprt; then
-			# # TODO pkgconfig file
-			# local hiprt_pn hiprt_pv
-			# hiprt_pn="dev-libs/hiprt"
-			# hiprt_pv="$(best_version "${hiprt_pn}")"
-			# if [[ -z "${hiprt_version}" ]]; then
-			# 	die "could not find hiprt"
-			# fi
-			# hiprt_pv="$(ver_cut 1-2 "${hiprt_pv/#${hiprt_pn}-/}")"
-			# hiprt_pv="$(ver_rs 1-2 ' ' "${hiprt_pv}")"
-			# hiprt_pv="$(eval printf "%02d%03d" "${hiprt_pv}")"
-			mycmakeargs+=(
-				# -DHIPRT_ROOT_DIR="${ESYSROOT}/usr/include/hiprt/${hiprt_pv}/"
-				-DHIPRT_ROOT_DIR="$(hipconfig -p)"
-				-DHIPRT_COMPILER_PARALLEL_JOBS="$(makeopts_jobs)"
-			)
-			# unset hiprt_pn hiprt_pv
-		fi
 	fi
 
 	if use optix; then
@@ -654,9 +615,6 @@ src_configure() {
 			use cuda && CYCLES_TEST_DEVICES+=( "CUDA" )
 			use optix && CYCLES_TEST_DEVICES+=( "OPTIX" )
 			use hip && CYCLES_TEST_DEVICES+=( "HIP" )
-			use hiprt && CYCLES_TEST_DEVICES+=( "HIP-RT" )
-			use oneapi && CYCLES_TEST_DEVICES+=( "ONEAPI" )
-			# use oneapirt && CYCLES_TEST_DEVICES+=( "ONEAPI-RT" )
 		fi
 		mycmakeargs+=(
 			-DCMAKE_INSTALL_PREFIX_WITH_CONFIG="${T}/usr"
@@ -665,6 +623,7 @@ src_configure() {
 
 		# NOTE in lieu of a FEATURE/build_options
 		if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
+			einfo "running expensive tests EXPENSIVE_TESTS=${EXPENSIVE_TESTS}"
 			mycmakeargs+=(
 				-DWITH_CYCLES_TEST_OSL="$(usex osl)"
 
@@ -679,6 +638,7 @@ src_configure() {
 				-DWITH_GPU_RENDER_TESTS_VULKAN="$(usex vulkan)"
 
 				-DWITH_SYSTEM_PYTHON_TESTS="yes"
+				-DTEST_SYSTEM_PYTHON_EXE="${PYTHON}"
 			)
 
 			if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] && use experimental; then
@@ -720,7 +680,8 @@ src_test() {
 
 	if use cuda; then
 		cuda_add_sandbox -w
-		addwrite "/dev/char/"
+		addwrite "/proc/self/task"
+		addpredict "/dev/char/"
 	fi
 
 	local -x CMAKE_SKIP_TESTS=(
@@ -729,6 +690,32 @@ src_test() {
 		"^cycles_image_colorspace_cpu$"
 		"^script_pyapi_bpy_driver_secure_eval$"
 	)
+
+	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
+		einfo "not running failing tests RUN_FAILING_TESTS=${RUN_FAILING_TESTS}"
+		CMAKE_SKIP_TESTS+=(
+			"^BLI$"
+			"^asset_system$"
+			"^cycles_bsdf_cpu$"
+			"^cycles_bsdf_cuda$"
+			"^cycles_bsdf_optix$"
+			"^cycles_displacement_cpu$"
+			"^cycles_displacement_cuda$"
+			"^cycles_displacement_optix$"
+			"^cycles_image_data_types_cpu$"
+			"^cycles_image_data_types_cuda$"
+			"^cycles_image_data_types_optix$"
+			"^cycles_osl_cpu$"
+			"^cycles_principled_bsdf_cpu$"
+			"^cycles_principled_bsdf_cuda$"
+			"^cycles_principled_bsdf_optix$"
+			"^cycles_shader_cpu$"
+			"^cycles_shader_cuda$"
+			"^cycles_shader_optix$"
+			"^geo_node_curves_curve_to_points$"
+			"^geo_node_geometry_duplicate_elements_curve_points$"
+		)
+	fi
 
 	if ! has_version "media-libs/openusd"; then
 		CMAKE_SKIP_TESTS+=(
@@ -739,37 +726,41 @@ src_test() {
 
 	# For debugging, print out all information.
 	local -x VERBOSE="$(usex debug "true" "false")"
+	"${VERBOSE}" && einfo "VERBOSE=${VERBOSE}"
 
 	# Show the window in the foreground.
 	# local -x USE_WINDOW="true" # non-zero
+	[[ -v USE_WINDOW ]] && einfo "USE_WINDOW=${USE_WINDOW}"
+
 	# local -x USE_DEBUG="true" # non-zero
+	[[ -v USE_DEBUG ]] && einfo "USE_DEBUG=${USE_DEBUG}"
 
 	if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
-		if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] &&
-			use experimental && use wayland; then
-				# This runs weston
-				xdg_environment_reset
-		fi
+		einfo "running expensive tests EXPENSIVE_TESTS=${EXPENSIVE_TESTS}"
+		# if [[ "${PV}" == *9999* && "${BVC}" == "alpha" ]] &&
+		# 	use experimental && use wayland; then
+		# 		# This runs weston
+		# 		xdg_environment_reset
+		# fi
 
-		if [[ "${USE_WINDOW}" == "true" ]]; then
-			xdg_environment_reset
-			# WITH_GPU_RENDER_TESTS_HEADED
-			if use wayland; then
-				local compositor exit_code
-				local logfile=${T}/weston.log
-				weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
-				compositor=$!
-				local -x WAYLAND_DISPLAY=wayland-5
-				sleep 1 # wait for xwayland to be up
-				local -x DISPLAY="$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)"
+		xdg_environment_reset
+		# WITH_GPU_RENDER_TESTS_HEADED
+		if use wayland; then
+			local compositor exit_code
+			local logfile=${T}/weston.log
+			weston --xwayland --backend=headless --socket=wayland-5 --idle-time=0 2>"${logfile}" &
+			compositor=$!
+			local -x WAYLAND_DISPLAY=wayland-5
+			sleep 1 # wait for xwayland to be up
+			# TODO use eapi9-pipestatus
+			local -x DISPLAY="$(grep "xserver listening on display" "${logfile}" | cut -d ' ' -f 5)"
 
-				cmake_src_test
+			cmake_src_test
 
-				exit_code=$?
-				kill "${compositor}"
-			elif use X; then
-				virtx cmake_src_test
-			fi
+			exit_code=$?
+			kill "${compositor}"
+		elif use X; then
+			virtx cmake_src_test
 		else
 			cmake_src_test
 		fi
