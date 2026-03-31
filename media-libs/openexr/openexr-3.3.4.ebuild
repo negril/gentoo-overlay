@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -112,13 +112,16 @@ src_configure() {
 		-DOPENEXR_FORCE_INTERNAL_DEFLATE="no"
 		-DOPENEXR_FORCE_INTERNAL_IMATH="no"
 	)
-	if use test; then
-		# OPENEXR_RUN_FUZZ_TESTS depends on BUILD_TESTING, see
-		#   - https://bugs.gentoo.org/925128
-		#   - https://openexr.com/en/latest/install.html#component-options
 
-		# NOTE: the fuzz tests are very slow
-		mycmakeargs+=( -DOPENEXR_RUN_FUZZ_TESTS="ON" )
+	if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
+		if use test; then
+			# OPENEXR_RUN_FUZZ_TESTS depends on BUILD_TESTING, see
+			#   - https://bugs.gentoo.org/925128
+			#   - https://openexr.com/en/latest/install.html#component-options
+
+			# NOTE: the fuzz tests are very slow
+			mycmakeargs+=( -DOPENEXR_RUN_FUZZ_TESTS="ON" )
+		fi
 	fi
 
 	cmake_src_configure
