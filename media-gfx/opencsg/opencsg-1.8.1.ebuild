@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -22,8 +22,6 @@ DOCS=(
 	build.txt
 	changelog.txt
 )
-
-PATCHES=( "${FILESDIR}"/${PN}-1.6.0-cmake.patch )
 
 src_configure() {
 	local mycmakeargs=(
