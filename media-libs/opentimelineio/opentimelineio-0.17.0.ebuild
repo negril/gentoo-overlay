@@ -8,10 +8,7 @@ inherit cmake
 MY_PN="OpenTimelineIO"
 
 DESCRIPTION="Open Source API and interchange format for editorial timeline information"
-HOMEPAGE="
-	https://github.com/AcademySoftwareFoundation/OpenTimelineIO
-	https://opentimeline.io
-"
+HOMEPAGE="https://github.com/AcademySoftwareFoundation/OpenTimelineIO"
 
 if [[ "${PV}" == *9999* ]]; then
 	inherit git-r3
@@ -28,7 +25,7 @@ else
 			-> rapidjson-${RAPIDJSON_COMMIT}.tar.gz
 	"
 	S="${WORKDIR}/${MY_PN}-${PV}"
-	KEYWORDS="~amd64 ~arm64"
+	KEYWORDS="~amd64 ~arm64 ~ppc64 ~riscv ~x86"
 fi
 
 LICENSE="Apache-2.0"
@@ -36,14 +33,12 @@ SLOT="0/$(ver_cut 1-2)"
 IUSE="test"
 RESTRICT="!test? ( test )"
 
+# Check on update
+# https://github.com/AcademySoftwareFoundation/OpenTimelineIO/pull/1852
 RDEPEND="
 	dev-libs/imath:3=
 "
-# Check on update
-# https://github.com/AcademySoftwareFoundation/OpenTimelineIO/pull/1852
-DEPEND="
-	dev-libs/imath:3
-"
+DEPEND="${RDEPEND}"
 
 DOCS=(
 	README.md

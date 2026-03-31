@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -18,14 +18,16 @@ fi
 
 DESCRIPTION="Open Source API and interchange format for editorial timeline information"
 HOMEPAGE="
-	https://github.com/AcademySoftwareFoundation/OpenTimelineIO
 	https://opentimeline.io
+	https://github.com/AcademySoftwareFoundation/OpenTimelineIO
 "
 
 if [[ "${PV}" == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/OpenTimelineIO.git"
-	EGIT_SUBMODULES=( )
+	EGIT_SUBMODULES=(
+		'-*'
+	)
 else
 	# if [[ "${CATEGORY}" == "dev-python" ]]; then
 	# inherit pypi
@@ -38,19 +40,24 @@ else
 		https://github.com/AcademySoftwareFoundation/OpenTimelineIO/archive/refs/tags/v${PV}.tar.gz
 			-> ${MY_PN}-${PV}.tar.gz
 		!system-rapidjson? (
-			https://github.com/Tencent/rapidjson/archive/${RAPIDJSON_COMMIT}.tar.gz
-				-> rapidjson-${RAPIDJSON_COMMIT}.tar.gz
+		https://github.com/Tencent/rapidjson/archive/${RAPIDJSON_COMMIT}.tar.gz
+			-> rapidjson-${RAPIDJSON_COMMIT}.tar.gz
 		)
 	"
 	S="${WORKDIR}/${MY_PN}-${PV}"
-	KEYWORDS="~amd64 ~arm64"
+	KEYWORDS="~amd64 ~arm64 ~ppc64 ~riscv ~x86"
 fi
 
 LICENSE="Apache-2.0"
 SLOT="0/$(ver_cut 1-2)"
-IUSE="+system-rapidjson test"
+IUSE="test"
+IUSE+="
+	+system-rapidjson
+"
 if [[ "${CATEGORY}" == "dev-python" ]]; then
-IUSE+=" cli"
+IUSE+="
+	cli
+"
 fi
 RESTRICT="!test? ( test )"
 
@@ -70,9 +77,19 @@ DEPEND="
 "
 fi
 
-DEPEND+="
-	system-rapidjson? ( >dev-libs/rapidjson-1.1.0-r4 )
-	dev-libs/imath:3
+# QA
+# imath - we want to rebuild on subslot changes
+RDEPEND="
+	${RDEPEND}
+	dev-libs/imath:=
+"
+
+DEPEND="
+	${RDEPEND}
+	${DEPEND}
+	system-rapidjson? (
+		~dev-libs/rapidjson-9999
+	)
 "
 
 DOCS=(
@@ -91,8 +108,10 @@ src_unpack() {
 }
 
 src_prepare() {
-	if [[ "${PV}" != *9999* ]] && ! use system-rapidjson; then
+	if [[ "${PV}" != *9999* ]]; then
+		if ! use system-rapidjson; then
 		mv -T "${WORKDIR}/rapidjson-${RAPIDJSON_COMMIT}" "src/deps/rapidjson" || die
+		fi
 	fi
 
 	sed \
@@ -102,11 +121,6 @@ src_prepare() {
 	sed \
 		"s|share/opentime|$(get_libdir)/cmake/opentime|g" \
 		-i src/opentime{,lineio}/CMakeLists.txt || die
-
-	# sed \
-	# 	"/set(OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR/ {
-	# 		s|\(\${CMAKE_INSTALL_PREFIX}\)/lib)|\1/$(get_libdir)|
-	# 	}" -i CMakeLists.txt || die
 
 	if [[ "${CATEGORY}" == "dev-python" ]]; then
 		sed -re '/.*: OTIO_build_ext,/d' -i setup.py || die
@@ -147,17 +161,20 @@ fi
 
 src_configure() {
 	local mycmakeargs=(
-		-DOTIO_CXX_COVERAGE="no"
-		-DOTIO_CXX_EXAMPLES="no"
-		-DOTIO_DEPENDENCIES_INSTALL="no"
-
 		-DBUILD_TESTING="$(usex test)"
 		-DOTIO_AUTOMATIC_SUBMODULES="no"
 
-		-DOTIO_FIND_RAPIDJSON="$(usex system-rapidjson)"
 		-DOTIO_FIND_IMATH="yes"
-		-DOTIO_IMATH_LIBS=""
+		-DOTIO_FIND_RAPIDJSON="$(usex system-rapidjson)"
 		-DOTIO_SHARED_LIBS="yes"
+
+		-DOTIO_CXX_COVERAGE="no"
+		-DOTIO_CXX_EXAMPLES="no"
+		# -DOTIO_CXX_INSTALL="yes"
+
+		-DOTIO_DEPENDENCIES_INSTALL="no"
+
+		# -DOTIO_PYTHON_INSTALL="no"
 	)
 	if [[ "${CATEGORY}" == "dev-python" ]]; then
 		distutils-r1_src_configure
