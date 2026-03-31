@@ -125,7 +125,10 @@ src_configure() {
 
 src_test() {
 	local CMAKE_SKIP_TESTS=(
+		# these are reproducer tests that will always fail
+		# like https://github.com/assimp/assimp/issues/727#issuecomment-175809243
 		'^utIssues'
+
 		# these show fp comparison related failures on certain seed values, we just repeat them often enough to pass
 		# '^AssimpAPITest_aiQuaternion.aiQuaternionFromNormalizedQuaternionTest$'
 		# '^AssimpAPITest_aiVector3D.aiTransformVecByMatrix3Test$'

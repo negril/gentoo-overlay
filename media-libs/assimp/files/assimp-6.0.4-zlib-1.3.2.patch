@@ -1,0 +1,43 @@
+From 8460062679ce4d7edc903a50c914396abfa38148 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 21 Mar 2026 23:22:25 +0100
+Subject: zlib 1.3.2
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/code/AssetLib/IFC/IFCLoader.cpp b/code/AssetLib/IFC/IFCLoader.cpp
+index 8c1e658..f9fd24b 100644
+--- a/code/AssetLib/IFC/IFCLoader.cpp
++++ b/code/AssetLib/IFC/IFCLoader.cpp
+@@ -50,11 +50,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <tuple>
+ 
+ #ifndef ASSIMP_BUILD_NO_COMPRESSED_IFC
+-#ifdef ASSIMP_USE_HUNTER
+ #include <minizip/unzip.h>
+-#else
+-#include <unzip.h>
+-#endif
+ #endif
+ 
+ #include "../STEPParser/STEPFileReader.h"
+diff --git a/code/Common/ZipArchiveIOSystem.cpp b/code/Common/ZipArchiveIOSystem.cpp
+index 11cd362..1031c2f 100644
+--- a/code/Common/ZipArchiveIOSystem.cpp
++++ b/code/Common/ZipArchiveIOSystem.cpp
+@@ -51,11 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <map>
+ #include <memory>
+ 
+-#ifdef ASSIMP_USE_HUNTER
+-#    include <minizip/unzip.h>
+-#else
+-#    include <unzip.h>
+-#endif
++#include <minizip/unzip.h>
+ 
+ namespace Assimp {
+ 
+-- 
+2.53.0
+
