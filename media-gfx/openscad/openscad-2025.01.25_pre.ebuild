@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+PYTHON_COMPAT=( python3_{11..13} )
 VIRTUALX_WM=( weston_xwayland )
 inherit cmake flag-o-matic optfeature python-any-r1 virtualx xdg
 
@@ -61,7 +61,7 @@ RDEPEND="
 	dev-libs/boost:=
 	dev-libs/double-conversion:=
 	dev-libs/glib:2
-	dev-libs/libxml2
+	dev-libs/libxml2:=
 	dev-libs/libzip:=
 	>=media-gfx/opencsg-1.7.0:=
 	media-libs/fontconfig
@@ -69,7 +69,7 @@ RDEPEND="
 	media-libs/harfbuzz:=
 	media-libs/lib3mf:=
 	sci-mathematics/cgal:=
-	sci-mathematics/clipper2
+	sci-mathematics/clipper2:=
 	media-libs/libglvnd
 	glx? (
 		media-libs/libglvnd[X]

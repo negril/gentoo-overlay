@@ -3,8 +3,8 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
-inherit cmake flag-o-matic optfeature python-any-r1 xdg
+PYTHON_COMPAT=( python3_{11..13} )
+inherit cmake flag-o-matic optfeature python-any-r1 virtualx xdg
 
 DESCRIPTION="The Programmers Solid 3D CAD Modeller"
 HOMEPAGE="https://openscad.org/"
@@ -20,7 +20,7 @@ if [[ ${PV} = *9999* ]] ; then
 	)
 else
 	if [[ ${PV} = *pre* ]] ; then
-		COMMIT="756e080c7e49072d9926cf9ce766def180a0dcae"
+		COMMIT="f3cac59bf973502ad4b278fd3f20298f9bc2fc84"
 		SANITIZERS_CMAKE_COMMIT="0573e2ea8651b9bb3083f193c41eb086497cc80a"
 		MCAD_COMMIT="bd0a7ba3f042bfbced5ca1894b236cea08904e26"
 
@@ -46,47 +46,47 @@ fi
 LICENSE="GPL-3+ LGPL-2.1"
 SLOT="0"
 
-IUSE="cgal dbus +egl experimental glx +gui hidapi +manifold mimalloc pdf spacenav test"
+IUSE="+cgal dbus +egl experimental glx +gui hidapi +manifold mimalloc pdf spacenav test"
 RESTRICT="!test? ( test )"
-
 REQUIRED_USE="
 	|| ( cgal manifold )
 	dbus? ( gui )
 	hidapi? ( gui )
 	spacenav? ( gui )
 	|| ( egl glx )
+	manifold? ( cgal )
 "
 
 RDEPEND="
 	dev-libs/boost:=
 	dev-libs/double-conversion:=
 	dev-libs/glib:2
-	dev-libs/libxml2
+	dev-libs/libxml2:=
 	dev-libs/libzip:=
-	media-gfx/opencsg
+	>=media-gfx/opencsg-1.7.0:=
 	media-libs/fontconfig
 	media-libs/freetype
 	media-libs/harfbuzz:=
 	media-libs/lib3mf:=
+	media-libs/libglvnd
+	>=sci-mathematics/clipper2-1.5.2:=
 	cgal? (
 		sci-mathematics/cgal:=
 	)
-	sci-mathematics/clipper2
-	media-libs/libglvnd
 	glx? (
 		media-libs/libglvnd[X]
 	)
 	gui? (
 		dev-qt/qt5compat:6
-		dev-qt/qtbase:6[concurrent,dbus?,network,opengl,widgets]
+		dev-qt/qtbase:6[concurrent,dbus?,-gles2-only,network,opengl,widgets]
 		dev-qt/qtmultimedia:6
 		dev-qt/qtsvg:6
-		x11-libs/qscintilla:=[qt6]
+		>=x11-libs/qscintilla-2.14.1-r1:=[qt6(+)]
 	)
 	hidapi? ( dev-libs/hidapi )
 	manifold? (
-		dev-cpp/tbb
-		>=sci-mathematics/manifold-3.0.1
+		dev-cpp/tbb:=
+		>=sci-mathematics/manifold-3.0.2_pre20250330:=
 	)
 	mimalloc? ( dev-libs/mimalloc:= )
 	pdf? ( x11-libs/cairo )
@@ -108,10 +108,7 @@ BDEPEND="
 			dev-python/pillow[${PYTHON_USEDEP}]
 			dev-python/pip[${PYTHON_USEDEP}]
 		')
-		|| (
-			gui-wm/tinywl
-			<gui-libs/wlroots-0.17.3[tinywl(-)]
-		)
+		gui-wm/tinywl
 	)
 "
 
@@ -119,16 +116,17 @@ DOCS=(
 	README.md
 	RELEASE_NOTES.md
 	doc/contributor_copyright.txt
-	doc/hacking.md
-	doc/testing.txt
+	# doc/hacking.md
+	# doc/testing.md
 	doc/translation.txt
 )
 
 # NOTE the build system sets up a venv for tests, we could use imagemagick with -DUSE_IMAGE_COMPARE_PY="no"
 python_check_deps() {
-	python_has_version "dev-python/numpy[${PYTHON_USEDEP}]" &&
-	python_has_version "dev-python/pillow[${PYTHON_USEDEP}]" &&
-	python_has_version "dev-python/pip[${PYTHON_USEDEP}]"
+	python_has_version -b \
+		"dev-python/numpy[${PYTHON_USEDEP}]" \
+		"dev-python/pillow[${PYTHON_USEDEP}]" \
+		"dev-python/pip[${PYTHON_USEDEP}]"
 }
 
 pkg_setup() {
@@ -208,7 +206,7 @@ src_configure() {
 }
 
 hardware_add_gpu_sandbox() {
-	local dris cards PREDICT=() WRITE=()
+	local dri cards PREDICT=() WRITE=()
 
 	# mesa will make use of udmabuf if it exists
 	if [[ -c "/dev/udmabuf" ]]; then
@@ -219,16 +217,16 @@ hardware_add_gpu_sandbox() {
 
 	# /dev/dri/card[%d]
 	# /dev/dri/renderD[128+%d]
-	readarray -t dris <<<"$(
+	readarray -t dri <<<"$(
 		find /sys/class/drm/*/device/drm \
 			-mindepth 1 -maxdepth 1 -type d -exec basename {} \; \
 			| sort | uniq | sed 's:^:/dev/dri/:'
 	)"
 
-	[[ -n "${dris[*]}" ]] && WRITE+=( "${dris[@]}" )
+	[[ -n "${dri[*]}" ]] && WRITE+=( "${dri[@]}" )
 
 	if [[ -d /sys/module/nvidia ]]; then
-		stat --printf="%Hr:%Lr"
+		# stat --printf="%Hr:%Lr"
 		PREDICT+=(
 			# /dev/char/195:X   # ../nvidiaX
 			# /dev/char/195:254 # ../nvidia-modeset
@@ -248,17 +246,17 @@ hardware_add_gpu_sandbox() {
 			"/dev/nvidia-caps/"
 
 			# "/dev/nvidia-caps-imex-channels/channel%d"
-			"/dev/nvidia-caps-imex-channels/"
+			# "/dev/nvidia-caps-imex-channels/"
 
 			"/dev/nvidia-modeset"
 
-			"/dev/nvidia-nvlink"
-			"/dev/nvidia-nvswitchctl"
+			# "/dev/nvidia-nvlink"
+			# "/dev/nvidia-nvswitchctl"
 
 			"/dev/nvidia-uvm"
 			"/dev/nvidia-uvm-tools"
 
-			"/dev/nvidia-vgpuctl"
+			# "/dev/nvidia-vgpuctl"
 		)
 	fi
 
@@ -290,7 +288,6 @@ hardware_add_gpu_sandbox() {
 		fi
 	done
 
-	local dev
 	for dev in "${PREDICT[@]}"; do
 		if [[ ! -e "${dev}" ]]; then
 			eqawarn "${dev} does not exist"
@@ -343,6 +340,17 @@ src_test() {
 	ln -s "${CMAKE_USE_DIR}/color-schemes" . || die
 	ln -s "${CMAKE_USE_DIR}/locale" . || die
 	ln -s "${CMAKE_USE_DIR}/shaders" . || die
+
+	local CMAKE_SKIP_TESTS=(
+	)
+
+	if ! has_version app-text/ghostscript-gpl ; then
+		CMAKE_SKIP_TESTS+=(
+			# needs GS
+			"^export-pdf_centered$"
+			"^export-pdf_simple-pdf$"
+		)
+	fi
 
 	virtwl cmake_src_test -j1
 }
