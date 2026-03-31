@@ -1,0 +1,96 @@
+From 41d11be8eca6f65d385b67413d1c261262e50432 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 3 Dec 2025 12:01:53 +0100
+Subject: [PATCH] use FetchContent
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1bb5582..7ea9a3a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -499,61 +499,37 @@ if(UHDR_BUILD_JAVA)
+ endif()
+ 
+ if(UHDR_BUILD_TESTS)
++  include(FetchContent)
+   # gtest and gmock
+-  set(GTEST_TARGET_NAME googletest)
+-  set(GTEST_PREFIX_DIR ${CMAKE_CURRENT_BINARY_DIR}/${GTEST_TARGET_NAME})
+-  set(GTEST_SOURCE_DIR ${THIRD_PARTY_DIR}/${GTEST_TARGET_NAME})
+-  set(GTEST_BINARY_DIR ${GTEST_PREFIX_DIR}/src/${GTEST_TARGET_NAME}-build)
+-  set(GTEST_INCLUDE_DIRS
+-      ${GTEST_SOURCE_DIR}/googletest/include
+-      ${GTEST_SOURCE_DIR}/googlemock/include)
+-  set(GTEST_LIB ${CMAKE_STATIC_LIBRARY_PREFIX}gtest${CMAKE_STATIC_LIBRARY_SUFFIX})
+-  set(GTEST_LIB_MAIN ${CMAKE_STATIC_LIBRARY_PREFIX}gtest_main${CMAKE_STATIC_LIBRARY_SUFFIX})
+-  if(IS_MULTI)
+-    set(GTEST_LIB_PREFIX ${GTEST_BINARY_DIR}/lib/$<CONFIG>/)
+-  else()
+-    set(GTEST_LIB_PREFIX ${GTEST_BINARY_DIR}/lib/)
+-  endif()
+-  set(GTEST_BOTH_LIBRARIES ${GTEST_LIB_PREFIX}${GTEST_LIB} ${GTEST_LIB_PREFIX}${GTEST_LIB_MAIN})
+-  ExternalProject_Add(${GTEST_TARGET_NAME}
++  set(GTEST_TARGET_NAME GTest::gtest_main)
++  set(GTEST_INCLUDE_DIRS "")
++  set(GTEST_BINARY_DIR "")
++  set(GTEST_BOTH_LIBRARIES GTest::gtest_main)
++
++  FetchContent_Declare(googletest
+       GIT_REPOSITORY https://github.com/google/googletest
+       GIT_TAG v1.14.0
+-      PREFIX ${GTEST_PREFIX_DIR}
+-      SOURCE_DIR ${GTEST_SOURCE_DIR}
+-      BINARY_DIR ${GTEST_BINARY_DIR}
+-      CMAKE_ARGS ${UHDR_CMAKE_ARGS}
+-      BUILD_BYPRODUCTS ${GTEST_BOTH_LIBRARIES}
+-      INSTALL_COMMAND ""
++      FIND_PACKAGE_ARGS NAMES GTest CONFIG COMPONENTS GTest GMock
+   )
++  FetchContent_MakeAvailable(googletest)
+ endif()
+ 
+ if(UHDR_BUILD_BENCHMARK)
++  include(FetchContent)
+   # benchmark
+-  set(BM_TARGET_NAME benchmark)
+-  set(BM_PREFIX_DIR ${CMAKE_CURRENT_BINARY_DIR}/${BM_TARGET_NAME})
+-  set(BM_SOURCE_DIR ${THIRD_PARTY_DIR}/${BM_TARGET_NAME})
+-  set(BM_BINARY_DIR ${BM_PREFIX_DIR}/src/${BM_TARGET_NAME}-build)
+-  set(BENCHMARK_INCLUDE_DIR ${BM_SOURCE_DIR}/include)
+-  set(BM_LIB ${CMAKE_STATIC_LIBRARY_PREFIX}benchmark${CMAKE_STATIC_LIBRARY_SUFFIX})
+-  set(BM_LIB_MAIN ${CMAKE_STATIC_LIBRARY_PREFIX}benchmark_main${CMAKE_STATIC_LIBRARY_SUFFIX})
+-  if(IS_MULTI)
+-    set(BM_LIB_PREFIX ${BM_BINARY_DIR}/src/$<CONFIG>/)
+-  else()
+-    set(BM_LIB_PREFIX ${BM_BINARY_DIR}/src/)
+-  endif()
+-  set(BENCHMARK_LIBRARIES ${BM_LIB_PREFIX}${BM_LIB} ${BM_LIB_PREFIX}${BM_LIB_MAIN})
+-  ExternalProject_Add(${BM_TARGET_NAME}
++  set(BM_TARGET_NAME benchmark::benchmark)
++  set(BENCHMARK_INCLUDE_DIR "")
++  set(BM_BINARY_DIR "")
++  set(BENCHMARK_LIBRARIES benchmark::benchmark)
++
++  FetchContent_Declare(benchmark
+       GIT_REPOSITORY https://github.com/google/benchmark.git
+       GIT_TAG v1.8.3
+-      PREFIX ${BM_PREFIX_DIR}
+-      SOURCE_DIR ${BM_SOURCE_DIR}
+-      BINARY_DIR ${BM_BINARY_DIR}
+-      CMAKE_ARGS ${UHDR_CMAKE_ARGS}
+-                 -DBENCHMARK_ENABLE_TESTING=OFF
+-                 -DBENCHMARK_DOWNLOAD_DEPENDENCIES=OFF
+-      BUILD_BYPRODUCTS ${BENCHMARK_LIBRARIES}
+-      INSTALL_COMMAND ""
++      FIND_PACKAGE_ARGS NAMES benchmark
+   )
++  set(BENCHMARK_ENABLE_TESTING OFF)
++  set(BENCHMARK_DOWNLOAD_DEPENDENCIES OFF)
++  FetchContent_MakeAvailable(benchmark)
+ endif()
+ 
+ set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
+-- 
+2.52.0
+

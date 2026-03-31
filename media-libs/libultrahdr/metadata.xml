@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person" proxied="yes">
+		<email>negril.nx+gentoo@gmail.com</email>
+		<name>Paul Zander</name>
+	</maintainer>
+	<maintainer type="project">
+		<email>sci@gentoo.org</email>
+		<name>Gentoo Science Project</name>
+	</maintainer>
+	<longdescription>
+	Ultra HDR is a true HDR image format, and is backcompatible. libultrahdr is the reference codec for the Ultra HDR format. The codecs that support the format can render the HDR intent of the image on HDR displays; other codecs can still decode and display the SDR intent of the image.
+	</longdescription>
+	<upstream>
+		<remote-id type="github">google/libultrahdr</remote-id>
+	</upstream>
+	<use>
+		<flag name="benchmark">Build benchmark tests</flag>
+		<flag name="tools">Build sample application</flag>
+	</use>
+</pkgmetadata>

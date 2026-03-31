@@ -1,0 +1,33 @@
+From a63c0dc9eec7235a864496f9eedc42347351abb0 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 3 Dec 2025 14:35:18 +0100
+Subject: [PATCH] static libs optional
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6f44cf0..b85f9aa 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -110,6 +110,9 @@ function(option_if_not_defined name description default)
+   endif()
+ endfunction()
+ 
++option_if_not_defined(BUILD_SHARED_LIBS "Build and use shared libraries" TRUE)
++option_if_not_defined(BUILD_STATIC_LIBS "Build static libraries" FALSE)
++
+ option_if_not_defined(UHDR_BUILD_EXAMPLES "Build sample application " TRUE)
+ option_if_not_defined(UHDR_BUILD_TESTS "Build unit tests " FALSE)
+ option_if_not_defined(UHDR_BUILD_BENCHMARK "Build benchmark tests " FALSE)
+@@ -742,7 +745,7 @@ endif()
+ combine_static_libs(${UHDR_CORE_LIB_NAME} ${UHDR_TARGET_NAME})
+ 
+ # Build static library as well
+-if(BUILD_SHARED_LIBS)
++if(BUILD_STATIC_LIBS AND BUILD_SHARED_LIBS)
+   set(UHDR_TARGET_NAME_STATIC uhdr-static)
+   add_library(${UHDR_TARGET_NAME_STATIC} STATIC)
+   add_dependencies(${UHDR_TARGET_NAME_STATIC} ${UHDR_CORE_LIB_NAME})
+-- 
+2.52.0
+
