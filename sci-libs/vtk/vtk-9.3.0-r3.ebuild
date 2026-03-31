@@ -145,7 +145,7 @@ RDEPEND="
 DEPEND="
 	${RDEPEND}
 	dev-cpp/cli11
-	dev-cpp/eigen
+	dev-cpp/eigen:=
 	dev-cpp/nlohmann_json
 	>=dev-libs/pegtl-3
 	dev-libs/utfcpp
@@ -226,7 +226,7 @@ vtk_check_compiler() {
 }
 
 pkg_pretend() {
-	[[ ${MERGE_TYPE} != binary ]] && has openmp && tc-check-openmp
+	[[ ${MERGE_TYPE} != binary ]] && use openmp && tc-check-openmp
 
 	if [[ $(tc-is-gcc) && $(gcc-majorversion) = 11 ]] && use cuda ; then
 		# FIXME: better use eerror?
@@ -240,7 +240,7 @@ pkg_pretend() {
 }
 
 pkg_setup() {
-	[[ ${MERGE_TYPE} != binary ]] && has openmp && tc-check-openmp
+	[[ ${MERGE_TYPE} != binary ]] && use openmp && tc-check-openmp
 
 	if [[ $(tc-is-gcc) && $(gcc-majorversion) = 11 ]] && use cuda ; then
 		# FIXME: better use eerror?
