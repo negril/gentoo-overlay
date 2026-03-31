@@ -18,7 +18,7 @@ S="${WORKDIR}/${PN}-${COMMIT}"
 
 LICENSE="BSD"
 SLOT="0"
-KEYWORDS="~amd64 ~arm ~arm64 ~ppc ~x86 ~amd64-linux ~x86-linux"
+KEYWORDS="~amd64 ~arm ~arm64 ~ppc ~x86"
 IUSE="cuda doc examples mpi octave openmp test"
 RESTRICT="!test? ( test )"
 
@@ -126,6 +126,11 @@ src_compile() {
 }
 
 src_test() {
+	if use cuda; then
+		addpredict "/dev/char/"
+		cuda_add_sandbox -w
+	fi
+
 	# some fail when run in parallel
 	cmake_src_test -j1
 }
