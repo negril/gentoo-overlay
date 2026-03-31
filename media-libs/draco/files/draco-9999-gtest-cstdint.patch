@@ -1,0 +1,22 @@
+From 800b53130178c7584e83b786f4bd4910c600c405 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Wed, 6 Aug 2025 09:50:10 +0200
+Subject: [PATCH] gtest cstdint
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/third_party/googletest/googletest/src/gtest-death-test.cc b/third_party/googletest/googletest/src/gtest-death-test.cc
+index da09a1cf..dc9b952e 100644
+--- a/third_party/googletest/googletest/src/gtest-death-test.cc
++++ b/third_party/googletest/googletest/src/gtest-death-test.cc
+@@ -32,6 +32,7 @@
+ 
+ #include "gtest/gtest-death-test.h"
+ 
++#include <cstdint>
+ #include <utility>
+ 
+ #include "gtest/internal/gtest-port.h"
+-- 
+2.50.1
+

@@ -1,0 +1,25 @@
+From 606860bd6ae7deb80a7c5fd05de07ecf34890463 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Wed, 6 Aug 2025 10:18:27 +0200
+Subject: [PATCH] fix reader file collision
+
+FileWriterFactoryTest.OpenWriter already creates 'fake file', causing failure.
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/src/draco/io/file_reader_factory_test.cc b/src/draco/io/file_reader_factory_test.cc
+index d304d63..35f5ebb 100644
+--- a/src/draco/io/file_reader_factory_test.cc
++++ b/src/draco/io/file_reader_factory_test.cc
+@@ -75,7 +75,7 @@ TEST(FileReaderFactoryTest, RegistrationFail) {
+ }
+ 
+ TEST(FileReaderFactoryTest, OpenReader) {
+-  auto reader = FileReaderFactory::OpenReader("fake file");
++  auto reader = FileReaderFactory::OpenReader("fake file2");
+   EXPECT_NE(reader, nullptr);
+   std::vector<char> *buffer = nullptr;
+   EXPECT_TRUE(reader->ReadFileToBuffer(buffer));
+-- 
+2.50.1
+
