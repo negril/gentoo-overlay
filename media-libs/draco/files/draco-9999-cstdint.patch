@@ -1,0 +1,22 @@
+From 93811849246e4bdcbee439ea33ac9ded158af589 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 6 Aug 2025 09:49:10 +0200
+Subject: [PATCH] cstdint
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/draco/compression/attributes/point_d_vector.h b/src/draco/compression/attributes/point_d_vector.h
+index 6ceb454..85c47ca 100644
+--- a/src/draco/compression/attributes/point_d_vector.h
++++ b/src/draco/compression/attributes/point_d_vector.h
+@@ -17,6 +17,7 @@
+ #define DRACO_COMPRESSION_ATTRIBUTES_POINT_D_VECTOR_H_
+ 
+ #include <cstddef>
++#include <cstdint>
+ #include <cstring>
+ #include <iterator>
+ #include <memory>
+-- 
+2.50.1
+
