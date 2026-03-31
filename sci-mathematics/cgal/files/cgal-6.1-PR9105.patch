@@ -1,0 +1,36 @@
+From 712464b6901a3f11486e3aee438731c89d2c383e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?S=C3=A9bastien=20Loriot?= <sebastien.loriot@cgal.org>
+Date: Tue, 21 Oct 2025 08:26:34 +0200
+Subject: [PATCH] try to please recent gcc
+
+---
+ include/CGAL/Regular_grid_2.h     | 2 +-
+ include/CGAL/Triangular_field_2.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/CGAL/Regular_grid_2.h b/include/CGAL/Regular_grid_2.h
+index 2ef9c992a01d..2e9eb33bc58d 100644
+--- a/include/CGAL/Regular_grid_2.h
++++ b/include/CGAL/Regular_grid_2.h
+@@ -93,7 +93,7 @@ class Regular_grid_2
+ 
+ template <class StreamLinesTraits_2>
+ inline
+-typename Regular_grid_2<StreamLinesTraits_2>::Geom_traits::Iso_rectangle_2
++typename StreamLinesTraits_2::Iso_rectangle_2
+ Regular_grid_2<StreamLinesTraits_2>::bbox() const
+ {
+   return typename Geom_traits::Iso_rectangle_2(0.0, 0.0,
+diff --git a/include/CGAL/Triangular_field_2.h b/include/CGAL/Triangular_field_2.h
+index 1dd733409c75..df6eb6807f4c 100644
+--- a/include/CGAL/Triangular_field_2.h
++++ b/include/CGAL/Triangular_field_2.h
+@@ -134,7 +134,7 @@ class Triangular_field_2
+ 
+ template <class StreamLinesTraits_2>
+ inline
+-typename Triangular_field_2<StreamLinesTraits_2>::Geom_traits::Iso_rectangle_2
++typename StreamLinesTraits_2::Iso_rectangle_2
+ Triangular_field_2<StreamLinesTraits_2>::bbox() const
+ {
+   return typename Geom_traits::Iso_rectangle_2(minx, miny, maxx,
