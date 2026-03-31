@@ -1,0 +1,117 @@
+diff --git a/contrib/Orochi/scripts/kernelCompile.py b/contrib/Orochi/scripts/kernelCompile.py
+index 7c9d98f..39db317 100644
+--- a/contrib/Orochi/scripts/kernelCompile.py
++++ b/contrib/Orochi/scripts/kernelCompile.py
+@@ -17,10 +17,11 @@ def compile( index ):
+ 	if index == 0 :
+ 		command = [
+ 			"hipcc",
+-			"-x", "hip", "..\ParallelPrimitives\RadixSortKernels.h", "-O3", "-std=c++17", "-ffast-math", "--cuda-device-only", "--genco", "-I../", "-include", "hip/hip_runtime.h", "-parallel-jobs=15"]
++			"-x", "hip", "..\ParallelPrimitives\RadixSortKernels.h", "-O3", "-std=c++17", "-ffast-math", "--cuda-device-only", "--genco", "-I../", "-include", "hip/hip_runtime.h"]
+ 		#command.append( "--offload-arch=gfx1100" )
+-		for i in enumArch( "gfx900" ):
+-			command.append( "--offload-arch=" + i )
++		for i in '__AMDGPU_FLAGS__'.split(';'):
++			if i.strip() != '':
++				command.append( "--offload-arch=" + i )
+ 		command.append( "-o" )
+ 		command.append( "../bitcodes/oro_compiled_kernels.hipfb" )
+ 	else:
+diff --git a/scripts/bitcodes/compile.py b/scripts/bitcodes/compile.py
+index f2f767b..a2c07b0 100644
+--- a/scripts/bitcodes/compile.py
++++ b/scripts/bitcodes/compile.py
+@@ -93,35 +93,25 @@ def compileAmd():
+     hip_version = hip_sdk_version_major +"."+ hip_sdk_version_minor
+         
+     # llvm.org/docs/AMDGPUUsage.html#processors
+-    gpus = ['gfx1100', 'gfx1101', 'gfx1102', 'gfx1103',  # Navi3
+-            'gfx1030', 'gfx1031', 'gfx1032', 'gfx1033', 'gfx1034', 'gfx1035', 'gfx1036',  # Navi2
+-            'gfx1010', 'gfx1011', 'gfx1012', 'gfx1013',  # Navi1
+-            'gfx900', 'gfx902', 'gfx904', 'gfx906', 'gfx908', 'gfx909', 'gfx90a', 'gfx90c', 'gfx940', 'gfx941', 'gfx942']  # Vega
+-    
+-    if hip_sdk_version_num >= 62: # Navi4 supported from 6.2
+-        gpus.append('gfx1200')
+-        gpus.append('gfx1201')
+-
+-    if hip_sdk_version_num >= 61: # Strix supported from 6.1
+-        gpus.append('gfx1150')
+-        gpus.append('gfx1151')
++    gpus = '__AMDGPU_FLAGS__'.split(';')
+ 
+     targets = ''
+     for i in gpus:
+-        targets += ' --offload-arch=' + i
++        if i.strip() != '':
++            targets += ' --offload-arch=' + i
+ 
+     parallel_jobs = 15
+ 
+     dst = 'hiprt' + hiprt_ver + '_' + hip_version + '_amd_lib' + postfix
+-    cmd = hipccpath + ' -x hip ../../hiprt/impl/hiprt_kernels_bitcode.h -O3 -std=c++17 ' + targets + ' -fgpu-rdc -c --gpu-bundle-output -c -emit-llvm -I../../contrib/Orochi/ -I../../ -DHIPRT_BITCODE_LINKING -ffast-math -parallel-jobs=' + str(parallel_jobs) + ' -o ' + dst
++    cmd = hipccpath + ' -x hip ../../hiprt/impl/hiprt_kernels_bitcode.h -O3 -std=c++17 ' + targets + ' -fgpu-rdc -c --gpu-bundle-output -c -emit-llvm -I../../contrib/Orochi/ -I../../ -DHIPRT_BITCODE_LINKING -ffast-math -o ' + dst
+     compileScript(cmd, dst)
+ 
+     dst = 'hiprt' + hiprt_ver + '_' + hip_version + '_amd.hipfb'
+-    cmd = hipccpath + ' -x hip ../../hiprt/impl/hiprt_kernels.h -O3 -std=c++17 ' + targets + ' -mllvm -amdgpu-early-inline-all=false -mllvm -amdgpu-function-calls=true --genco -I../../ -DHIPRT_BITCODE_LINKING -ffast-math -parallel-jobs=' + str(parallel_jobs) + ' -o ' + dst
++    cmd = hipccpath + ' -x hip ../../hiprt/impl/hiprt_kernels.h -O3 -std=c++17 ' + targets + ' -mllvm -amdgpu-early-inline-all=false -mllvm -amdgpu-function-calls=true --genco -I../../ -DHIPRT_BITCODE_LINKING -ffast-math  -o ' + dst
+     compileScript(cmd, dst)
+ 
+     dst = 'oro_compiled_kernels.hipfb'
+-    cmd = hipccpath + ' -x hip ../../contrib/Orochi/ParallelPrimitives/RadixSortKernels.h -O3 -std=c++17 ' + targets + ' --genco -I../../contrib/Orochi/ -include hip/hip_runtime.h -DHIPRT_BITCODE_LINKING -ffast-math -parallel-jobs=' + str(parallel_jobs) + ' -o ' + dst
++    cmd = hipccpath + ' -x hip ../../contrib/Orochi/ParallelPrimitives/RadixSortKernels.h -O3 -std=c++17 ' + targets + ' --genco -I../../contrib/Orochi/ -include hip/hip_runtime.h -DHIPRT_BITCODE_LINKING -ffast-math -o ' + dst
+     compileScript(cmd, dst)
+ 
+ 
+diff --git a/scripts/bitcodes/precompile_bitcode.py b/scripts/bitcodes/precompile_bitcode.py
+index f637d15..3d1df68 100644
+--- a/scripts/bitcodes/precompile_bitcode.py
++++ b/scripts/bitcodes/precompile_bitcode.py
+@@ -93,10 +93,7 @@ def compileAmd():
+         hipccpath = '\"' + hipccpath + '\"'
+ 
+     # llvm.org/docs/AMDGPUUsage.html#processors
+-    gpus = ['gfx1100', 'gfx1101', 'gfx1102', 'gfx1103',  # Navi3
+-            'gfx1030', 'gfx1031', 'gfx1032', 'gfx1033', 'gfx1034', 'gfx1035', 'gfx1036',  # Navi2
+-            'gfx1010', 'gfx1011', 'gfx1012', 'gfx1013',  # Navi1
+-            'gfx900', 'gfx902', 'gfx904', 'gfx906', 'gfx908', 'gfx909', 'gfx90a', 'gfx90c', 'gfx940', 'gfx941', 'gfx942']  # Vega
++    gpus = '__AMDGPU_FLAGS__'.split(';')
+     
+     result = subprocess.check_output(hipccpath + ' --version', shell=True)
+     hip_sdk_version = result.decode('utf-8')
+@@ -104,18 +101,11 @@ def compileAmd():
+     hip_sdk_version_minor = re.match(r'HIP version: (\d+).(\d+)', hip_sdk_version).group(2)
+     hip_sdk_version_num = 10 * int(hip_sdk_version_major) + int(hip_sdk_version_minor)
+     hip_version = hip_sdk_version_major +"."+ hip_sdk_version_minor
+-    
+-    if hip_sdk_version_num >= 62: # Navi4 supported from 6.2
+-        gpus.append('gfx1200')
+-        gpus.append('gfx1201')
+-
+-    if hip_sdk_version_num >= 61: # Strix supported from 6.1
+-        gpus.append('gfx1150')
+-        gpus.append('gfx1151')
+         
+     targets = ''
+     for i in gpus:
+-        targets += ' --offload-arch=' + i
++        if i.strip() != '':
++            targets += ' --offload-arch=' + i
+ 
+     # compile hiprt traversal code
+     hiprt_lib = hiprtlibpath + 'hiprt' + hiprt_ver + '_' + hip_version + '_amd_lib' + postfix
+@@ -123,12 +113,12 @@ def compileAmd():
+ 
+     # compile custom function table
+     hiprt_custom_func = 'hiprt' + hiprt_ver + '_' + hip_version + '_custom_func_table.bc'
+-    cmd = hipccpath + ' -O3 -std=c++17 ' + targets + ' -fgpu-rdc -c --gpu-bundle-output -c -emit-llvm -I../../ -ffast-math ../../test/bitcodes/custom_func_table.cpp -parallel-jobs=15 -o ' + hiprt_custom_func
++    cmd = hipccpath + ' -O3 -std=c++17 ' + targets + ' -fgpu-rdc -c --gpu-bundle-output -c -emit-llvm -I../../ -ffast-math ../../test/bitcodes/custom_func_table.cpp -o ' + hiprt_custom_func
+     compileScript('compiling ', cmd, hiprt_custom_func)
+ 
+     # compiling unit test
+     hiprt_unit_test = 'hiprt' + hiprt_ver + '_' + hip_version + '_unit_test'+ postfix
+-    cmd = hipccpath + ' -O3 -std=c++17 ' + targets + ' -fgpu-rdc -c --gpu-bundle-output -c -emit-llvm -I../../ -ffast-math -D BLOCK_SIZE=64 -D SHARED_STACK_SIZE=16 ../../test/bitcodes/unit_test.cpp -parallel-jobs=15 -o ' + hiprt_unit_test
++    cmd = hipccpath + ' -O3 -std=c++17 ' + targets + ' -fgpu-rdc -c --gpu-bundle-output -c -emit-llvm -I../../ -ffast-math -D BLOCK_SIZE=64 -D SHARED_STACK_SIZE=16 ../../test/bitcodes/unit_test.cpp -o ' + hiprt_unit_test
+     compileScript('compiling ', cmd, hiprt_unit_test)
+ 
+     # linking

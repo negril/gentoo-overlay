@@ -1,0 +1,14 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 179a500..83b98f0 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -302,6 +302,9 @@ set(HIPRT_NAME "hiprt")
+ add_library(${HIPRT_NAME} SHARED)
+ set_target_properties(${HIPRT_NAME} PROPERTIES VERSION 2.3 SOVERSION 1)
+ 
++include(GNUInstallDirs)
++set(HIPRT_DATA_DIRECTORY "${CMAKE_INSTALL_DATADIR}/hiprt/${version_str_}/")
++target_compile_definitions(${HIPRT_NAME} PRIVATE HIPRT_DATA_DIRECTORY=\"${HIPRT_DATA_DIRECTORY}\")
+ target_compile_definitions(${HIPRT_NAME} PRIVATE HIPRT_EXPORTS)
+ 
+ 
