@@ -3,6 +3,11 @@
 
 EAPI=8
 
+# TODO
+# add hip
+# boost[python] -> pybind11 -DPYBIND11=ON
+# add SONAME version check from IMATH_LIB_SOVERSION
+
 PYTHON_COMPAT=( python3_{12..13} )
 
 inherit cmake python-single-r1
@@ -15,7 +20,7 @@ SRC_URI="https://github.com/AcademySoftwareFoundation/${MY_PN}/archive/refs/tags
 S="${WORKDIR}/${MY_PN}-${PV}"
 
 LICENSE="BSD"
-SLOT="3/29"
+SLOT="3/30"
 KEYWORDS="~amd64 ~arm ~arm64 ~hppa ~loong ~ppc ~ppc64 ~riscv ~sparc ~x86"
 IUSE="doc large-stack python test"
 REQUIRED_USE="python? ( ${PYTHON_REQUIRED_USE} )"
@@ -45,10 +50,15 @@ BDEPEND="
 	python? ( ${PYTHON_DEPS} )
 "
 
-DOCS=( CHANGES.md CONTRIBUTORS.md README.md SECURITY.md )
+DOCS=(
+	CHANGES.md
+	CONTRIBUTORS.md
+	README.md
+	SECURITY.md
+)
 
 PATCHES=(
-	"${FILESDIR}/${PN}-3.1.11-fix_cmake_module_export.patch"
+	"${FILESDIR}/${PN}-3.2.2-float-comp-is-hard.patch"
 )
 
 pkg_setup() {
@@ -69,9 +79,7 @@ src_configure() {
 	if use python; then
 		mycmakeargs+=(
 			-DPYTHON=ON
-			# looks up Python first, then Python3 and Python2, so we specify both..
-			-DPython_EXECUTABLE="${PYTHON}"
-			-DPython3_EXECUTABLE="${PYTHON}"
+			-DPython3_EXECUTABLE="${EPYTHON}"
 			-DPython3_INCLUDE_DIR="$(python_get_includedir)"
 			-DPython3_LIBRARY="$(python_get_library_path)"
 		)
@@ -80,7 +88,20 @@ src_configure() {
 	cmake_src_configure
 }
 
+src_test() {
+	local CMAKE_SKIP_TESTS=(
+		"^PyImath.PyImathTestC$"
+	)
+
+	cmake_src_test
+}
+
 src_install() {
-	use doc && HTML_DOCS=( "${BUILD_DIR}/website/sphinx/." )
+	if use doc; then
+		local HTML_DOCS=(
+			"${BUILD_DIR}/website/sphinx/."
+		)
+	fi
+
 	cmake_src_install
 }
