@@ -1,0 +1,47 @@
+From b473d89e3c87aeae13e9fe9e0b8ef3a287161235 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Tue, 20 May 2025 14:13:14 +0200
+Subject: [PATCH] vtk components
+
+Only include the components we actually use.
+This prevents a circular loop occt -> vtk -> occt.
+
+diff --git a/adm/cmake/vtk.cmake b/adm/cmake/vtk.cmake
+index 48650fe7d..6c168bf59 100644
+--- a/adm/cmake/vtk.cmake
++++ b/adm/cmake/vtk.cmake
+@@ -74,7 +74,30 @@ if (3RDPARTY_VTK_DIR AND EXISTS "${3RDPARTY_VTK_DIR}")
+   set (ENV{VTK_DIR} "${3RDPARTY_VTK_DIR}")
+ endif()
+ 
+-find_package(VTK QUIET)
++# see src/TKIVtk*/EXTERNLIB
++set(VTK_COMPONENTS
++    CommonCore
++    FiltersGeneral
++    IOImage
++    ImagingCore
++    InteractionStyle
++)
++
++if(USE_OPENGL)
++  list(APPEND VTK_COMPONENTS
++    RenderingCore
++    RenderingGL2PSOpenGL2
++    RenderingOpenGL2
++  )
++
++  if(USE_FREETYPE)
++    list(APPEND VTK_COMPONENTS
++      RenderingFreeType
++    )
++  endif()
++endif()
++
++find_package(VTK REQUIRED COMPONENTS "${VTK_COMPONENTS}" )
+ 
+ if (3RDPARTY_VTK_DIR AND EXISTS "${3RDPARTY_VTK_DIR}")
+   set (ENV{VTK_DIR} ${CACHED_VTK_DIR})
+-- 
+2.49.0
+
