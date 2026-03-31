@@ -1,0 +1,43 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4da38ea..9671ba5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -107,6 +107,7 @@ set(LIB_SUFFIX "" CACHE STRING "Suffix for 'lib' folder in target directory stru
+ set(LIB_SUBFOLDER "" CACHE STRING "Subfolder under the 'lib' folder in target directory structure. E.g. set to 'renderdoc' to use /usr/local/lib/renderdoc instead of /usr/local/lib.")
+ set(VULKAN_JSON_SUFFIX "" CACHE STRING "Suffix for the vulkan implicit_layer json file. E.g. set to '.x86_64' to use renderdoc_capture.x86_64.json instead of renderdoc_capture.json")
+ 
++option(INSTALL_SHARED_FILES "" OFF)
+ option(INTERNAL_SELF_CAPTURE "Internal option: enable self-capture" OFF)
+ 
+ set(RDOC_BASE_NAME "renderdoc")
+diff --git a/qrenderdoc/CMakeLists.txt b/qrenderdoc/CMakeLists.txt
+index b2eb466..59f1e31 100644
+--- a/qrenderdoc/CMakeLists.txt
++++ b/qrenderdoc/CMakeLists.txt
+@@ -402,6 +402,7 @@ endif()
+ install (PROGRAMS ${CMAKE_BINARY_DIR}/bin/qrenderdoc DESTINATION bin)
+ 
+ # Install supporting files for file associations etc
++if (INSTALL_SHARED_FILES)
+ install (FILES share/application-x-renderdoc-capture.svg DESTINATION share/icons/hicolor/scalable/mimetypes/)
+ install (FILES share/renderdoc-icon-16x16.xpm DESTINATION share/pixmaps/)
+ install (FILES share/renderdoc-icon-32x32.xpm DESTINATION share/pixmaps/)
+@@ -409,7 +410,8 @@ install (FILES share/menu DESTINATION share/menu RENAME renderdoc)
+ install (FILES share/renderdoc.desktop DESTINATION share/applications)
+ install (FILES share/renderdoc.thumbnailer DESTINATION share/thumbnailers)
+ install (FILES share/renderdoc-capture.xml DESTINATION share/mime/packages)
+-
++endif()
++if (false)
+ install (CODE "MESSAGE(\"You now need to update some caches.\")")
+ install (CODE "MESSAGE(\"e.g.\")")
+ install (CODE "MESSAGE(\"sudo update-desktop-database\")")
+@@ -417,7 +419,7 @@ install (CODE "MESSAGE(\"sudo update-menus\")")
+ install (CODE "MESSAGE(\"sudo update-mime-database /usr/share/mime/\")")
+ install (CODE "MESSAGE(\"sudo gtk-update-icon-cache /usr/share/icons/hicolor/\")")
+ install (CODE "MESSAGE(\"NB: Your paths may vary.\")")
+-
++endif()
+ endif() # if(ENABLE_QRENDERDOC)
+ 
+ # Build python modules - primarily used for constructing documentation
