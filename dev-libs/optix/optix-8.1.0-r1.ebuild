@@ -3,12 +3,12 @@
 
 EAPI=8
 
-inherit cmake cuda
+inherit cmake cuda flag-o-matic toolchain-funcs
 MY_PV=$(ver_cut 1-2)
 PV_BUILD="-35015278"
 
 DESCRIPTION="NVIDIA Ray Tracing Engine"
-HOMEPAGE="https://developer.nvidia.com/optix"
+HOMEPAGE="https://developer.nvidia.com/rtx/ray-tracing/optix"
 SRC_URI="
 	!headers-only? (
 		amd64? (
@@ -28,7 +28,7 @@ LICENSE="NVIDIA-SDK"
 SLOT="0/$(ver_cut 1)"
 KEYWORDS="~amd64 ~arm64"
 IUSE="+headers-only"
-RESTRICT="bindist mirror !headers-only? ( fetch )"
+RESTRICT="bindist mirror !headers-only? ( fetch ) test"
 
 RDEPEND=">=x11-drivers/nvidia-drivers-555"
 
@@ -43,7 +43,7 @@ src_unpack() {
 		default
 	else
 		skip="$(grep -a ^tail "${DISTDIR}/${A}" | tail -n1 | cut -d' ' -f 3)"
-		tail -n "${skip}" "${DISTDIR}/${A}" | tar -zx
+		tail -n "${skip}" "${DISTDIR}/${A}" | tar -zx -f -
 		assert "unpacking ${A} failed"
 	fi
 }
@@ -53,7 +53,8 @@ src_prepare() {
 		default
 	else
 		export CMAKE_USE_DIR="${WORKDIR}/SDK"
-		# cmake_run_in "${S}_build" \
+		sed -e "s/CMAKE_CXX_STANDARD 11/CMAKE_CXX_STANDARD 17/" -i "SDK/CMakeLists.txt" || die
+
 		cmake_src_prepare
 	fi
 }
@@ -63,27 +64,44 @@ src_configure() {
 
 	filter-lto
 
-	# local -x CUDAHOSTCXX="$(cuda_gccdir)"
+	# cmake-4 #951350
+	: "${CMAKE_POLICY_VERSION_MINIMUM:=3.10}"
+	export CMAKE_POLICY_VERSION_MINIMUM
+
+	# allow slotted install
+	: "${CUDA_PATH:=${ESYSROOT}/opt/cuda}"
+	export CUDA_PATH
+
+	local -x CUDAHOSTCXX="$(cuda_gccdir)"
 	local -x CUDAHOSTLD="$(tc-getCXX)"
 	local mycmakeargs=(
 		-DCUDA_HOST_COMPILER="$(cuda_gccdir)"
+		-DGLFW_INSTALL="no"
+		-DCUDA_CHECK_DEPENDENCIES_DURING_COMPILE="yes"
+		-DOPTIX_OPTIXIR_BUILD_CONFIGURATION="${CMAKE_BUILD_TYPE}"
 	)
 
-	# cmake_run_in "${S}_build" \
+	if [[ -v CUDAARCHS ]]; then
+		local optix_CUDAARCHS="$(echo "${CUDAARCHS}" | tr ';' '\n' | sort | head -n1)"
+
+		mycmakeargs+=(
+			-DCUDA_MIN_SM_TARGET="sm_${optix_CUDAARCHS}"
+			-DCUDA_MIN_SM_COMPUTE_TARGET="compute_${optix_CUDAARCHS}"
+		)
+	fi
+
 	cmake_src_configure
 }
 
 src_compile() {
 	use headers-only && return
 
-	# cmake_run_in "${S}_build" \
 	cmake_src_compile
 }
 
 src_test() {
 	use headers-only && return
 
-	# cmake_run_in "${S}_build" \
 	cmake_src_test
 }
 
@@ -98,9 +116,9 @@ src_install() {
 		return
 	fi
 
-	# cd "${WORKDIR}/SDK_build" && cmake -P cmake_install.cmake
+	# missing a install target so cmake_src_install fails
 	cmake_run_in "${BUILD_DIR}" cmake -P cmake_install.cmake
 
-	DOCS=( doc/OptiX_{API_Reference,Programming_Guide}_${PV}.pdf )
+	local DOCS=( "doc/OptiX_"{API_Reference,Programming_Guide}"_${PV}.pdf" )
 	einstalldocs
 }
