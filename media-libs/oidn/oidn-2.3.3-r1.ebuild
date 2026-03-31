@@ -3,13 +3,13 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+PYTHON_COMPAT=( python3_{11..13} )
 ROCM_VERSION=6.3
 CUDA_DEVICE_TARGETS=1
 
 inherit cmake cuda python-any-r1 rocm
 
-DESCRIPTION="Intel® Open Image Denoise library"
+DESCRIPTION="Intel Open Image Denoise library"
 HOMEPAGE="https://www.openimagedenoise.org https://github.com/RenderKit/oidn"
 
 if [[ ${PV} = *9999* ]]; then
@@ -33,15 +33,21 @@ RESTRICT="!test? ( test )"
 RDEPEND="
 	dev-cpp/tbb:=
 	dev-lang/ispc
-	cuda? ( dev-util/nvidia-cuda-toolkit:= )
-	hip? ( dev-util/hip:= )
+	cuda? (
+		dev-util/nvidia-cuda-toolkit:=
+		dev-libs/cutlass
+	)
+	hip? (
+		dev-util/hip:=
+	)
 	openimageio? ( media-libs/openimageio:= )
 "
 DEPEND="${RDEPEND}"
 BDEPEND="${PYTHON_DEPS}"
 
 PATCHES=(
-	"${FILESDIR}/${PN}-2.2.2-amdgpu-targets.patch"
+	"${FILESDIR}/${PN}-2.3.3-amdgpu-targets.patch"
+	"${FILESDIR}/${PN}-2.3.3-backport-ck-utility-get_id.hpp-from-composable_kernel.patch"
 )
 
 src_prepare() {
@@ -50,32 +56,18 @@ src_prepare() {
 	fi
 
 	if use hip; then
-		if has_version ">=dev-util/hip-6.2"; then
-			eapply "${FILESDIR}/${PN}-2.3.1-hip-clang-19.patch"
-			eapply "${FILESDIR}/${PN}-2.3.1-system-composable-kernel.patch"
-			eapply "${FILESDIR}/${PN}-2.3.1-composable-kernel-api.patch"
-		fi
-
-		if has_version "dev-util/hip[llvm_slot_19]"; then
-			# Fix Clang 19 error
-			# Bug: https://github.com/RenderKit/oidn/issues/250
-			sed -i "s/.template Run(/.template Run<>(/g" \
-				external/composable_kernel/include/ck/tensor_operation/gpu/block/blockwise_gemm_wmma.hpp \
-				external/composable_kernel/include/ck/tensor_operation/gpu/block/blockwise_gemm_xdlops_skip_b_lds.hpp \
-				external/composable_kernel/include/ck/tensor_operation/gpu/block/blockwise_gemm_xdlops.hpp || die
-		fi
-
 		# https://bugs.gentoo.org/930391
 		sed "/-Wno-unused-result/s:): --rocm-path=${EPREFIX}/usr):" \
 			-i devices/hip/CMakeLists.txt || die
 	fi
 
-	sed -e "/^install.*llvm_macros.cmake.*cmake/d" -i CMakeLists.txt || die
 	# do not fortify source -- bug 895018
 	sed -e "s/-D_FORTIFY_SOURCE=2//g" -i {cmake/oidn_platform,external/mkl-dnn/cmake/SDL}.cmake || die
 
-	# 950261
-	sed -e "/set(CMAKE_CXX_STANDARD /s/^/# /" -i cmake/oidn_platform.cmake || die
+	# Don't de-bundle composable_kernel for two reasons:
+	# 1. sci-libs/composable-kernel takes a very long time to compile and oidn only uses a subset of it.
+	# 2. We've run into compilation issues when trying to debundle it. See #955869
+	rm -r external/{cutlass,mkl-dnn} || die
 
 	cmake_src_prepare
 }
@@ -84,6 +76,7 @@ src_configure() {
 	local mycmakeargs=(
 		-DOIDN_APPS="$(usex apps)"
 
+		-DOIDN_LIBRARY_VERSIONED="yes"
 		-DOIDN_DEVICE_CPU="yes"
 		-DOIDN_DEVICE_CUDA="$(usex cuda)"
 		-DOIDN_DEVICE_HIP="$(usex hip)"
@@ -109,7 +102,21 @@ src_configure() {
 	cmake_src_configure
 }
 
+src_compile() {
+	if use cuda; then
+		addpredict /dev/char/
+		cuda_add_sandbox
+	fi
+
+	cmake_src_compile
+}
+
 src_test() {
+	if use cuda; then
+		addpredict /dev/char/
+		cuda_add_sandbox -w
+	fi
+
 	"${BUILD_DIR}"/oidnTest || die "There were test failures!"
 }
 

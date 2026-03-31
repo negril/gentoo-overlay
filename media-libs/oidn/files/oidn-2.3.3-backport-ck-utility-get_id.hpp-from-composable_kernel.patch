@@ -1,0 +1,31 @@
+From bc39266b8fd896c96d66bc9678d1a93f0d91b898 Mon Sep 17 00:00:00 2001
+From: Ada Ahmed <yretenai@gmail.com>
+Date: Tue, 28 Oct 2025 16:55:52 +0530
+Subject: [PATCH] backport ck/utility/get_id.hpp from composable_kernel 7.0.2
+
+Signed-off-by: Ada Ahmed <yretenai@gmail.com>
+---
+ external/composable_kernel/include/ck/utility/get_id.hpp | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/external/composable_kernel/include/ck/utility/get_id.hpp b/external/composable_kernel/include/ck/utility/get_id.hpp
+index 77564c6..fd0d102 100644
+--- a/external/composable_kernel/include/ck/utility/get_id.hpp
++++ b/external/composable_kernel/include/ck/utility/get_id.hpp
+@@ -9,8 +9,11 @@ namespace ck {
+ 
+ __host__ __device__ constexpr index_t get_warp_size()
+ {
+-    // warpSize is defined by HIP
+-    return warpSize;
++#if defined(__GFX9__) || !defined(__HIP_DEVICE_COMPILE__)
++    return 64;
++#else
++    return 32;
++#endif
+ }
+ 
+ __device__ index_t get_thread_local_1d_id() { return threadIdx.x; }
+-- 
+2.51.1
+
