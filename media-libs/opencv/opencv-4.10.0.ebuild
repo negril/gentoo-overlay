@@ -1,9 +1,9 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+PYTHON_COMPAT=( python3_{11..13} )
 inherit cuda java-pkg-opt-2 cmake-multilib flag-o-matic multilib multiprocessing python-r1 toolchain-funcs virtualx xdg-utils
 
 DESCRIPTION="A collection of algorithms and sample code for various computer vision problems"
@@ -57,12 +57,13 @@ else
 			https://github.com/${PN}/${PN}_contrib/commit/667a66ee0e99f3f3263c1ef2de1b90d9244b7bd4.patch
 			-> ${PN}_contrib-4.10.0-3607.patch
 		)
-		test? (
-			https://github.com/${PN}/${PN}_extra/archive/refs/tags/${PV}.tar.gz -> ${PN}_extra-${PV}.tar.gz
-		)
 		contribdnn? (
 			https://github.com/ShiqiYu/libfacedetection.train/raw/02246e79b1e976c83d1e135a85e0628120c93769/onnx/yunet_s_640_640.onnx -> yunet-202303.onnx
 		)
+		test? (
+			https://github.com/${PN}/${PN}_extra/archive/refs/tags/${PV}.tar.gz -> ${PN}_extra-${PV}.tar.gz
+		)
+		https://github.com/opencv/opencv/commit/1db93911aeb65599f22db47d5d39f75bc94a821d.patch -> ${PN}-4.10.0-protobuf-30.patch
 	"
 	KEYWORDS="~amd64 ~arm ~arm64 ~loong ~ppc ~ppc64 ~riscv ~x86"
 fi
@@ -186,7 +187,7 @@ RESTRICT="!test? ( test )"
 
 COMMON_DEPEND="
 	app-arch/bzip2[${MULTILIB_USEDEP}]
-	dev-libs/protobuf:=[${MULTILIB_USEDEP}]
+	dev-libs/protobuf:=[protoc(+),protobuf(+),${MULTILIB_USEDEP}]
 	virtual/zlib:=[${MULTILIB_USEDEP}]
 	avif? ( media-libs/libavif:=[${MULTILIB_USEDEP}] )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
@@ -236,7 +237,7 @@ COMMON_DEPEND="
 		)
 	)
 	onnx? (
-		sci-libs/onnxruntime
+		sci-ml/onnxruntime
 	)
 	opencl? (
 		virtual/opencl[${MULTILIB_USEDEP}]
@@ -294,6 +295,11 @@ COMMON_DEPEND="
 		>=dev-libs/wayland-protocols-1.13
 	)
 "
+GST_TEST_DEPEND="
+	media-plugins/gst-plugins-aom[${MULTILIB_USEDEP}]
+	media-plugins/gst-plugins-mpeg2enc[${MULTILIB_USEDEP}]
+	media-plugins/gst-plugins-openh264[${MULTILIB_USEDEP}]
+"
 DEPEND="
 	${COMMON_DEPEND}
 	eigen? ( >=dev-cpp/eigen-3.3.8-r1:3 )
@@ -301,15 +307,18 @@ DEPEND="
 	test? (
 		wayland? ( dev-libs/weston[examples,headless,remoting,screen-sharing,wayland-compositor] )
 		gstreamer? (
-			media-plugins/gst-plugins-aom[${MULTILIB_USEDEP}]
+			amd64? ( ${GST_TEST_DEPEND} )
+			arm64? ( ${GST_TEST_DEPEND} )
+			x86? ( ${GST_TEST_DEPEND} )
+			arm? ( media-plugins/gst-plugins-openh264[${MULTILIB_USEDEP}] )
 			media-plugins/gst-plugins-jpeg[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-libav[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-mpeg2dec[${MULTILIB_USEDEP}]
-			media-plugins/gst-plugins-mpeg2enc[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-mpg123[${MULTILIB_USEDEP}]
-			media-plugins/gst-plugins-openh264[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-x264[${MULTILIB_USEDEP}]
-			media-plugins/gst-plugins-vpx[${MULTILIB_USEDEP}]
+			!ppc? ( !ppc64? (
+				media-plugins/gst-plugins-vpx[${MULTILIB_USEDEP}]
+			) )
 		)
 	)
 "
@@ -320,6 +329,7 @@ RDEPEND="
 unset COMMON_DEPEND
 
 BDEPEND="
+	dev-util/patchelf
 	virtual/pkgconfig
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	doc? (
@@ -349,6 +359,12 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.10.0-cuda-fp16.patch" # 25880
 	"${FILESDIR}/${PN}-4.10.0-26234.patch" # 26234
 	"${FILESDIR}/${PN}-4.10.0-tbb-detection.patch"
+
+	"${DISTDIR}/${P}-protobuf-30.patch" # drop in 4.11
+	"${FILESDIR}/${P}-cmake4.patch" # PR pending
+	"${FILESDIR}/${PN}-4.11.0-qt-6.9.patch" # https://github.com/opencv/opencv/issues/27223
+
+	"${FILESDIR}"/${PN}-4.11.0-fix-libspng-link.patch #  PR pending #27314
 
 	# TODO applied in src_prepare
 	# "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
@@ -549,7 +565,7 @@ src_prepare() {
 			)-${file}" || die
 
 		mkdir -p "${WORKDIR}/${PN}_extra-${PV}/testdata/cv/dnn/onnx/models/" || die
-		mv "${DISTDIR}/yunet-202303.onnx" "${WORKDIR}/${PN}_extra-${PV}/testdata/cv/dnn/onnx/models/" || die
+		cp "${DISTDIR}/yunet-202303.onnx" "${WORKDIR}/${PN}_extra-${PV}/testdata/cv/dnn/onnx/models/" || die
 	fi
 
 	if use cuda; then
@@ -580,10 +596,6 @@ src_prepare() {
 multilib_src_configure() {
 	# bug #919101 and https://github.com/opencv/opencv/issues/19020
 	filter-lto
-
-	if tc-is-gcc && [[ $(gcc-major-version) -ge 15 ]] && use contribdnn; then
-		append-cxxflags "-fno-tree-vectorize"
-	fi
 
 	# please don't sort here, order is the same as in CMakeLists.txt
 	local mycmakeargs=(
@@ -656,7 +668,7 @@ multilib_src_configure() {
 		-DWITH_AVIF="$(usex avif)"
 		-DWITH_FREETYPE="$(usex truetype)"
 		-DWITH_ONNX="$(multilib_native_usex onnx)"
-		-DONNXRT_ROOT_DIR="${EPREFIX}/usr/"
+		-DONNXRT_ROOT_DIR="${ONNXRT_ROOT_DIR:-${ESYSROOT}/usr/}"
 		-DWITH_VULKAN="$(usex vulkan)"
 		-DWITH_WAYLAND="$(usex wayland)"
 	# ===================================================
@@ -669,7 +681,7 @@ multilib_src_configure() {
 		# NOTE set this via MYCMAKEARGS if needed
 		-DWITH_NVCUVID="no" # TODO needs NVIDIA Video Codec SDK
 		-DWITH_NVCUVENC="no" # TODO needs NVIDIA Video Codec SDK
-		-DCUDA_NPP_LIBRARY_ROOT_DIR="$(usex cuda "${CUDA_PATH:=${EPREFIX}/opt/cuda}" "")"
+		-DCUDA_NPP_LIBRARY_ROOT_DIR="$(usex cuda "${CUDA_PATH:-${ESYSROOT}/opt/cuda}" "")"
 	# ===================================================
 	# OpenCV build components
 	# ===================================================
@@ -884,8 +896,8 @@ multilib_src_configure() {
 				)
 			fi
 		else
-			local -x CUDAARCHS
 			: "${CUDAARCHS:="$(cuda_get_host_native_arch)"}"
+			export CUDAARCHS
 		fi
 
 		local -x CUDAHOSTCXX CUDAHOSTLD
