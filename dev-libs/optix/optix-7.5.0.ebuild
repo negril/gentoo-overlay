@@ -42,8 +42,8 @@ unset i
 LICENSE="NVIDIA-SDK"
 SLOT="0"
 KEYWORDS="~amd64 ~arm64"
-RESTRICT="bindist mirror !headers-only? ( fetch )"
 IUSE="+headers-only"
+RESTRICT="bindist mirror !headers-only? ( fetch )"
 
 RDEPEND=">=x11-drivers/nvidia-drivers-510"
 

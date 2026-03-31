@@ -21,4 +21,7 @@
   <use>
     <flag name="headers-only">Download and install only the header files</flag>
   </use>
+  <upstream>
+    <remote-id type="github">NVIDIA/optix-dev</remote-id>
+  </upstream>
 </pkgmetadata>
