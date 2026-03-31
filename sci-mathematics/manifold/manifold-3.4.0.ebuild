@@ -62,7 +62,7 @@ src_configure() {
 		-DMANIFOLD_CROSS_SECTION="yes"
 		-DMANIFOLD_DEBUG="$(usex debug)"
 		-DMANIFOLD_DOWNLOADS="no"
-		-DMANIFOLD_EXPORT="$(usex assimp)"
+		-DASSIMP_ENABLE="$(usex assimp)"
 		-DMANIFOLD_JSBIND="no"
 		-DMANIFOLD_PAR="$(usex tbb ON OFF)"
 		-DMANIFOLD_STRICT="no" # adds -Werror

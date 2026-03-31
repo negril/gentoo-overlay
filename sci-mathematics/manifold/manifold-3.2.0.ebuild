@@ -25,18 +25,16 @@ else
 fi
 
 LICENSE="Apache-2.0"
-# SONAME
-SLOT="0/3"
+SLOT="0/1"
 
-IUSE="assimp debug python +tbb test"
+IUSE="debug python +tbb test"
 REQUIRED_USE="python? ( ${PYTHON_REQUIRED_USE} )"
 
 RESTRICT="!test? ( test )"
 
 RDEPEND="
-	sci-mathematics/clipper2:=
-	assimp? ( media-libs/assimp:= )
 	tbb? ( dev-cpp/tbb:= )
+	sci-mathematics/clipper2:=
 	python? ( ${PYTHON_DEPS}
 		$(python_gen_cond_dep '
 			dev-python/numpy[${PYTHON_USEDEP}]
@@ -57,15 +55,26 @@ pkg_setup() {
 	use python && python-single-r1_pkg_setup
 }
 
+src_prepare() {
+	cmake_src_prepare
+
+	sed \
+		-e "/list(APPEND MANIFOLD_FLAGS/s/^/# DONOTSET /" \
+		-i CMakeLists.txt || die
+
+	sed \
+		-e '/<memory>/a#include <cstdint>' \
+		-i include/manifold/manifold.h || die
+}
+
 src_configure() {
 	local mycmakeargs=(
 		-DMANIFOLD_CROSS_SECTION="yes"
 		-DMANIFOLD_DEBUG="$(usex debug)"
 		-DMANIFOLD_DOWNLOADS="no"
-		-DMANIFOLD_EXPORT="$(usex assimp)"
+		-DMANIFOLD_EXPORT="no"
 		-DMANIFOLD_JSBIND="no"
 		-DMANIFOLD_PAR="$(usex tbb ON OFF)"
-		-DMANIFOLD_STRICT="no" # adds -Werror
 		-DMANIFOLD_PYBIND="$(usex python)"
 		-DMANIFOLD_TEST="$(usex test)"
 	)
