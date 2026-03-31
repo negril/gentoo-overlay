@@ -38,7 +38,7 @@ S="${WORKDIR}/VTK-${PV}"
 
 LICENSE="BSD LGPL-2"
 SLOT="0/${MY_PV}"
-KEYWORDS="~amd64 ~arm ~arm64 ~x86 ~amd64-linux ~x86-linux"
+KEYWORDS="~amd64 ~arm ~arm64 ~x86"
 
 # TODO: Like to simplify these. Mostly the flags related to Groups.
 IUSE="
@@ -144,7 +144,7 @@ RDEPEND="
 	dev-libs/icu:=
 	dev-libs/jsoncpp:=
 	>=dev-libs/libfmt-8.1.1:=
-	dev-libs/libxml2:2
+	dev-libs/libxml2:2=
 	dev-libs/libzip:=
 	dev-libs/pugixml
 	media-libs/freetype
@@ -213,7 +213,7 @@ RDEPEND="
 DEPEND="
 	${RDEPEND}
 	dev-cpp/cli11
-	dev-cpp/eigen
+	dev-cpp/eigen:=
 	dev-cpp/nlohmann_json
 	>=dev-libs/pegtl-3
 	dev-libs/utfcpp
@@ -327,7 +327,7 @@ cuda_get_host_native_arch() {
 }
 
 pkg_pretend() {
-	[[ ${MERGE_TYPE} != binary ]] && has openmp && tc-check-openmp
+	[[ ${MERGE_TYPE} != binary ]] && use openmp && tc-check-openmp
 
 	vtk_check_reqs
 
@@ -339,7 +339,7 @@ pkg_pretend() {
 }
 
 pkg_setup() {
-	[[ ${MERGE_TYPE} != binary ]] && has openmp && tc-check-openmp
+	[[ ${MERGE_TYPE} != binary ]] && use openmp && tc-check-openmp
 
 	vtk_check_reqs
 
