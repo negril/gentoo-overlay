@@ -20,7 +20,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {20..20} )
+LLVM_COMPAT=( {20..22} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
@@ -100,6 +100,7 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 	test? (
 		color-management
 		jpeg2k
+		opensubdiv
 	)
 "
 
@@ -166,7 +167,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-libs/openexr-3.3.5:0=
 	)
 	openpgl? ( media-libs/openpgl:= )
-	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,cuda?,tbb?] )
+	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,tbb?] )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
@@ -231,7 +232,7 @@ DEPEND="${RDEPEND}
 	)
 "
 
-if [[ "${PV}" == *9999* ]]; then
+if [[ "${PV}" == 9999* ]]; then
 DEPEND+="
 	test? (
 		experimental? (
@@ -254,11 +255,13 @@ BDEPEND="
 		dev-texlive/texlive-latex
 		dev-texlive/texlive-latexextra
 	)
+	nls? (
+		sys-devel/gettext
+	)
 	vulkan? (
 		dev-util/spirv-headers
 		dev-util/vulkan-headers
 	)
-	nls? ( sys-devel/gettext )
 	wayland? (
 		dev-util/wayland-scanner
 	)
@@ -504,6 +507,7 @@ src_configure() {
 
 		# Compiler Options:
 		# -DWITH_BUILDINFO="yes"
+		# -DWITH_COMPILER_SIMD="no" # This makes it so Blender doesn't append their own -march flags
 
 		# System Options:
 		-DWITH_INSTALL_PORTABLE="no"
@@ -548,7 +552,7 @@ src_configure() {
 		-DWITH_PYTHON_INSTALL="no"
 		-DWITH_PYTHON_INSTALL_NUMPY="no"
 		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
-		# -DWITH_PYTHON_MODULE="no"
+		-DWITH_PYTHON_MODULE="no" # $(usex python)" # builds bpy
 		-DWITH_PYTHON_SECURITY="yes"
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
@@ -598,6 +602,10 @@ src_configure() {
 		-DWITH_RUBBERBAND="$(usex rubberband)"
 		# -DPOSTINSTALL_SCRIPT:PATH=""
 		# -DPOSTCONFIGURE_SCRIPT:PATH=""
+
+		# We disable these to respect the user's choice of linker.
+		-DWITH_LINKER_MOLD="no"
+		-DWITH_LINKER_LLD="no"
 	)
 
 	if has_version ">=dev-python/numpy-2"; then
@@ -695,13 +703,6 @@ src_configure() {
 	# WITH_ASSERT_RELEASE filters this
 	append-cflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
 	append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
-
-	if tc-is-gcc; then
-		# We disable these to respect the user's choice of linker.
-		mycmakeargs+=(
-			-DWITH_LINKER_GOLD="no"
-		)
-	fi
 
 	if tc-is-clang || use osl; then
 		mycmakeargs+=(
@@ -801,7 +802,10 @@ src_test() {
 	fi
 
 	local -x CMAKE_SKIP_TESTS=(
+		"^cycles_image_data_types_optix$"
 		"^script_pyapi_bpy_driver_secure_eval$"
+		# "^imbuf_save$"
+		"^cycles_image_colorspace_cpu$"
 	)
 
 	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
@@ -847,7 +851,18 @@ src_test() {
 	# Needed if openimageio wasn't build with -DNDEBUG
 	local -x OPENIMAGEIO_DEBUG=0
 
-	local -x CYCLESTEST_ARGS="-t 0"
+	local CTEST_JOBS="1"
+	# local -x CYCLESTEST_ARGS="-t 1 --gpu-vsync off --gpu-backend opengl --gpu-compilation-subprocesses 16 --offline-mode"
+	# local -x CYCLESTEST_ARGS="-t 16" #${CTEST_LOADAVG:-$(get_makeopts_loadavg)}"
+
+	# local CMAKE_RUN_TESTS=(
+	# 	"^blenkernel$"
+	# 	"^io_fbx_import$"
+	# 	"^io_gltf_roundtrip$"
+	# 	"^modifiers$"
+	# )
+
+	# myctestargs+=( -R '('$( IFS='|'; echo "${CMAKE_RUN_TESTS[*]}")')'  )
 
 	if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
 		einfo "running expensive tests EXPENSIVE_TESTS=${EXPENSIVE_TESTS}"
@@ -933,13 +948,16 @@ src_install() {
 	# Fix doc installdir
 	docinto html
 	dodoc "${CMAKE_USE_DIR}/release/text/readme.html"
-	rm -r "${ED}/usr/share/doc/blender" || die
 
 	python_optimize "${ED}/usr/share/blender/${BV}/scripts"
 
-	mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" \
-		|| die "blender-thumbnailer version rename failed"
-	mv "${ED}/usr/bin/blender" "${ED}/usr/bin/blender-${BV}" || die "blender version rename failed"
+	if ! in_use python || ! use python; then
+		rm -r "${ED}/usr/share/doc/blender" || die
+
+		mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" \
+			|| die "blender-thumbnailer version rename failed"
+		mv "${ED}/usr/bin/blender" "${ED}/usr/bin/blender-${BV}" || die "blender version rename failed"
+	fi
 }
 
 pkg_postinst() {

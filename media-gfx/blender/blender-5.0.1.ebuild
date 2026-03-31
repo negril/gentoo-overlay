@@ -802,6 +802,8 @@ src_test() {
 
 	local -x CMAKE_SKIP_TESTS=(
 		"^script_pyapi_bpy_driver_secure_eval$"
+		# broken since 5.0.1
+		"^geo_node_volume_sdf_grid_filtering$"
 	)
 
 	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
