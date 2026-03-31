@@ -34,7 +34,7 @@ RESTRICT="!test? ( test )"
 
 RDEPEND="
 	tbb? ( dev-cpp/tbb:= )
-	sci-mathematics/clipper2
+	sci-mathematics/clipper2:=
 	python? ( ${PYTHON_DEPS}
 		$(python_gen_cond_dep '
 			dev-python/numpy[${PYTHON_USEDEP}]
