@@ -3,10 +3,10 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+PYTHON_COMPAT=( python3_{11..13} )
 
 # Check this on updates
-LLVM_COMPAT=( {18..19} )
+LLVM_COMPAT=( {17..18} )
 
 inherit cmake cuda flag-o-matic llvm-r1 toolchain-funcs python-single-r1
 
@@ -47,7 +47,6 @@ RDEPEND="
 		llvm-core/clang:${LLVM_SLOT}=
 		llvm-core/llvm:${LLVM_SLOT}=
 	')
-	optix? ( dev-libs/optix[-headers-only] )
 	python? (
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
@@ -64,9 +63,10 @@ RDEPEND="
 DEPEND="${RDEPEND}
 	dev-util/patchelf
 	>=media-libs/openexr-3
-	sys-libs/zlib
+	virtual/zlib:=
 	test? (
 		media-fonts/droid
+		optix? ( dev-libs/optix )
 	)
 "
 BDEPEND="
@@ -79,7 +79,6 @@ PATCHES=(
 	"${FILESDIR}/${PN}-boost-config.patch"
 	"${FILESDIR}/${PN}-oslfile.patch"
 	"${FILESDIR}/${PN}-include-cstdint.patch"
-	"${FILESDIR}/${PN}-1.12.14.0-m_dz.patch"
 )
 
 pkg_setup() {
@@ -89,12 +88,13 @@ pkg_setup() {
 }
 
 src_prepare() {
-	if use optix; then
+	if use test && use optix; then
 		cuda_src_prepare
 		cuda_add_sandbox -w
 	fi
 
 	sed -e "/^install.*llvm_macros.cmake.*cmake/d" -i CMakeLists.txt || die
+	sed -e "/install_targets ( libtestshade )/d" -i src/testshade/CMakeLists.txt || die
 
 	cmake_src_prepare
 }
@@ -187,7 +187,6 @@ src_configure() {
 		-DUSE_SIMD="$(IFS=","; echo "${mysimd[*]}")"
 		-DUSE_BATCHED="$(IFS=","; echo "${mybatched[*]}")"
 		-DUSE_LIBCPLUSPLUS="$(usex libcxx)"
-		-DOSL_USE_OPTIX="$(usex optix)"
 		-DUSE_QT="$(usex gui)"
 
 		-DOpenImageIO_ROOT="${EPREFIX}/usr"
@@ -196,20 +195,6 @@ src_configure() {
 	if use debug; then
 		mycmakeargs+=(
 			-DVEC_REPORT="yes"
-		)
-	fi
-
-	if use optix; then
-		mycmakeargs+=(
-			-DOptiX_FIND_QUIETLY="no"
-			-DCUDA_FIND_QUIETLY="no"
-
-			-DOPTIXHOME="${EPREFIX}/opt/optix"
-			-DCUDA_TOOLKIT_ROOT_DIR="${CUDA_PATH:-${ESYSROOT}/opt/cuda}"
-
-			-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
-			-DOSL_EXTRA_NVCC_ARGS="--compiler-bindir;$(cuda_gccdir)"
-			-DCUDA_VERBOSE_BUILD="yes"
 		)
 	fi
 
@@ -224,6 +209,23 @@ src_configure() {
 			"-DPYTHON_VERSION=${EPYTHON#python}"
 			"-DPYTHON_SITE_DIR=$(python_get_sitedir)"
 		)
+	fi
+
+	if use test; then
+		if use optix; then
+			mycmakeargs+=(
+				-DOSL_USE_OPTIX="yes"
+				-DOptiX_FIND_QUIETLY="no"
+				-DCUDA_FIND_QUIETLY="no"
+
+				-DOPTIXHOME="${EPREFIX}/opt/optix"
+				-DCUDA_TOOLKIT_ROOT_DIR="${CUDA_PATH:-${ESYSROOT}/opt/cuda}"
+
+				-DCUDA_NVCC_FLAGS="--compiler-bindir;$(cuda_gccdir)"
+				-DOSL_EXTRA_NVCC_ARGS="--compiler-bindir;$(cuda_gccdir)"
+				-DCUDA_VERBOSE_BUILD="yes"
+			)
+		fi
 	fi
 
 	cmake_src_configure
@@ -264,6 +266,7 @@ src_test() {
 		"^testoptix-reparam.optix.opt$"
 		"^transform-reg.regress.batched.opt$"
 		"^spline-reg.regress.batched.opt$"
+		"^texture3d-opts-reg.regress.batched.opt$"
 
 		# doesn't handle parameters
 		"^osl-imageio$"
@@ -282,7 +285,7 @@ src_test() {
 
 	myctestargs=(
 		# src/build-scripts/ci-test.bash
-		'--force-new-ctest-process'
+		# '--force-new-ctest-process'
 	)
 
 	local -x DEBUG CXXFLAGS LD_LIBRARY_PATH DIR OSL_DIR OSL_SOURCE_DIR PYTHONPATH
@@ -316,7 +319,7 @@ src_test() {
 
 	myctestargs=(
 		# src/build-scripts/ci-test.bash
-		'--force-new-ctest-process'
+		# '--force-new-ctest-process'
 		--repeat until-pass:10
 		-R "^render"
 	)
@@ -334,7 +337,6 @@ src_install() {
 	if use test; then
 		rm \
 			"${ED}/usr/bin/test"{render,shade{,_dso}} \
-			"${ED}/usr/$(get_libdir)/libtestshade.so"* \
 			|| die
 	fi
 

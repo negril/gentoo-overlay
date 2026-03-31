@@ -1,4 +1,4 @@
-# Copyright 1999-2026 Gentoo Authors
+# Copyright 1999-2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -7,7 +7,7 @@ EAPI=8
 PYTHON_COMPAT=( python3_{11..13} )
 
 # Check this on updates
-LLVM_COMPAT=( {18..22} )
+LLVM_COMPAT=( {18..21} )
 
 inherit cmake cuda flag-o-matic llvm-r1 toolchain-funcs python-single-r1
 
@@ -439,7 +439,7 @@ src_test() {
 		--repeat until-pass:10
 	)
 
-# 	cmake_src_test
+	cmake_src_test
 }
 
 src_install() {

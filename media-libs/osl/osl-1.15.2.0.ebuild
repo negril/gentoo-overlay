@@ -439,7 +439,7 @@ src_test() {
 		--repeat until-pass:10
 	)
 
-# 	cmake_src_test
+	cmake_src_test
 }
 
 src_install() {
