@@ -128,7 +128,7 @@ RDEPEND="${PYTHON_DEPS}
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
 	oidn? ( >=media-libs/oidn-2.1.0 )
-	oneapi? ( dev-libs/intel-compute-runtime[l0] )
+	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
@@ -139,7 +139,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
 	)
-	optix? ( dev-libs/optix )
+	optix? ( <dev-libs/optix-9:= )
 	osl? (
 		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
@@ -213,6 +213,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-CUDA_NVCC_FLAGS.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
+	"${FILESDIR}/${PN}-4.2.9-python3.13.patch"
 
 	"${FILESDIR}/${PN}-4.3.2-openvdb-12.patch"
 )
@@ -555,7 +556,7 @@ src_test() {
 
 	# Sanity check that the script and datafile path is valid.
 	# If they are not vaild, blender will fallback to the default path which is not what we want.
-	[[ -d "$BLENDER_SYSTEM_RESOURCES" ]] || die "The custom resources path is invalid, fix the ebuild!"
+	[[ -d "${BLENDER_SYSTEM_RESOURCES}" ]] || die "The custom resources path is invalid, fix the ebuild!"
 
 	if use cuda; then
 		cuda_add_sandbox -w
