@@ -3,22 +3,31 @@
 
 EAPI=8
 
+# OPENCV_CMAKE_DEBUG_MESSAGES
+
 PYTHON_COMPAT=( python3_{11..13} )
-inherit cuda java-pkg-opt-2 cmake-multilib flag-o-matic multilib multiprocessing python-r1 toolchain-funcs virtualx xdg-utils
+
+inherit flag-o-matic multilib multiprocessing toolchain-funcs
+inherit cuda java-pkg-opt-2 cmake-multilib python-r1 virtualx xdg-utils
 
 DESCRIPTION="A collection of algorithms and sample code for various computer vision problems"
 HOMEPAGE="https://opencv.org"
 
-# TODO
-# - dnn: move module from opencv_contrib
-#   https://github.com/opencv/opencv/commit/93729784bb1c4e544e07ec27a43ef57c4f456cec
-
-if [[ ${PV} = *9999* ]] ; then
+if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/${PN}/${PN}.git"
+	if [[ ${PV} = 4.9999* ]]; then
+		EGIT_BRANCH="4.x"
+	elif [[ ${PV} = 5.9999* ]]; then
+		EGIT_BRANCH="5.x"
+	fi
+	NVIDIA_OPTICAL_FLOW_COMMIT="edb50da3cf849840d680249aa6dbef248ebce2ca"
+	# branch v0.1.2e
+	ADE_PV="0.1.2e"
+	ADE_MD5="e36774fc32e99463462f5b882f5d572d"
 else
-	# branch master
-	ADE_PV="0.1.2d"
+	# branch v0.1.2e
+	ADE_PV="0.1.2e"
 	# branch wechat_qrcode_20210119
 	QRCODE_COMMIT="a8b69ccc738421293254aec5ddb38bd523503252"
 	# branch dnn_samples_face_detector_20170830
@@ -37,7 +46,7 @@ else
 		https://github.com/opencv/ade/archive/v${ADE_PV}.tar.gz -> ade-${ADE_PV}.tar.gz
 		contrib? (
 			https://github.com/${PN}/${PN}_contrib/archive/${PV}.tar.gz -> ${PN}_contrib-${PV}.tar.gz
-			dnnsamples? (
+			wechat-qrcode? (
 				https://github.com/${PN}/${PN}_3rdparty/archive/${QRCODE_COMMIT}.tar.gz -> ${PN}_3rdparty-${QRCODE_COMMIT}.tar.gz
 				https://github.com/${PN}/${PN}_3rdparty/archive/${DNN_SAMPLES_FACE_DETECTOR_COMMIT}.tar.gz
 					-> ${PN}_3rdparty-${DNN_SAMPLES_FACE_DETECTOR_COMMIT}.tar.gz
@@ -57,16 +66,56 @@ else
 			https://github.com/${PN}/${PN}_contrib/commit/667a66ee0e99f3f3263c1ef2de1b90d9244b7bd4.patch
 			-> ${PN}_contrib-4.10.0-3607.patch
 		)
-		contribdnn? (
-			https://github.com/ShiqiYu/libfacedetection.train/raw/02246e79b1e976c83d1e135a85e0628120c93769/onnx/yunet_s_640_640.onnx -> yunet-202303.onnx
-		)
 		test? (
 			https://github.com/${PN}/${PN}_extra/archive/refs/tags/${PV}.tar.gz -> ${PN}_extra-${PV}.tar.gz
 		)
-		https://github.com/opencv/opencv/commit/1db93911aeb65599f22db47d5d39f75bc94a821d.patch -> ${PN}-4.10.0-protobuf-30.patch
+		contribdnn? (
+			https://github.com/ShiqiYu/libfacedetection.train/raw/02246e79b1e976c83d1e135a85e0628120c93769/onnx/yunet_s_640_640.onnx -> yunet-202303.onnx
+		)
+		https://github.com/opencv/opencv_contrib/commit/2ad42248bbc3f6a6c427a1ae9265246a4bb28766.patch -> ${PN}_contrib-PR4066.patch
 	"
-	KEYWORDS="~amd64 ~arm ~arm64 ~loong ~ppc ~ppc64 ~riscv ~x86"
+	KEYWORDS="~amd64 ~arm ~arm64 ~loong ~ppc64 ~riscv ~x86"
 fi
+
+# dnn/bvlc_alexnet.caffemodel
+# dnn/bvlc_googlenet.caffemodel
+# dnn/colorization_deploy_v2.prototxt
+# dnn/DenseNet_121.caffemodel
+# dnn/DenseNet_121.prototxt
+# dnn/Enet-model-best.net
+# dnn/faster_rcnn_inception_v2_coco_2018_01_28.pb
+# dnn/faster_rcnn_resnet50_coco_2018_01_28.pb
+# dnn/fast_neural_style_eccv16_starry_night.t7
+# dnn/fcn8s-heavy-pascal.caffemodel
+# dnn/MobileNetSSD_deploy_19e3ec3.caffemodel
+# dnn/MobileNetSSD_deploy_19e3ec3.prototxt
+# dnn/onnx/models/caffenet.onnx
+# dnn/onnx/models/inception_v2.onnx
+# dnn/onnx/models/mobilenetv2.onnx
+# dnn/onnx/models/rcnn_ilsvrc13.onnx
+# dnn/onnx/models/shufflenet.onnx
+# dnn/opencv_face_detector.caffemodel
+# dnn/opencv_face_detector_fp16.caffemodel
+# dnn/openface_nn4.small2.v1.t7
+# dnn/openpose_pose_coco.caffemodel
+# dnn/openpose_pose_mpi.caffemodel
+# dnn/ResNet-50-model.caffemodel
+# dnn/resnet50_rfcn_final.caffemodel
+# dnn/squeezenet_v1.1.caffemodel
+# dnn/ssd_inception_v2_coco_2017_11_17.pb
+# dnn/ssd_mobilenet_v1_coco_2017_11_17.pb
+# dnn/ssd_mobilenet_v1_ppn_coco.pb
+# dnn/ssd_mobilenet_v2_coco_2018_03_29.pb
+# dnn/tensorflow_inception_graph.pb
+# dnn/tiny-yolo-voc.weights
+# dnn/VGG16_faster_rcnn_final.caffemodel
+# dnn/VGG_ILSVRC2016_SSD_300x300_iter_440000.caffemodel
+# dnn/yolov3.weights
+# dnn/yolov4-tiny-2020-12.weights
+# dnn/yolov4.weights
+# dnn/yolov4x-mish.weights
+# dnn/yolo-voc.weights
+# dnn/ZF_faster_rcnn_final.caffemodel
 
 LICENSE="Apache-2.0"
 SLOT="0/${PV}" # subslot = libopencv* soname version
@@ -75,41 +124,42 @@ SLOT="0/${PV}" # subslot = libopencv* soname version
 IUSE="debug doc +eigen gflags glog java non-free opencvapps python test testprograms"
 
 # modules
-IUSE+=" contrib contribcvv contribdnn contribfreetype contribhdf contribovis contribsfm contribxfeatures2d dnnsamples examples features2d"
+IUSE+=" contrib contribcvv contribdnn contribfreetype contribhdf contribovis contribsfm contribxfeatures2d examples features2d wechat-qrcode"
 # hardware
 IUSE+=" cuda cudnn onnx opencl video_cards_intel"
 # video
 IUSE+=" +ffmpeg gphoto2 gstreamer ieee1394 openni openni2 xine vaapi v4l"
 # image
-IUSE+=" avif gdal jasper jpeg jpeg2k openexr png quirc spng tesseract tiff webp"
+IUSE+=" avif gdal gif jasper jpeg jpeg2k openexr png quirc spng tesseract tiff webp"
 # gui
 IUSE+=" gtk3 qt6 opengl truetype vtk vulkan wayland"
 # parallel
 IUSE+=" openmp tbb"
 # lapack options
-IUSE+=" atlas lapack mkl"
+IUSE+=" lapack atlas mkl openblas +reference"
 
 # from cmake/OpenCVCompilerOptimizations.cmake
 # TODO make this only relevant for binhost
 CPU_FEATURES_MAP=(
+	cpu_flags_arm_sve:SVE
 	cpu_flags_arm_neon:NEON
 	cpu_flags_arm_vfpv3:VFPV3
 
-	# cpu_flags_arm_fp:FP16
+	cpu_flags_arm_fp:FP16
 
 	cpu_flags_arm_asimddp:NEON_DOTPROD
-	# cpu_flags_arm_neon_fp16:NEON_FP16
-	# cpu_flags_arm_neon_bf16:NEON_BF16
+	cpu_flags_arm_neon-fp16:NEON_FP16
+	cpu_flags_arm_neon-bf16:NEON_BF16
 
-	# cpu_flags_loong_lsx:LSX
-	# cpu_flags_loong_lasx:LASX
+	cpu_flags_loong_lsx:LSX
+	cpu_flags_loong_lasx:LASX
 
-	# cpu_flags_mips_msa:MSA
+	cpu_flags_mips_msa:MSA
 
 	cpu_flags_ppc_vsx:VSX   # (always available on Power8)
 	cpu_flags_ppc_vsx3:VSX3 # (always available on Power9)
 
-	# cpu_flags_riscv_rvv:RVV
+	cpu_flags_riscv_rvv:RVV
 
 	cpu_flags_x86_sse:SSE   # (always available on 64-bit CPUs)
 	cpu_flags_x86_sse2:SSE2 # (always available on 64-bit CPUs)
@@ -144,6 +194,16 @@ CPU_FEATURES_MAP=(
 	cpu_flags_x86_avx512_4fmaps:AVX_5124FMAPS
 	cpu_flags_x86_avx512_4vnniw:AVX_5124VNNIW
 
+# AVX_512F AVX512_COMMON AVX512_KNL AVX512_KNM AVX512_SKX AVX512_CNL AVX512_CLX AVX512_ICL
+# CPU features groups:
+# AVX512_COMMON (Common instructions AVX-512F/CD for all CPUs that support AVX-512)
+# AVX512_KNL (Knights Landing with AVX-512F/CD/ER/PF)
+# AVX512_KNM (Knights Mill with AVX-512F/CD/ER/PF/4FMAPS/4VNNIW/VPOPCNTDQ)
+# AVX512_SKX (Skylake-X with AVX-512F/CD/BW/DQ/VL)
+# AVX512_CNL (Cannon Lake with AVX-512F/CD/BW/DQ/VL/IFMA/VBMI)
+# AVX512_CLX (Cascade Lake with AVX-512F/CD/BW/DQ/VL/VNNI)
+# AVX512_ICL (Ice Lake with AVX-512F/CD/BW/DQ/VL/IFMA/VBMI/VNNI/VBMI2/BITALG/VPOPCNTDQ/VPCLMULQDQ*/GFNI*/VAES*)
+
 )
 IUSE+=" ${CPU_FEATURES_MAP[*]%:*}"
 
@@ -162,31 +222,33 @@ REQUIRED_USE="
 		contrib
 	)
 	cudnn? ( cuda )
-	dnnsamples? ( examples )
 	gflags? ( contrib )
 	glog? ( contrib )
 	contribcvv? ( contrib qt6 )
-	contribdnn? ( contrib )
 	contribfreetype? ( contrib )
 	contribhdf? ( contrib )
 	contribovis? ( contrib )
 	contribsfm? ( contrib eigen gflags glog )
 	contribxfeatures2d? ( contrib )
+	lapack? ( ?? ( atlas mkl openblas reference ) )
 	java? ( python )
-	opengl? ( || ( qt6 wayland ) )
+	opengl? ( || ( gtk3 qt6 wayland ) )
 	jasper? ( !abi_x86_32 )
 	python? ( ${PYTHON_REQUIRED_USE} )
 	tesseract? ( contrib )
-	?? ( gtk3 qt6 wayland )
 	testprograms? ( test )
 	test? ( || ( ffmpeg gstreamer ) jpeg png tiff features2d )
-	wayland? ( !vtk )
+	wechat-qrcode? ( contribdnn )
 "
+#	examples? ( opencl )
+# 	wayland? ( !vtk )
+# 	?? ( gtk3 qt6 wayland )
 
 RESTRICT="!test? ( test )"
 
+# NOTE
+# dev-libs/flatbuffers is header only, but we still want to rebuild on sub-slot changes
 COMMON_DEPEND="
-	app-arch/bzip2[${MULTILIB_USEDEP}]
 	dev-libs/protobuf:=[protoc(+),protobuf(+),${MULTILIB_USEDEP}]
 	virtual/zlib:=[${MULTILIB_USEDEP}]
 	avif? ( media-libs/libavif:=[${MULTILIB_USEDEP}] )
@@ -195,7 +257,10 @@ COMMON_DEPEND="
 		dev-cpp/abseil-cpp:=
 		dev-libs/cudnn:=
 	)
-	contribdnn? ( dev-libs/flatbuffers:= )
+	contribdnn? (
+		dev-cpp/abseil-cpp:=
+		>=dev-libs/flatbuffers-25.9.23:=
+	)
 	contribhdf? ( sci-libs/hdf5:= )
 	contribfreetype? (
 		media-libs/freetype:2[${MULTILIB_USEDEP}]
@@ -203,7 +268,6 @@ COMMON_DEPEND="
 	)
 	contribovis? ( >=dev-games/ogre-1.12:= )
 	ffmpeg? ( media-video/ffmpeg:0=[${MULTILIB_USEDEP}] )
-	truetype? ( media-libs/freetype:2[${MULTILIB_USEDEP}] )
 	gdal? ( sci-libs/gdal:= )
 	gflags? ( dev-cpp/gflags:=[${MULTILIB_USEDEP}] )
 	glog? ( dev-cpp/glog:=[${MULTILIB_USEDEP}] )
@@ -220,14 +284,19 @@ COMMON_DEPEND="
 		media-libs/libdc1394:=[${MULTILIB_USEDEP}]
 		sys-libs/libraw1394[${MULTILIB_USEDEP}]
 	)
-	jpeg? ( media-libs/libjpeg-turbo:=[${MULTILIB_USEDEP}] )
+	jpeg? ( >=media-libs/libjpeg-turbo-3.1.0:=[${MULTILIB_USEDEP}] )
 	jpeg2k? (
 		jasper? ( media-libs/jasper:= )
-		!jasper? ( media-libs/openjpeg:2=[${MULTILIB_USEDEP}] )
+		!jasper? ( >=media-libs/openjpeg-2.5.3:2=[${MULTILIB_USEDEP}] )
 	)
 	lapack? (
 		atlas? ( sci-libs/atlas )
-		mkl? ( sci-libs/mkl )
+		mkl? (
+			sci-libs/mkl[tbb?]
+			openmp? ( sci-libs/mkl[gnu-openmp] )
+		)
+		openblas? ( sci-libs/openblas )
+		reference? ( sci-libs/lapack[lapacke] )
 		!atlas? (
 			!mkl? (
 				virtual/cblas
@@ -259,19 +328,21 @@ COMMON_DEPEND="
 	)
 	png? (
 		!spng? ( media-libs/libpng:0=[${MULTILIB_USEDEP}] )
-		spng? ( media-libs/libspng[${MULTILIB_USEDEP}] )
+		spng? ( media-libs/libspng )
 	)
 	python? (
 		${PYTHON_DEPS}
 		dev-python/numpy:=[${PYTHON_USEDEP}]
 	)
 	qt6? (
+		dev-qt/qt5compat:6
 		dev-qt/qtbase:6[gui,widgets,concurrent,opengl?]
 	)
 	quirc? ( media-libs/quirc )
+	tbb? ( >=dev-cpp/tbb-2022.1.0:=[${MULTILIB_USEDEP}] )
 	tesseract? ( app-text/tesseract[${MULTILIB_USEDEP}] )
-	tbb? ( dev-cpp/tbb:=[${MULTILIB_USEDEP}] )
 	tiff? ( media-libs/tiff:=[${MULTILIB_USEDEP}] )
+	truetype? ( media-libs/freetype:2[${MULTILIB_USEDEP}] )
 	v4l? ( >=media-libs/libv4l-0.8.3[${MULTILIB_USEDEP}] )
 	vaapi? ( media-libs/libva[${MULTILIB_USEDEP}] )
 	vtk? (
@@ -279,7 +350,7 @@ COMMON_DEPEND="
 		|| (
 			(
 				sci-libs/vtk[opencascade(+)]
-				sci-libs/opencascade[-ffmpeg]
+				sci-libs/opencascade[-ffmpeg(-)]
 			)
 			sci-libs/vtk[-opencascade(-)]
 		)
@@ -305,7 +376,7 @@ DEPEND="
 	eigen? ( >=dev-cpp/eigen-3.3.8-r1:3= )
 	java? ( >=virtual/jdk-1.8:* )
 	test? (
-		wayland? ( dev-libs/weston[examples,headless,remoting,screen-sharing,wayland-compositor] )
+		wayland? ( gui-wm/tinywl )
 		gstreamer? (
 			amd64? ( ${GST_TEST_DEPEND} )
 			arm64? ( ${GST_TEST_DEPEND} )
@@ -316,9 +387,9 @@ DEPEND="
 			media-plugins/gst-plugins-mpeg2dec[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-mpg123[${MULTILIB_USEDEP}]
 			media-plugins/gst-plugins-x264[${MULTILIB_USEDEP}]
-			!ppc? ( !ppc64? (
+			!elibc_musl? ( !ppc? ( !ppc64? (
 				media-plugins/gst-plugins-vpx[${MULTILIB_USEDEP}]
-			) )
+			) ) )
 		)
 	)
 "
@@ -329,7 +400,6 @@ RDEPEND="
 unset COMMON_DEPEND
 
 BDEPEND="
-	dev-util/patchelf
 	virtual/pkgconfig
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	doc? (
@@ -339,48 +409,62 @@ BDEPEND="
 		)
 	)
 	java? ( >=dev-java/ant-1.10.14-r3 )
+	test? (
+		!arm? (
+			ffmpeg? (
+				media-fonts/wqy-microhei
+			)
+			gstreamer? (
+				media-fonts/wqy-microhei
+			)
+		)
+	)
 "
 
 PATCHES=(
 	"${FILESDIR}/${PN}-3.4.1-cuda-add-relaxed-constexpr.patch"
 	"${FILESDIR}/${PN}-4.1.2-opencl-license.patch"
 	"${FILESDIR}/${PN}-4.4.0-disable-native-cpuflag-detect.patch"
-	"${FILESDIR}/${PN}-4.5.0-link-with-cblas-for-lapack.patch"
+	"${FILESDIR}/${PN}-4.12.0-link-with-cblas-for-lapack.patch"
 
-	"${FILESDIR}/${PN}-4.8.1-use-system-flatbuffers.patch"
+# 	"${FILESDIR}/${PN}-4.8.1-use-system-flatbuffers.patch"
 	"${FILESDIR}/${PN}-4.8.1-use-system-opencl.patch"
 
 	"${FILESDIR}/${PN}-4.9.0-drop-python2-detection.patch"
-	"${FILESDIR}/${PN}-4.9.0-ade-0.1.2d.tar.gz.patch"
-	"${FILESDIR}/${PN}-4.9.0-cmake-cleanup.patch"
+# 	"${FILESDIR}/${PN}-4.9.0-cmake-cleanup.patch"
 
 	"${FILESDIR}/${PN}-4.10.0-dnn-explicitly-include-abseil-cpp.patch"
-	"${FILESDIR}/${PN}-4.10.0-cudnn-9.patch" # 25841
-	"${FILESDIR}/${PN}-4.10.0-cuda-fp16.patch" # 25880
-	"${FILESDIR}/${PN}-4.10.0-26234.patch" # 26234
 	"${FILESDIR}/${PN}-4.10.0-tbb-detection.patch"
 
-	"${DISTDIR}/${P}-protobuf-30.patch" # drop in 4.11
-	"${FILESDIR}/${P}-cmake4.patch" # PR pending
-	"${FILESDIR}/${PN}-4.11.0-qt-6.9.patch" # https://github.com/opencv/opencv/issues/27223
+	"${FILESDIR}/${PN}-4.11.0-ade-0.1.2e.tar.gz.patch"
+	"${FILESDIR}/${PN}-4.11.0-cmake-CMP0177.patch"
 
-	"${FILESDIR}"/${PN}-4.11.0-fix-libspng-link.patch #  PR pending #27314
+	"${FILESDIR}/${PN}-4.12.0-cmake-4.patch"
+# 	"${FILESDIR}/${PN}-4.11.0-qt-6.9.patch" # https://github.com/opencv/opencv/issues/27223
+
+# 	"${FILESDIR}/${PN}-4.12.0-cuda-13.0.patch"
+
+# 	"${FILESDIR}/${PN}-4.11.0-ffmpeg8.patch" # PR 27691
+# 	"${DISTDIR}/${P}-fix_videowriter_raw_return_code.patch"
+# 	"${DISTDIR}/${PN}-4.12.0-eigen5.patch" # PR 27536
 
 	# TODO applied in src_prepare
 	# "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
 
 	# "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
 
-	# "${FILESDIR}/${PN}_contrib-4.10.0-CUDA-12.6-tuple_size.patch" # 3785
+	# "${FILESDIR}/${PN}_contrib-4.12.0-cuda-13.0.patch"
+
+	# "${DISTDIR}/${PN}_contrib-PR4066.patch"
 )
 
 cuda_get_host_compiler() {
-	if [[ -n "${NVCC_CCBIN}" ]]; then
+	if [[ -v NVCC_CCBIN ]]; then
 		echo "${NVCC_CCBIN}"
 		return
 	fi
 
-	if [[ -n "${CUDAHOSTCXX}" ]]; then
+	if [[ -v CUDAHOSTCXX ]]; then
 		echo "${CUDAHOSTCXX}"
 		return
 	fi
@@ -391,8 +475,31 @@ cuda_get_host_compiler() {
 		die "$(tc-get-compiler-type) compiler is not supported"
 	fi
 
-	local compiler compiler_type compiler_version
-	local package package_version
+	# TODO logic flaw
+	# we don't define NVCC_CCBIN as local here as it would override the env var, but we return if it set
+	# we then set NVCC_CCBIN to tc-getCXX, and later export it on success
+
+	# compiler with CHOST prefix
+	# x86_64-pc-linux-gnu-g++
+	local compiler
+
+	# gcc or clang
+	local compiler_type
+
+	# major version of the current compiler. 15
+	local compiler_version
+
+	# cat/pkg of the compiler
+	# sys-devel/gcc, llvm-core/clang
+	local package
+
+	# QPN of the package we are checking
+	# sys-devel/gcc, <sys-devel/gcc-15
+	local package_version
+
+	# system compiler e.g. tc-getCXX plus version
+	# used to skip rechecking, as we check NVCC_CCBIN first
+	# x86_64-pc-linux-gnu-g++-15
 	local NVCC_CCBIN_default
 
 	compiler_type="$(tc-get-compiler-type)"
@@ -404,23 +511,63 @@ cuda_get_host_compiler() {
 
 	compiler="${NVCC_CCBIN/%-${compiler_version}}"
 
+# 	eqawarn "asdf compiler: $compiler"
+# 	eqawarn "asdf compiler_type: $compiler_type"
+# 	eqawarn "asdf compiler_version: $compiler_version"
+#
+# 	eqawarn "asdf package: $package"
+#
+# 	eqawarn "asdf NVCC_CCBIN: $NVCC_CCBIN"
+# 	eqawarn "asdf NVCC_CCBIN_default: $NVCC_CCBIN_default"
+
 	# store the package so we can re-use it later
-	package="sys-devel/${compiler_type}"
+	if tc-is-gcc; then
+		package="sys-devel/${compiler_type}"
+	elif tc-is-clang; then
+		package="llvm-core/${compiler_type}"
+	else
+		die "$(tc-get-compiler-type) compiler is not supported"
+	fi
+
 	package_version="${package}"
+
+# 	eqawarn "asdf package_version: $package_version"
 
 	ebegin "testing ${NVCC_CCBIN_default} (default)"
 
-	while ! nvcc -v -ccbin "${NVCC_CCBIN}" - -x cu <<<"int main(){}" &>> "${T}/cuda_get_host_compiler.log" ; do
+	while ! \
+		nvcc "${NVCCFLAGS}" \
+			-x cu \
+			-ccbin "${NVCC_CCBIN}" \
+			- \
+			<<<"int main(){}" \
+			&>> "${T}/cuda_get_host_compiler.log" ;
+		do
 		eend 1
 
 		while true; do
 			# prepare next version
-			if ! package_version="<$(best_version "${package_version}")"; then
-				die "could not find a supported version of ${compiler}"
+			local package_version_next
+			package_version_next="$(best_version "${package_version}")"
+
+			if [[ -z "${package_version_next}" ]]; then
+# 				eerror "$(cat "${T}/cuda_get_host_compiler.log")"
+# 				eerror
+				eerror "Compiler lookup failed. Nothing installed matches: ${package_version}."
+				eerror "You can use NVCC_CCBIN to specify the exact compiler to use."
+				eerror "Check ${T}/cuda_get_host_compiler.log for details."
+				die "Could not find a supported version of ${compiler}. Did not find \"${package_version}\". NVCC_CCBIN is unset."
 			fi
 
+			package_version="<${package_version_next}"
+# 			eqawarn "asdf package_version: $package_version"
+			eqawarn "1 ${package_version/#<${package}-/}"
+			eqawarn "2 ${package_version}"
+			eqawarn "3 ${package}-"
 			NVCC_CCBIN="${compiler}-$(ver_cut 1 "${package_version/#<${package}-/}")"
+# 			eqawarn "NVCC_CCBIN: ${NVCC_CCBIN}"
 
+			# skip the next version equals the already checked system default
 			[[ "${NVCC_CCBIN}" != "${NVCC_CCBIN_default}" ]] && break
 		done
 		ebegin "testing ${NVCC_CCBIN}"
@@ -432,8 +579,12 @@ cuda_get_host_compiler() {
 }
 
 cuda_get_host_native_arch() {
-	[[ -n ${CUDAARCHS} ]] && echo "${CUDAARCHS}"
+	if [[ -v CUDAARCHS ]]; then
+		echo "${CUDAARCHS}"
+		return
+	fi
 
+	# TODO nvptx-arch ?
 	__nvcc_device_query || die "failed to query the native device"
 }
 
@@ -450,7 +601,8 @@ pkg_pretend() {
 	fi
 
 	# When building binpkgs you probably want to include all targets
-	if use cuda && [[ ${MERGE_TYPE} == "buildonly" ]] && [[ -n "${CUDA_GENERATION}" || -n "${CUDA_ARCH_BIN}" ]]; then
+	# TODO CUDAARCHS
+	if use cuda && [[ ${MERGE_TYPE} == "buildonly" ]] && [[ -v CUDA_GENERATION || -v CUDA_ARCH_BIN ]]; then
 		local info_message="When building a binary package it's recommended to unset CUDA_GENERATION and CUDA_ARCH_BIN"
 		einfo "$info_message so all available architectures are build."
 	fi
@@ -465,17 +617,66 @@ pkg_setup() {
 		# NOTE We try to load nvidia-uvm and nvidia-modeset here,
 		# so __nvcc_device_query does not fail later.
 
-		nvidia-modprobe -m -u -c 0 || true
+		nvidia-smi -L &> /dev/null || true
 	fi
+}
+
+src_unpack() {
+	if [[ ${PV} = *9999* ]] ; then
+		git-r3_src_fetch
+		git-r3_checkout
+
+		if use contrib; then
+			git-r3_fetch "https://github.com/${PN}/${PN}_contrib"
+			git-r3_checkout "https://github.com/${PN}/${PN}_contrib" "${WORKDIR}/${PN}_contrib-${PV}"
+		fi
+
+		if use test; then
+			git-r3_fetch "https://github.com/${PN}/${PN}_extra"
+			git-r3_checkout "https://github.com/${PN}/${PN}_extra" "${WORKDIR}/${PN}_extra-${PV}"
+		fi
+	else
+		default
+	fi
+
+	# remove bundled stuff
+	local files_3rdparty=(
+		# cpufeatures
+		# fastcv
+		ffmpeg
+		# flatbuffers
+		include/{opencl,vulkan}
+		# ippicv
+		# ittnotify
+		libjasper
+		libjpeg
+		libjpeg-turbo
+		libpng
+		libspng
+		libtiff
+		# libtim-vx
+		libwebp
+		openexr
+		openjpeg
+		# orbbecsdk
+		protobuf
+		quirc
+		tbb
+		zlib
+		zlib-ng
+	)
+
+	local file
+	for file in "${files_3rdparty[@]}"; do
+		rm -r "${S}/3rdparty/${file}" || die "Removing 3rd party components (${file}) failed"
+
+		sed -e "\_add\_subdirectory(.*3rdparty/${file})_d" \
+			-i "${S}/CMakeLists.txt" "${S}/cmake"/*cmake || die
+	done
 }
 
 src_prepare() {
 	cmake_src_prepare
-
-	# remove bundled stuff
-	rm -r 3rdparty || die "Removing 3rd party components failed"
-	sed -e '/add_subdirectory(.*3rdparty.*)/ d' \
-		-i CMakeLists.txt cmake/*cmake || die
 
 	sed \
 		-e 's:truetype/wqy:wqy-microhei:g' \
@@ -484,19 +685,29 @@ src_prepare() {
 			modules/gapi/test/render/ftp_render_test.cpp \
 		|| die
 
+	sed \
+		-e '1i message(STATUS "CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES}")' \
+		-i \
+			cmake/OpenCVFindFrameworks.cmake \
+		|| die
+
+	sed \
+		-e '/find_package(OpenMP/s/)/ COMPONENTS C CXX)/g' \
+		-i \
+			cmake/OpenCVFindFrameworks.cmake \
+		|| die
+
 	if use contrib; then
-		cd "${WORKDIR}/${PN}_contrib-${PV}" || die
+		pushd "${WORKDIR}/${PN}_contrib-${PV}" >/dev/null || die
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-rgbd.patch"
 		eapply "${FILESDIR}/${PN}_contrib-4.8.1-NVIDIAOpticalFlowSDK-2.0.tar.gz.patch"
-		if type -P nvcc &> /dev/null && ver_test "$(nvcc --version | tail -n 1 | cut -d '_' -f 2- | cut -d '.' -f 1-2)" -ge 12.4; then
-			eapply "${DISTDIR}/${PN}_contrib-4.10.0-3607.patch"
-			eapply "${FILESDIR}/${PN}_contrib-4.10.0-CUDA-12.6-tuple_size.patch" # 3785
-		fi
+		# eapply "${FILESDIR}/${PN}_contrib-4.12.0-cuda-13.0.patch"
 
-		cd "${S}" || die
+		eapply "${DISTDIR}/${PN}_contrib-PR4066.patch"
+		[[ -n "${PATCHES_CONTRIB_USER[*]}" ]] && eapply "${PATCHES_CONTRIB_USER[@]}"
+		popd >/dev/null || die
 
 		! use contribcvv && { rm -R "${WORKDIR}/${PN}_contrib-${PV}/modules/cvv" || die; }
-		! use contribdnn && { rm -R "${S}/modules/dnn" || die; }
 		! use contribfreetype && { rm -R "${WORKDIR}/${PN}_contrib-${PV}/modules/freetype" || die; }
 		! use contribhdf && { rm -R "${WORKDIR}/${PN}_contrib-${PV}/modules/hdf" || die; }
 		! use contribovis && { rm -R "${WORKDIR}/${PN}_contrib-${PV}/modules/ovis" || die; }
@@ -509,7 +720,15 @@ src_prepare() {
 		"${DISTDIR}/ade-${ADE_PV}.tar.gz" \
 		"${S}/.cache/ade/$(md5sum "${DISTDIR}/ade-${ADE_PV}.tar.gz" | cut -f 1 -d " ")-v${ADE_PV}.tar.gz" || die
 
-	if use dnnsamples; then
+	if [[ ${PV} = *9999* ]] ; then
+		sed \
+			-e "/ade_filename/s/\.zip/.tar.gz/" \
+			-e "/set(ade_md5/s/\".*\"/\"${ADE_MD5}\"/g" \
+			-i "${S}/modules/gapi/cmake/DownloadADE.cmake" || die
+	fi
+
+	if [[ ${PV} != *9999* ]] ; then
+	if use wechat-qrcode; then
 		mkdir -p "${S}/.cache/wechat_qrcode" || die
 		for file in "detect.caffemodel" "detect.prototxt" "sr.prototxt" "sr.caffemodel"; do
 			mv \
@@ -576,6 +795,7 @@ src_prepare() {
 				md5sum "${DISTDIR}/NVIDIAOpticalFlowSDK-${NVIDIA_OPTICAL_FLOW_COMMIT}.tar.gz" | cut -f 1 -d " " \
 			)-${NVIDIA_OPTICAL_FLOW_COMMIT}.tar.gz" || die
 	fi
+	fi
 
 	if use java; then
 		java-pkg-opt-2_src_prepare
@@ -596,6 +816,9 @@ src_prepare() {
 multilib_src_configure() {
 	# bug #919101 and https://github.com/opencv/opencv/issues/19020
 	filter-lto
+
+	append-cppflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
+# 	append-cppflags "$(multilib_native_usex contribdnn '-DHAVE_FLATBUFFERS' '')"
 
 	# please don't sort here, order is the same as in CMakeLists.txt
 	local mycmakeargs=(
@@ -620,19 +843,19 @@ multilib_src_configure() {
 		-DWITH_GSTREAMER="$(usex gstreamer)"
 		-DWITH_GTK="$(usex gtk3)"
 		-DWITH_GTK_2_X="no" # only want gtk3 nowadays
+		-DWITH_IMGCODEC_GIF="$(usex gif)"
 		-DWITH_IPP="no"
+		-DWITH_JULIA="no"
 		-DWITH_JASPER="$(usex jpeg2k "$(multilib_native_usex jasper)")"
 		-DWITH_JPEG="$(usex jpeg)"
 		-DWITH_OPENJPEG="$(usex jpeg2k "$(multilib_native_usex !jasper)")"
 		-DWITH_WEBP="$(usex webp)"
 		-DWITH_OPENEXR="$(multilib_native_usex openexr)"
-		-DWITH_OPENGL="$(usex qt6 "$(usex opengl)")"
-		-DOpenGL_GL_PREFERENCE="GLVND"
 		-DWITH_OPENVX="no"
 		-DWITH_OPENNI="$(multilib_native_usex openni)"
 		-DWITH_OPENNI2="$(multilib_native_usex openni2)"
 		-DWITH_PNG="$(usex png)"
-		-DWITH_SPNG="$(usex png "$(usex spng)")"
+		-DWITH_SPNG="$(usex png "$(multilib_native_usex spng)")"
 		-DWITH_GDCM="no"
 		-DWITH_PVAPI="no"
 		-DWITH_GIGEAPI="no"
@@ -758,9 +981,12 @@ multilib_src_configure() {
 	# ===================================================
 	# configure modules to be build
 	# ===================================================
+		-DBUILD_opencv_dnn="$(usex contribdnn)"
 		-DBUILD_opencv_gapi="$(usex ffmpeg yes "$(usex gstreamer)")"
 		-DBUILD_opencv_features2d="$(usex features2d)"
 		-DBUILD_opencv_java_bindings_generator="$(usex java)"
+		-DBUILD_opencv_wechat_qrcode="$(usex wechat-qrcode)"
+		-DBUILD_opencv_julia="no"
 		-DBUILD_opencv_js="no"
 		-DBUILD_opencv_js_bindings_generator="no"
 		-DBUILD_opencv_objc_bindings_generator="no"
@@ -778,6 +1004,8 @@ multilib_src_configure() {
 
 		-DDNN_PLUGIN_LIST="all"
 		-DHIGHGUI_ENABLE_PLUGINS="no"
+
+		-DOPENCV_SKIP_SAMPLES_SYCL="yes"
 	)
 
 	local VIDEOIO_PLUGIN_LIST=()
@@ -795,6 +1023,7 @@ multilib_src_configure() {
 	if [[ ${PV} != *9999* ]] ; then
 		mycmakeargs+=(
 			-DOPENCV_VCSVERSION="${PV}"
+			-DBUILD_INFO_SKIP_EXTRA_MODULES="yes"
 		)
 	fi
 
@@ -861,43 +1090,94 @@ multilib_src_configure() {
 	if use contrib; then
 		mycmakeargs+=(
 			-DBUILD_opencv_cvv="$(usex contribcvv)"
-			-DBUILD_opencv_dnn="$(usex contribdnn)"
-			-DOPENCV_DNN_OPENCL="$(usex opencl)"
-			-DOPENCV_DNN_CUDA="$(multilib_native_usex cudnn)"
 
 			-DBUILD_opencv_freetype="$(usex contribfreetype)"
 			-DBUILD_opencv_hdf="$(multilib_native_usex contribhdf)"
 			-DBUILD_opencv_ovis="$(usex contribovis)"
 			-DBUILD_opencv_sfm="$(usex contribsfm)"
 			-DBUILD_opencv_xfeatures2d="$(usex contribxfeatures2d)"
+			-DWITH_TESSERACT="$(multilib_native_usex tesseract)"
 		)
-
-		if ! multilib_native_use tesseract; then
-			mycmakeargs+=(
-				-DCMAKE_DISABLE_FIND_PACKAGE_Tesseract="yes"
-			)
-		fi
 	fi
 
 	# workaround for bug 413429
 	tc-export CC CXX
 
 	if multilib_native_use cuda; then
-		cuda_add_sandbox -w
-		addwrite "/proc/self/task"
+		# Check if we can get the arch from the present gpu
+		if ! SANDBOX_WRITE=/dev/nvidiactl test -w /dev/nvidiactl; then
 
-		if ! test -w /dev/nvidiactl; then
-			# eqawarn "Can't access the GPU at /dev/nvidiactl."
-			# eqawarn "User $(id -nu) is not in the group \"video\"."
-			if [[ -z "${CUDA_GENERATION}" ]] && [[ -z "${CUDA_ARCH_BIN}" ]]; then
-				# build all targets
+			# Needs write access to /dev/nvidiactl.
+			# /dev/nvidiactl usually is 660 root:video .
+
+			eqawarn "Can't access the GPU at /dev/nvidiactl."
+			eqawarn "User $(id -nu) is not in the group \"video\"."
+
+			# export CUDAARCHS="all"
+			# build all targets
+			mycmakeargs+=(
+				# can't use "all" as that breaks openmp
+				# nvcc fatal   : Unsupported gpu architecture 'compute_all'
+				# -DCMAKE_CUDA_ARCHITECTURES="all"
+
+				# with openmp -> CUDA_ARCHITECTURES is empty for target "cmTC_0088f"
+				# -DCUDA_GENERATION="Auto" # requires access to GPU
+
+				# wrong arch....
+				# -DCMAKE_CUDA_ARCHITECTURES="${CUDAARCHS:-50}" # breaks with openmp otherwise..
+
+				-DOpenMP_CUDA_FLAGS=""
+				-DOpenMP_CUDA_LIB_NAMES=""
+			)
+
+			local CUDA_DEVICE_ACCESS="false"
+
+			cuda_add_sandbox
+		else
+			cuda_add_sandbox -w
+		fi
+
+		addwrite "/proc/self/task"
+		addpredict "/dev/char/"
+
+		# order of preference CMAKE_CUDA_ARCHITECTURES > CUDA_GENERATION > CUDA_ARCH_BIN and/or CUDA_ARCH_PTX
+		# CMAKE_CUDA_ARCHITECTURES is set from the CUDAARCHS env var
+		if [[ -v CUDAARCHS ]]; then
+			eqawarn "CUDAARCHS ${CUDAARCHS}"
+			mycmakeargs+=(
+				-DCMAKE_CUDA_ARCHITECTURES="${CUDAARCHS}"
+			)
+		elif [[ -v CUDA_GENERATION ]]; then
+			eqawarn "CUDA_GENERATION ${CUDA_GENERATION}"
+			mycmakeargs+=(
+				-DCUDA_GENERATION="${CUDA_GENERATION}"
+			)
+		elif [[ -v CUDA_ARCH_BIN ]]; then
+			eqawarn "CUDA_ARCH_BIN ${CUDA_ARCH_BIN}"
+			mycmakeargs+=(
+				-DCUDA_ARCH_BIN="${CUDA_ARCH_BIN}"
+			)
+			if [[ -v CUDA_ARCH_PTX ]]; then
+				eqawarn "CUDA_ARCH_PTX ${CUDA_ARCH_PTX}"
 				mycmakeargs+=(
-					-DCUDA_GENERATION=""
+					-DCUDA_ARCH_PTX="${CUDA_ARCH_PTX}"
 				)
 			fi
 		else
-			: "${CUDAARCHS:="$(cuda_get_host_native_arch)"}"
-			export CUDAARCHS
+			eqawarn "CUDA_DEVICE_ACCESS ${CUDA_DEVICE_ACCESS}"
+			if [[ "${CUDA_DEVICE_ACCESS}" == "false" ]]; then
+				mycmakeargs+=(
+					-DCUDA_GENERATION="Auto"
+				)
+			else
+				eqawarn detect
+				: "${CUDAARCHS:="$(cuda_get_host_native_arch)"}"
+				export CUDAARCHS
+				mycmakeargs+=(
+					-DCUDA_GENERATION="${CUDAARCHS}"
+					-DCMAKE_CUDA_ARCHITECTURES="${CUDAARCHS}"
+				)
+			fi
 		fi
 
 		local -x CUDAHOSTCXX CUDAHOSTLD
@@ -914,7 +1194,23 @@ multilib_src_configure() {
 		fi
 
 		mycmakeargs+=(
+			-DOPENCV_CMAKE_CUDA_DEBUG="$(usex debug 1 0)"
 			-DENABLE_CUDA_FIRST_CLASS_LANGUAGE="yes"
+		)
+	fi
+
+	if use cudnn; then
+		mycmakeargs+=(
+			-DCUDNN_INCLUDE_DIR="${CUDNN_PATH:-${ESYSROOT}/opt/cuda}/include"
+			-DCUDNN_LIBRARY="${CUDNN_PATH:-${ESYSROOT}/opt/cuda}/$(get_libdir)/libcudnn.so"
+		)
+	fi
+
+	if use contribdnn; then
+		mycmakeargs+=(
+			-DOPENCV_DNN_OPENCL="$(usex opencl)"
+			-DOPENCV_DNN_CUDA="$(multilib_native_usex cudnn)"
+			# -DOPENCV_DNN_TFLITE="$(multilib_native_usex contribdnn)"
 		)
 	fi
 
@@ -933,16 +1229,64 @@ multilib_src_configure() {
 		)
 	fi
 
-	if use mkl; then
-		mycmakeargs+=(
-			-DLAPACK_IMPL="MKL"
-			-DMKL_WITH_OPENMP="$(usex openmp)"
-			-DMKL_WITH_TBB="$(usex tbb)"
-		)
+	if multilib_native_use lapack; then
+		if use mkl; then
+			mycmakeargs+=(
+				-DWITH_MKL="yes"
+				-DMKL_WITH_OPENMP="$(usex openmp)"
+				-DMKL_WITH_TBB="$(usex tbb)"
+			)
+		else
+# 			local blas_backend
+# 			use atlas && blas_backend="atlas"
+# 			use openblas && blas_backend="openblas"
+# 			use reference && blas_backend="reference"
+#
+# 			local lapack_libaries=(
+# 				# lapack blas cblas
+# 				"${ESYSROOT}/usr/$(get_libdir)/lapack/${blas_backend}/liblapack.so"
+# 				"${ESYSROOT}/usr/$(get_libdir)/blas/${blas_backend}/libblas.so"
+# 				"${ESYSROOT}/usr/$(get_libdir)/blas/${blas_backend}/libcblas.so"
+# 			)
+#
+# 			local lapack_include
+# 			if use reference; then
+# 				lapack_include="${ESYSROOT}/usr/include"
+# 			else
+# 				lapack_include="${ESYSROOT}/usr/include/${blas_backend}"
+# 			fi
+
+			mycmakeargs+=(
+				-DSKIP_OPENBLAS_PACKAGE="$(usex !openblas)"
+				-DOPENCV_LAPACK_DISABLE_MKL="yes"
+
+# # 				-DOPENCV_LAPACK_FIND_PACKAGE_ONLY="yes"
+# 				-DLAPACK_IMPL="LAPACK/Gentoo"
+# 				-DLAPACK_CBLAS_H="cblas.h"
+# 				-DLAPACK_LAPACKE_H="lapacke.h"
+# 				-DLAPACK_INCLUDE_DIR="${lapack_include}"
+# 				-DLAPACK_LIBRARIES="lapack;blas;cblas"
+# # 				-DLAPACK_LIBRARIES="$(IFS=';'; echo "${lapack_libaries[*]}")"
+			)
+		fi
+	fi
+
+	if use gtk3 || use qt6 || use wayland; then
+		if use opengl; then
+			mycmakeargs+=(
+				-DWITH_OPENGL="yes"
+				-DOpenGL_GL_PREFERENCE="GLVND"
+			)
+		else
+			mycmakeargs+=(
+				-DWITH_OPENGL="no"
+			)
+		fi
 	fi
 
 	# NOTE set this via MYCMAKEARGS if needed
 	if use opencl; then
+		mycmakeargs+=( -DOPENCL_INCLUDE_DIR="${ESYSROOT}/usr/include" )
 		if has_version sci-libs/clfft; then
 			mycmakeargs+=( -DWITH_OPENCLAMDFFT="yes" )
 		else
@@ -982,7 +1326,12 @@ multilib_src_configure() {
 		)
 	fi
 
+	if use vulkan; then
+		mycmakeargs+=( -DVULKAN_INCLUDE_DIRS="${ESYSROOT}/usr/include" )
+	fi
+
 	if multilib_native_use python; then
+		# shellcheck disable=SC2329
 		python_configure() {
 			# Set all python variables to load the correct Gentoo paths
 			local mycmakeargs=(
@@ -993,7 +1342,9 @@ multilib_src_configure() {
 				-DBUILD_opencv_python_bindings_generator="yes"
 				-DBUILD_opencv_python_tests="$(usex test)"
 				-DPYTHON_DEFAULT_EXECUTABLE="${EPYTHON}"
+				-DPYTHON_EXECUTABLE="${EPYTHON}" # check
 				-DINSTALL_PYTHON_EXAMPLES="$(usex examples)"
+				# -DPYTHON3_LIMITED_API="yes"
 			)
 			cmake_src_configure
 		}
@@ -1001,6 +1352,7 @@ multilib_src_configure() {
 		python_foreach_impl python_configure
 	else
 		mycmakeargs+=(
+			-DOPENCV_PYTHON_SKIP_DETECTION="yes"
 			-DPYTHON_EXECUTABLE="no"
 			-DINSTALL_PYTHON_EXAMPLES="no"
 			-DBUILD_opencv_python3="no"
@@ -1019,6 +1371,29 @@ multilib_src_compile() {
 	fi
 }
 
+# from firefox/thunderbird
+virtwl() {
+	debug-print-function "${FUNCNAME[*]}" "$@"
+
+	[[ $# -lt 1 ]] && die "${FUNCNAME[*]} needs at least one argument"
+	[[ -n $XDG_RUNTIME_DIR ]] || die "${FUNCNAME[*]} needs XDG_RUNTIME_DIR to be set; try xdg_environment_reset"
+	tinywl -h >/dev/null || die 'tinywl -h failed'
+
+	local VIRTWL VIRTWL_PID
+	coproc VIRTWL { WLR_BACKENDS=headless exec tinywl -s 'echo $WAYLAND_DISPLAY; read _; kill $PPID'; }
+	#	 &> "${T}/tinywl.log"
+	local -x WAYLAND_DISPLAY
+	read -r WAYLAND_DISPLAY <&"${VIRTWL[0]}"
+
+	debug-print "${FUNCNAME[*]}: $*"
+	"$@"
+	local r=$?
+
+	[[ -n $VIRTWL_PID ]] || die "tinywl exited unexpectedly"
+	exec {VIRTWL[0]}<&- {VIRTWL[1]}>&-
+	return "${r}"
+}
+
 multilib_src_test() {
 	# no tests on ABI_X86_32
 	! multilib_is_native_abi && return
@@ -1028,34 +1403,56 @@ multilib_src_test() {
 
 	declare -xA OPENCV_SKIP_TESTS
 
+	local -x OPENCV_SKIP_TESTS_calib3d=(
+		'Calib3d_Homography.not_normalized'
+	)
+
+	: # opencv_test_core hal_intrin128.int32x4_CPP_EMULATOR hal_intrin128.uint32x4_CPP_EMULATOR hal_intrin128.uint64x2_CPP_EMULATOR hal_intrin128.int64x2_CPP_EMULATOR hal_intrin128.float32x4_CPP_EMULATOR hal_intrin128.float64x2_CPP_EMULATOR
 	local -x OPENCV_SKIP_TESTS_core=(
 		'hal_intrin128.*32x4_CPP_EMULATOR'
 		'hal_intrin128.*64x2_CPP_EMULATOR'
 	)
 
+	: # opencv_test_gapi AsyncAPICancelation/cancel/0.basic AsyncAPICancelation/cancel/1.basic AsyncAPICancelation/cancel/2.basic AsyncAPICancelation/cancel/3.basic
 	local -x OPENCV_SKIP_TESTS_gapi=(
 		'AsyncAPICancelation/cancel/*.basic'
 	)
 
 	local -x OPENCV_SKIP_TESTS_videoio=(
 		'*mfx*'
-		'videoio/videoio_bunny.frame_count/12'
 	)
 
 	local -x OPENCV_SKIP_TESTS_video=(
+		# needs dnn/gsoc2016-goturn/goturn.caffemodel
 		'GOTURN.accuracy'
+		# needs dnn/onnx/models/dasiamrpn_model.onnx
 		'DaSiamRPN.accuracy'
+		# needs dnn/onnx/models/nanotrack_backbone_sim.onnx
 		'NanoTrack.accuracy_NanoTrack_V1'
+		# needs dnn/onnx/models/nanotrack_backbone_sim_v2.onnx
 		'NanoTrack.accuracy_NanoTrack_V2'
+		# needs dnn/gsoc2016-goturn/goturn.caffemodel
 		'Tracking/DistanceAndOverlap.GOTURN*'
 	)
 
 	if ! use gtk3 && ! use qt6; then
-		local -x OPENCV_SKIP_TESTS_highgui=(
-			'Highgui_GUI.*'
-		)
+		# TODO Compositor doesn't have required interfaces in function 'init'
+		# && ! use wayland
+		# local -x OPENCV_SKIP_TESTS_highgui=(
+		# 	'Highgui_GUI.*'
+		# )
+		:
 	else
 		addpredict /dev/fuse
+	fi
+
+	if use wayland; then
+		if use gtk3 || use qt6; then
+			local -x OPENCV_SKIP_TESTS_highgui=(
+				'Highgui_GUI.regression'
+				'Highgui_GUI.small_width_image'
+			)
+		fi
 	fi
 
 	if multilib_native_use cuda; then
@@ -1075,27 +1472,32 @@ multilib_src_test() {
 
 	if use contribdnn; then
 		local -x OPENCV_SKIP_TESTS_dnn=(
-			'Test_ONNX_layers.LSTM_cell_forward/*'
-			'Test_ONNX_layers.LSTM_cell_bidirectional/*'
-			'Test_TensorFlow_layers.Convolution3D/*'
-			'Test_TensorFlow_layers.concat_3d/*'
+			'Test_ONNX_layers.LSTM_cell_forward/0'
+			'Test_ONNX_layers.LSTM_cell_bidirectional/0'
+			'Test_TensorFlow_layers.Convolution3D/1'
+			'Test_TensorFlow_layers.concat_3d/1'
 		)
 		local -x OPENCV_SKIP_TESTS_objdetect=(
-			'Objdetect_face_detection.regression'
-			'Objdetect_face_recognition.regression' 'Objdetect_QRCode_Encode_Decode_Structured_Append.regression'
+			# dnn/onnx/models/face_recognizer_fast.onnx
+			'Objdetect_face_recognition.regression'
+			'Objdetect_QRCode_Encode_Decode_Structured_Append.regression'
 		)
+		:
 	else
+		# dnn/onnx/models/yunet-202303.onnx
 		local -x OPENCV_SKIP_TESTS_objdetect=(
 			'Objdetect_face_detection.regression'
 			'Objdetect_face_recognition.regression'
-			)
+		)
 
 		OPENCV_SKIP_TESTS_video+=(
 			'vittrack.accuracy_vittrack'
 		)
 	fi
-	if use dnnsamples; then
+
+	if use wechat-qrcode; then
 		local -x OPENCV_SKIP_TESTS_wechat_qrcode=(
+			# dnn/wechat_2021-01/detect.prototxt
 			'Objdetect_QRCode_points_position.rotate45'
 			'Objdetect_QRCode_Big.regression'
 			'Objdetect_QRCode_Tiny.regression'
@@ -1104,24 +1506,45 @@ multilib_src_test() {
 		)
 	fi
 
+	local -x OPENCV_SKIP_TESTS_imgproc=(
+		"Imgproc_ConnectedComponents.spaghetti_bbdt_sauf_stats"
+		"Imgproc_ConnectedComponents.chessboard_even"
+		"Imgproc_ConnectedComponents.chessboard_odd"
+		"Imgproc_ConnectedComponents.maxlabels_8conn_even"
+		"Imgproc_ConnectedComponents.maxlabels_8conn_odd"
+	)
+
+	local -x OPENCV_SKIP_TESTS_imgcodecs=(
+		"Imgcodecs_Png.ReadWriteWithExif"
+		"Imgcodecs_AVIF*"
+	)
+
+	local -x OPENCV_SKIP_TESTS_photo=(
+		"Photo_CalibrateDebevec.regression$"
+	)
+
+	local -x OPENCV_SKIP_TESTS_stitching=(
+	)
+
 	if multilib_native_use cuda; then
 		if ! SANDBOX_WRITE=/dev/nvidiactl test -w /dev/nvidiactl ; then
 			eerror "Can't access the GPU at /dev/nvidiactl."
 			eerror "User $(id -nu) is not in the group \"video\"."
 			local -x TEST_CUDA="false"
-			# local -x OPENCV_PARALLEL_BACKEND="threads"
-			# local -x DNN_BACKEND_OPENCV="cuda"
 
-			local -x OPENCV_SKIP_TESTS_photo=( "CUDA_*" )
-			local -x OPENCV_SKIP_TESTS_stitching=( "CUDA_*" )
+			OPENCV_SKIP_TESTS_photo+=( "CUDA_*" )
+			OPENCV_SKIP_TESTS_stitching+=( "CUDA_*" )
 			OPENCV_SKIP_TESTS_video+=( "CUDA_*" )
 		else
+			# local -x OPENCV_PARALLEL_BACKEND="threads"
+			local -x DNN_BACKEND_OPENCV="cuda"
 			cuda_add_sandbox -w
 			addwrite "/dev/dri/"
-			[[ -e /dev/udmabuf ]] && addwrite /dev/udmabuf
+			[[ -c /dev/udmabuf ]] && addwrite /dev/udmabuf
 		fi
 	fi
 
+	# shellcheck disable=SC2329
 	opencv_test() {
 		cd "${BUILD_DIR}" || die
 
@@ -1134,23 +1557,31 @@ multilib_src_test() {
 		# # path to extra OpenVINO plugins
 		# local -x OPENCV_DNN_IE_EXTRA_PLUGIN_PATH="${BUILD_DIR}/lib"
 
-		local -x OPENCV_TEMP_PATH="${T}"
+		local -x OPENCV_TEMP_PATH="${T%/}"
 
 		local -x OPENCV_TEST_DATA_PATH="${WORKDIR}/${PN}_extra-${PV}/testdata"
+
+		if use debug; then
+			local -x OPENCV_LOG_LEVEL=DEBUG
+		fi
 
 		local test_opts_base=(
 			--skip_unstable=1
 			--test_threads="$(makeopts_jobs)"
+			--test_debug="$(usex debug 2 0)"
+			# --test_require_data=1 # OPENCV_TEST_REQUIRE_DATA="true"
+			# --test_bigdata=1
+			# --test_tag_enable="verylong,mem_6gb" #,skip_other,dnn_skip_cuda,dnn_skip_cuda_fp16,dnn_skip_parser
 		)
 
 		local results=()
 
 		local tests
-		readarray -t tests <<< "$(find "${BUILD_DIR}/bin" -name 'opencv_test_*')"
+		readarray -t tests <<< "$(find "${BUILD_DIR}/bin" -name 'opencv_test_*' | sort)"
 
 		for test in "${tests[@]}" ; do
 
-			if [[ ${TEST_CUDA} == "false" && ${test} = *opencv_test_cu* ]] ; then
+			if [[ ${TEST_CUDA} == "false" ]] && [[ ${test} == *opencv_test_cu* || ${test} == *opencv_test_dnn* ]] ; then
 				eqawarn "Skipping test ${test}"
 				continue
 			fi
@@ -1180,29 +1611,46 @@ multilib_src_test() {
 		done
 
 		if [[ -n "${results[*]}" ]]; then
-			eerror "failed: ${results[*]}"
+			echo -e "failed: ${results[*]}"
+			if command -v jq &>/dev/null; then
+				for res in "${results[@]}"; do
+					if [[ -f "${BUILD_DIR}/test-reports/${res}.json" ]]; then
+						eerror "${res}: $(
+							jq -r '.testsuites.[] |
+								select( .failures != 0) |
+								.testsuite.[] |
+								select( (.failures | length) > 0) |
+								"\(.classname).\(.name)"' "${BUILD_DIR}/test-reports/${res}.json" | \
+								tr '\n' ' '
+							)"
+					else
+						eerror "${res}: no test report"
+					fi
+				done
+			fi
 			die "${results[*]}"
 		fi
 	}
 
-	if use wayland; then
-		xdg_environment_reset
+	local virtx_cmd=
 
-		local -x WAYLAND_DISPLAY=wayland-7
-		weston --backend=headless-backend.so --socket="${WAYLAND_DISPLAY}" --idle-time=0 &
-		local compositor=$!
+	xdg_environment_reset
+
+	if use wayland; then
+		virtx_cmd=virtwl
+	else
+		virtx_cmd=virtx
 	fi
+
+	# NOTE we do this to defeat pkgcheck saying virtualx.eclass is unused, as it can't detect it being called from a var
+	[[ -z "${virtx_cmd}" ]] && virtx
 
 	local -x MESA_SHADER_CACHE_DISABLE=true
 
 	if multilib_native_use python; then
-		virtx python_foreach_impl opencv_test
+		"${virtx_cmd}" python_foreach_impl opencv_test
 	else
-		virtx opencv_test
-	fi
-
-	if use wayland; then
-		kill "${compositor}" || die
+		"${virtx_cmd}" opencv_test
 	fi
 }
 
