@@ -1,0 +1,20 @@
+From 272bebcd40a06e144785e9a9312d1b6e4fc54728 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 6 Feb 2026 13:57:55 +0100
+Subject: [PATCH] cmake 4
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 38de3bf..9e5005a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.8.0)
++cmake_minimum_required(VERSION 3.10.0)
+ project(Ptex)
+ 
+ option(PTEX_BUILD_STATIC_LIBS "Enable building Ptex static libraries" ON)
+-- 
+2.52.0
+
