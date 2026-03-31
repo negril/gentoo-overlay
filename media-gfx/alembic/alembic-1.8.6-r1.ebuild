@@ -1,9 +1,9 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..12} )
+PYTHON_COMPAT=( python3_{12..12} )
 
 inherit cmake python-single-r1
 
@@ -29,7 +29,7 @@ RDEPEND="
 		>=sci-libs/hdf5-1.10.2:=[zlib(+)]
 		>=virtual/zlib-1.2.11-r1:=
 	)
-	python? ( $(python_gen_cond_dep 'dev-libs/boost[python,${PYTHON_USEDEP}]') )
+	python? ( $(python_gen_cond_dep 'dev-libs/boost:=[python,${PYTHON_USEDEP}]') )
 "
 DEPEND="${RDEPEND}"
 
