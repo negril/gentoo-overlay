@@ -12,7 +12,7 @@ SRC_URI="https://github.com/NGSolve/netgen/archive/refs/tags/v${PV}.tar.gz -> ${
 
 LICENSE="LGPL-2.1"
 SLOT="0"
-KEYWORDS="~amd64 ~x86"
+KEYWORDS="amd64 ~x86"
 
 IUSE="ffmpeg gui jpeg mpi +opencascade python test"
 RESTRICT="!test? ( test )"
@@ -73,18 +73,20 @@ PATCHES=(
 	"${FILESDIR}/${PN}-6.2.2406-find-libjpeg-turbo-library.patch"
 	"${FILESDIR}/${PN}-6.2.2301-fix-nullptr-deref-in-archive.patch"
 	"${FILESDIR}/${PN}-6.2.2406-encoding_h.patch"
+	"${FILESDIR}/${PN}-6.2.2406-link-against-jpeg.patch"
+	"${FILESDIR}/${PN}-PR202-std_map.patch"
 )
 
 pkg_setup() {
 	if use python; then
 			python-single-r1_pkg_setup
 
-			# NOTE This calls find_package(Python3) without specifying Interpreter in COMPONENTS.
-			# Python3_FIND_UNVERSIONED_NAMES=FIRST is thus never checked and we search the highest python version first.
-			pushd "${T}/${EPYTHON}/bin" > /dev/null || die
-			cp "python-config" "${EPYTHON}-config" || die
-			chmod +x "${EPYTHON}-config" || die
-			popd > /dev/null || die
+			# # NOTE This calls find_package(Python3) without specifying Interpreter in COMPONENTS.
+			# # Python3_FIND_UNVERSIONED_NAMES=FIRST is thus never checked and we search the highest python version first.
+			# pushd "${T}/${EPYTHON}/bin" > /dev/null || die
+			# cp "python-config" "${EPYTHON}-config" || die
+			# chmod +x "${EPYTHON}-config" || die
+			# popd > /dev/null || die
 	fi
 }
 
@@ -94,6 +96,11 @@ src_prepare() {
 	# cat <<- EOF > "${S}/version.txt" || die
 	# 	v${PV}-0-08eec44
 	# EOF
+
+	# 855214 needs git
+	sed \
+		-e '/-DBDIR=${CMAKE_CURRENT_BINARY_DIR}/a -DNETGEN_VERSION_GIT=${NETGEN_VERSION_GIT}' \
+		-i CMakeLists.txt || die
 
 	rm external_dependencies -r || die
 
@@ -132,6 +139,8 @@ src_configure() {
 		mycmakeargs+=( -DTK_INCLUDE_PATH="/usr/$(get_libdir)/tk8.6/include" )
 	fi
 	if use python; then
+		append-cppflags -DPYBIND11_NO_ASSERT_GIL_HELD_INCREF_DECREF
+
 		mycmakeargs+=(
 			-DPREFER_SYSTEM_PYBIND11=ON
 			# # needed, so the value gets passed to NetgenConfig.cmake instead of ${T}/pythonX.Y
@@ -150,10 +159,9 @@ src_test() {
 	DESTDIR="${T}" cmake_build install
 
 	if use python; then
-		# local -x PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+		local -x PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 		local -x NETGENDIR="${T}/usr/bin"
 		export PYTHONPATH="${T}$(python_get_sitedir):${T}/usr/$(get_libdir):${BUILD_DIR}/libsrc/core"
-		echo "PYTHONPATH $PYTHONPATH"
 	fi
 
 	CMAKE_SKIP_TESTS=(
