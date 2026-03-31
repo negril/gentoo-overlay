@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -7,8 +7,11 @@ inherit cmake flag-o-matic
 
 DESCRIPTION="A library for storing voxel data"
 HOMEPAGE="http://opensource.imageworks.com/?p=field3d"
+
+
 SRC_COMMIT="b0ff0cd67893a4cbfa322676eb3eef10100d904d"
 SRC_URI="https://github.com/imageworks/Field3D/archive/${SRC_COMMIT}.tar.gz -> ${P}.tar.gz"
+S="${WORKDIR}/${PN}-${SRC_COMMIT}"
 
 LICENSE="BSD"
 SLOT="0"
@@ -31,8 +34,6 @@ PATCHES=(
 	"${FILESDIR}/${PN}-1.7.2-openexr-3-imath.patch"
 	"${FILESDIR}/${PN}-1.7.2-boost-1.83-timer-header-deprecated.patch"
 )
-
-S="${WORKDIR}/${PN}-${SRC_COMMIT}"
 
 src_prepare() {
 	sed -e "s#auto_ptr#unique_ptr#g" -i include/*.h || die
