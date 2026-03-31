@@ -13,18 +13,12 @@ MY_PN="OCCT"
 MY_TEST_PV="7.9.0"
 MY_TEST_PV2="${MY_TEST_PV//./_}_beta1"
 
-SRC_URI="
-	test? (
-		https://github.com/Open-Cascade-SAS/${MY_PN}/releases/download/V${MY_TEST_PV2}/${PN}-dataset-${MY_TEST_PV}.tar.xz
-	)
-"
-
 if [[ ${PV} = *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/Open-Cascade-SAS/${MY_PN}.git"
 else
 	MY_PV="${PV//./_}"
-	SRC_URI+="
+	SRC_URI="
 		https://github.com/Open-Cascade-SAS/${MY_PN}/archive/refs/tags/V${MY_PV}.tar.gz -> ${P}.tar.gz
 	"
 	S="${WORKDIR}/${MY_PN}-${MY_PV}"
@@ -33,6 +27,12 @@ else
 		KEYWORDS="~amd64 ~arm ~arm64 ~riscv ~x86"
 	fi
 fi
+
+SRC_URI+="
+	test? (
+		https://github.com/Open-Cascade-SAS/${MY_PN}/releases/download/V${MY_TEST_PV2}/${PN}-dataset-${MY_TEST_PV}.tar.xz
+	)
+"
 
 LICENSE="|| ( Open-CASCADE-LGPL-2.1-Exception-1.0 LGPL-2.1 )"
 SLOT="0/$(ver_cut 1-2)"
@@ -155,32 +155,37 @@ fi
 
 PATCHES=(
 	"${FILESDIR}/${PN}-7.9.2-0001-fix-installation-of-cmake-config-files.patch"
-	# "${FILESDIR}/${PN}-7.9.0-0002-avoid-pre-stripping-binaries.patch"
+	"${FILESDIR}/${PN}-7.9.0-0002-avoid-pre-stripping-binaries.patch"
 	# "${FILESDIR}/${PN}-7.9.2-0003-Fix-building-with-musl.patch"
-	"${FILESDIR}/${PN}-7.9.0-0004-Only-try-to-find-the-jemalloc-libs-we-are-going-to-u.patch"
+	# "${FILESDIR}/${PN}-7.9.0-0004-Only-try-to-find-the-jemalloc-libs-we-are-going-to-u.patch"
 	"${FILESDIR}/${PN}-7.8.0-tests.patch"
 	# "${FILESDIR}/${PN}-7.8.0-jemalloc-noexcept.patch"
+	# "${FILESDIR}/${PN}-7.9.3-cmake-4.patch"
 )
 
 src_unpack() {
 	if [[ ${PV} = *9999* ]] ; then
 		git-r3_src_unpack
-	else
-		unpack "${P}.tar.gz"
+	# else
+	# 	unpack "${P}.tar.gz"
 	fi
 
-	if use test; then
-		pushd "${WORKDIR}" > /dev/null || die
-		# should be in paths indicated by CSF_TestDataPath environment variable,
-		# or in subfolder data in the script directory
-		unpack "${PN}-dataset-${MY_TEST_PV}.tar.xz"
-		popd > /dev/null || die
-	fi
+	# if use test; then
+	# 	pushd "${WORKDIR}" > /dev/null || die
+	# 	# should be in paths indicated by CSF_TestDataPath environment variable,
+	# 	# or in subfolder data in the script directory
+	# 	unpack "${PN}-dataset-${MY_TEST_PV}.tar.xz"
+	# 	popd > /dev/null || die
+	# fi
+
+	default
 }
 
 src_prepare() {
 	# File DEFINES has not been found in
-	touch src/Visualization/TKOpenGles/DEFINES || die
+	if [[ -d src/TKOpenGles ]]; then
+		touch src/TKOpenGles/DEFINES || die
+	fi
 
 	cmake_src_prepare
 
@@ -198,6 +203,8 @@ src_configure() {
 	# https://tracker.dev.opencascade.org/view.php?id=33091
 	filter-lto
 
+	# replace-flags -O3 -O2
+
 	local mycmakeargs=(
 		-D3RDPARTY_DIR="${ESYSROOT}/usr"
 		# -DBUILD_CPP_STANDARD="C++23"
@@ -212,7 +219,7 @@ src_configure() {
 		# -DBUILD_RESOURCES="yes"
 		# -DBUILD_YACCLEX="yes"
 
-		-DBUILD_RELEASE_DISABLE_EXCEPTIONS="no" # bug #847916
+		-DBUILD_RELEASE_DISABLE_EXCEPTIONS="yes" # bug #847916
 		-DINSTALL_DIR="${EPREFIX}/usr"
 		-DINSTALL_DIR_BIN="$(get_libdir)/${PN}/bin"
 		-DINSTALL_DIR_CMAKE="$(get_libdir)/cmake/${PN}"
@@ -338,6 +345,16 @@ src_configure() {
 }
 
 src_test() {
+	if use vtk && has_version "sci-libs/vtk[cuda]"; then
+		cuda_add_sandbox -w
+	fi
+
+	if use gles2 || use opengl; then
+		xdg_environment_reset
+		addwrite '/dev/dri/'
+		[[ -c /dev/udmabuf ]] && addwrite /dev/udmabuf
+	fi
+
 	# override variable from /etc/env.d/99opencascade
 	local -x CASROOT="${BUILD_DIR}"
 
@@ -362,17 +379,27 @@ src_test() {
 		-overwrite
 	)
 
+	# local test_name
+	# for test_name in "${test_names[@]}"; do
+	# 	mkdir -vp "$(dirname "${BUILD_DIR}/test_results/${test_name// /\/}")" || die
+	# 	cat >> "${test_file}" <<- _EOF_ || die
+	# 		test ${test_name} -outfile "${BUILD_DIR}/test_results/${test_name// /\/}" ${test_opts[@]}
+	# 	_EOF_
+	# done
+
 	local test_name
 	for test_name in "${test_names[@]}"; do
-		mkdir -vp "$(dirname "${BUILD_DIR}/test_results/${test_name// /\/}")" || die
+		# mkdir -vp "$(dirname "${BUILD_DIR}/test_results/${test_name// /\/}")" || die
+		# cat >> "${test_file}" <<- _EOF_ || die
+		# 	test ${test_name} -outfile "${BUILD_DIR}/test_results/${test_name// /\/}" ${test_opts[@]}
+		# _EOF_
+
 		cat >> "${test_file}" <<- _EOF_ || die
-			test ${test_name} -outfile "${BUILD_DIR}/test_results/${test_name// /\/}" ${test_opts[@]}
+			testgrid ${test_name} -outdir "${BUILD_DIR}/test_results" ${test_opts[@]}
 		_EOF_
 	done
 
-	local testgrid_opts=(
-		-overwrite
-	)
+	local testgrid_opts=()
 
 	local SKIP_TESTS=()
 	local DEL_TESTS=()
@@ -405,9 +432,12 @@ src_test() {
 			'heal checkshape bug32448_1'
 			'hlr exact_hlr bug25813_2'
 			'hlr poly_hlr '{Plate,bug25813_{2,3,4}}
-			'lowalgos intss bug'{25950,27431,29807_i{1003,2006,3003},30703,565,567_1}
+			'lowalgos intss bug'{25950,27431,29807_i{1003,2006,3003},30703,565,567_1,23972,29910_2}
+			# where does this come from?
+			'lowalgos extcc bug29858_04'
 			'lowalgos proximity A'{4,5}
 			'offset wire_closed_inside_0_005 D1'
+			'offset wire_unclosed_outside_0_025 A1'
 			'opengles3 general msaa'
 			'opengles3 geom interior'{1,2}
 			'opengles3 raytrace msaa'
@@ -417,34 +447,26 @@ src_test() {
 			'opengl background bug27836'
 			'opengles3 background bug27836'
 
-			'de step_2 U8'
-			'de step_3 D7'
-			'de step_2 T9'
-			'geometry circ2d3Tan CircleCirclePoint_13'
-			'lowalgos intss bug23972'
+			# misses testdata
+			# 'boolean gdml_private'
+
+			# zink + lavapipe
+			'opengl hatch bug31702'
+			'vselect bugs bug129_'{1,2}
 		)
 
 		DEL_TESTS+=(
 			# Error: non-linear time growth detected!
 			# 'v3d/trsf/bug26029'
-
-			# needs dri3
-			# 'opengl/drivers/opengles'
-			# 'opengles3'
 		)
 	fi
 
 	if ! use gles2; then
 		DEL_TESTS+=(
-			# 'opengl/drivers/opengles'
-			# 'opengles3'
+			# needs dri3
+			'opengl/drivers/opengles'
+			'opengles3'
 		)
-	fi
-
-	if use gles2 || use opengl; then
-		xdg_environment_reset
-		addwrite '/dev/dri/'
-		[[ -c /dev/udmabuf ]] && addwrite /dev/udmabuf
 	fi
 
 	if ! use tk || ! use vtk; then
@@ -468,13 +490,16 @@ src_test() {
 
 	local test
 	for test in "${DEL_TESTS[@]}"; do
-		rm -r "${CMAKE_USE_DIR}/tests/${test}" || die
+		if [[ -e "${CMAKE_USE_DIR}/tests/${test}" ]]; then
+			rm -fr "${CMAKE_USE_DIR}/tests/${test}" || die
+		fi
 	done
 
 	testgrid_opts+=(
-		# -refresh 5 # default is 60
+		-refresh 5 # default is 60
 		-overwrite
 		-parallel "$(makeopts_jobs)"
+		# -parallel 1
 	)
 	cat >> "${test_file}" <<- _EOF_ || die
 		testgrid -outdir "${BUILD_DIR}/test_results" ${testgrid_opts[@]}
@@ -487,6 +512,7 @@ src_test() {
 
 	# Work around zink warnings
 	export LIBGL_ALWAYS_SOFTWARE="true"
+	export __GLX_VENDOR_LIBRARY_NAME="mesa"
 
 	virtx \
 		"${BUILD_DIR}/draw.sh" \

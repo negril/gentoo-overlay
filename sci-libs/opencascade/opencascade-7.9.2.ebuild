@@ -155,11 +155,12 @@ fi
 
 PATCHES=(
 	"${FILESDIR}/${PN}-7.9.2-0001-fix-installation-of-cmake-config-files.patch"
-	# "${FILESDIR}/${PN}-7.9.0-0002-avoid-pre-stripping-binaries.patch"
-	# "${FILESDIR}/${PN}-7.9.2-0003-Fix-building-with-musl.patch"
+	"${FILESDIR}/${PN}-7.9.0-0002-avoid-pre-stripping-binaries.patch"
+	"${FILESDIR}/${PN}-7.9.2-0003-Fix-building-with-musl.patch"
 	"${FILESDIR}/${PN}-7.9.0-0004-Only-try-to-find-the-jemalloc-libs-we-are-going-to-u.patch"
 	"${FILESDIR}/${PN}-7.8.0-tests.patch"
-	# "${FILESDIR}/${PN}-7.8.0-jemalloc-noexcept.patch"
+	"${FILESDIR}/${PN}-7.8.0-jemalloc-noexcept.patch"
+	"${FILESDIR}/${PN}-7.9.3-cmake-4.patch"
 )
 
 src_unpack() {
@@ -180,7 +181,7 @@ src_unpack() {
 
 src_prepare() {
 	# File DEFINES has not been found in
-	touch src/Visualization/TKOpenGles/DEFINES || die
+	touch src/TKOpenGles/DEFINES || die
 
 	cmake_src_prepare
 
@@ -221,7 +222,7 @@ src_configure() {
 		-DINSTALL_DIR_INCLUDE="include/${PN}"
 		-DINSTALL_DIR_LIB="$(get_libdir)/${PN}"
 		-DINSTALL_DIR_RESOURCE="share/${PN}/resources"
-		# -DINSTALL_DIR_SAMPLES="share/${PN}/samples"
+		-DINSTALL_DIR_SAMPLES="share/${PN}/samples"
 		-DINSTALL_DIR_SCRIPT="$(get_libdir)/${PN}/bin"
 		-DINSTALL_DIR_TESTS="share/${PN}/tests"
 		-DINSTALL_DIR_WITH_VERSION="no"
@@ -262,12 +263,6 @@ src_configure() {
 		mycmakeargs+=( -DUSE_MMGR_TYPE=FLEXIBLE )
 	fi
 
-	if use debug; then
-		mycmakeargs+=(
-			-DBUILD_WITH_DEBUG="yes"
-		)
-	fi
-
 	if use doc; then
 		mycmakeargs+=(
 			-DINSTALL_DOC_Overview="yes"
@@ -288,8 +283,8 @@ src_configure() {
 		fi
 	else
 		mycmakeargs+=(
-			# -DINSTALL_SAMPLES="no"
-			# -DBUILD_Inspector="no"
+			-DINSTALL_SAMPLES="no"
+			-DBUILD_Inspector="no"
 		)
 	fi
 
@@ -338,10 +333,6 @@ src_configure() {
 }
 
 src_test() {
-	# override variable from /etc/env.d/99opencascade
-	local -x CASROOT="${BUILD_DIR}"
-
-	# inject custom test data location
 	cat >> "${BUILD_DIR}/custom.sh" <<- _EOF_ || die
 		export CSF_TestDataPath="${WORKDIR}/${PN}-dataset-${MY_TEST_PV}"
 	_EOF_
@@ -349,7 +340,7 @@ src_test() {
 	local test_file="${T}/testscript.tcl"
 
 	local draw_opts=(
-		"$(usex debug "d" "i")" # see ${BUILD_DIR}/custom*.sh
+		i # see ${BUILD_DIR}/custom*.sh
 		# -b # batch mode (no GUI, no viewers)
 		-v # no GUI, use virtual (off-screen) windows for viewers
 	)
@@ -364,9 +355,9 @@ src_test() {
 
 	local test_name
 	for test_name in "${test_names[@]}"; do
-		mkdir -vp "$(dirname "${BUILD_DIR}/test_results/${test_name// /\/}")" || die
+		mkdir -vp "$(dirname "${BUILD_DIR}/test_results/${test_name// /\/}.html")" || die
 		cat >> "${test_file}" <<- _EOF_ || die
-			test ${test_name} -outfile "${BUILD_DIR}/test_results/${test_name// /\/}" ${test_opts[@]}
+			test ${test_name} -outfile "${BUILD_DIR}/test_results/${test_name// /\/}.html" ${test_opts[@]}
 		_EOF_
 	done
 
@@ -416,12 +407,6 @@ src_test() {
 
 			'opengl background bug27836'
 			'opengles3 background bug27836'
-
-			'de step_2 U8'
-			'de step_3 D7'
-			'de step_2 T9'
-			'geometry circ2d3Tan CircleCirclePoint_13'
-			'lowalgos intss bug23972'
 		)
 
 		DEL_TESTS+=(
@@ -488,6 +473,8 @@ src_test() {
 	# Work around zink warnings
 	export LIBGL_ALWAYS_SOFTWARE="true"
 
+	local -x CASROOT="${BUILD_DIR}"
+
 	virtx \
 		"${BUILD_DIR}/draw.sh" \
 		"${draw_opts[@]}" \
@@ -502,7 +489,7 @@ src_test() {
 	if [[ -n ${failed_tests} ]]; then
 		eerror "Failed tests:"
 		eerror "${failed_tests}"
-		die "Test failed"
+		die
 	fi
 }
 
