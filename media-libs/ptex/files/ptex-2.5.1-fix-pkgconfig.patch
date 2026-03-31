@@ -1,0 +1,23 @@
+From 4e1d2c6b9432525096d7b25183c86d75883128d7 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 6 Feb 2026 13:58:12 +0100
+Subject: [PATCH] fix pkgconfig
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/build/ptex.pc.in b/src/build/ptex.pc.in
+index b81a2fd..e2586b6 100644
+--- a/src/build/ptex.pc.in
++++ b/src/build/ptex.pc.in
+@@ -13,7 +13,7 @@ includedir="@CMAKE_INSTALL_PKGCONFIG_INCLUDEDIR@"
+ Name: @PROJECT_NAME@
+ Description: @CMAKE_PROJECT_DESCRIPTION@
+ URL: @CMAKE_PROJECT_HOMEPAGE_URL@
+-Version: @PROJECT_VERSION@
++Version: @PTEX_MAJOR_VERSION@.@PTEX_MINOR_VERSION@
+ Requires: @pc_req_public@
+ Requires.private: @pc_req_private@
+ Cflags: -I"${includedir}"
+-- 
+2.52.0
+
