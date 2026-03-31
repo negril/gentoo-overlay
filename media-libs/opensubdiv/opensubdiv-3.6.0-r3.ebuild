@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+PYTHON_COMPAT=( python3_{11..13} )
 
 inherit cmake cuda flag-o-matic python-any-r1 toolchain-funcs virtualx xdg
 
@@ -36,14 +36,16 @@ BDEPEND="
 	python? ( ${PYTHON_DEPS} )
 "
 
+# opengl requires GLX, libglvnd[X]
 RDEPEND="
 	examples? (
 		opengl? (
 			glfw? (
-				media-libs/glfw[X?]
+				>=media-libs/glfw-3.4[X?]
 			)
 		)
 	)
+	opengl? ( media-libs/libglvnd[X] )
 	opencl? ( virtual/opencl )
 	openmp? ( || (
 		sys-devel/gcc:*[openmp]
@@ -51,7 +53,7 @@ RDEPEND="
 	) )
 	ptex? ( media-libs/ptex )
 	tbb? ( dev-cpp/tbb:= )
-	test? ( media-libs/glfw[X] )
+	test? ( >=media-libs/glfw-3.4[X] )
 "
 
 # CUDA_RUNTIME is statically linked
@@ -59,7 +61,7 @@ DEPEND="
 	${RDEPEND}
 	test? (
 		glfw? (
-			media-libs/glfw[X?]
+			>=media-libs/glfw-3.4[X?]
 		)
 	)
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
@@ -223,7 +225,13 @@ src_test() {
 	# "far_tutorial_1_2 breaks with gcc and > -O1"
 	tc-is-gcc && is-flagq '-O@(2|3|fast)' && CMAKE_SKIP_TESTS+=( "far_tutorial_1_2" )
 
-	use cuda && cuda_add_sandbox -w
+	if use cuda; then
+		cuda_add_sandbox -w
+		addpredict /dev/char/
+		addwrite /dev/dri/card0
+		addwrite /dev/dri/renderD128
+		addwrite /dev/udmabuf
+	fi
 
 	virtx cmake_src_test
 
