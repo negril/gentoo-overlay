@@ -1,0 +1,556 @@
+From 5c43fadb041061068ee26e53a2b80ccd63350a92 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 26 Dec 2025 17:21:43 +0100
+Subject: GNUInstallDirs
+
+naive way to fix the install dirs
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d6edbc1..9b7f991 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -43,6 +43,8 @@ project (PASTIX C CXX Fortran)
+ include(CMakeDependentOption)
+ include(CheckFunctionExists)
+ 
++include(GNUInstallDirs)
++
+ # The current version number
+ set( PASTIX_VERSION_MAJOR 6 )
+ set( PASTIX_VERSION_MINOR 4 )
+@@ -109,7 +111,7 @@ set(CMAKE_SKIP_BUILD_RPATH  FALSE)
+ set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+ 
+ # the RPATH to be used when installing
+-list(APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
++list(APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}")
+ 
+ ### Misc options
+ option(BUILD_SHARED_LIBS
+@@ -939,17 +941,18 @@ install(FILES ${PASTIX_HDRS}
+ # export target pastix
+ install(EXPORT pastixTargets
+         NAMESPACE PASTIX::
+-        DESTINATION lib/cmake/pastix
++        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pastix
+         )
+ 
+ # Installation
+ # ------------
+ install( TARGETS pastix
+   EXPORT pastixTargets
+-  RUNTIME DESTINATION bin
+-  ARCHIVE DESTINATION lib
+-  LIBRARY DESTINATION lib
+-  PUBLIC_HEADER DESTINATION include )
++  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++)
+ 
+ ## Executable and tests
+ enable_testing()
+@@ -1228,13 +1231,13 @@ add_custom_target (tags
+ # see https://cmake.org/cmake/help/latest/module/CMakePackageConfigHelpers.html
+ include(CMakePackageConfigHelpers)
+ 
+-set(BIN_INSTALL_DIR "bin/"     CACHE STRING "where to install executables relative to prefix" )
+-set(INC_INSTALL_DIR "include/" CACHE STRING "where to install headers relative to prefix"     )
+-set(LIB_INSTALL_DIR "lib/"     CACHE STRING "where to install libraries relative to prefix"   )
++set(BIN_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}/"     CACHE STRING "where to install executables relative to prefix" )
++set(INC_INSTALL_DIR "${CMAKE_INSTALL_INCLUDEDIR}/" CACHE STRING "where to install headers relative to prefix"     )
++set(LIB_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/"     CACHE STRING "where to install libraries relative to prefix"   )
+ 
+ configure_package_config_file( cmake_modules/PASTIXConfig.cmake.in
+   ${CMAKE_CURRENT_BINARY_DIR}/PASTIXConfig.cmake
+-  INSTALL_DESTINATION lib/cmake/pastix
++  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pastix
+   PATH_VARS BIN_INSTALL_DIR INC_INSTALL_DIR LIB_INSTALL_DIR)
+ write_basic_package_version_file(PASTIXConfigVersion.cmake
+   VERSION ${PASTIX_VERSION}
+@@ -1244,7 +1247,7 @@ write_basic_package_version_file(PASTIXConfigVersion.cmake
+ install( FILES
+   ${CMAKE_CURRENT_BINARY_DIR}/PASTIXConfig.cmake
+   ${CMAKE_CURRENT_BINARY_DIR}/PASTIXConfigVersion.cmake
+-  DESTINATION lib/cmake/pastix)
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pastix)
+ 
+ #############################################################
+ # Print Options
+diff --git a/kernels/CMakeLists.txt b/kernels/CMakeLists.txt
+index 4a8785e..a3ca680 100644
+--- a/kernels/CMakeLists.txt
++++ b/kernels/CMakeLists.txt
+@@ -208,17 +208,18 @@ endif()
+ # ----------------------------
+ install(EXPORT pastix_kernelsTargets
+   NAMESPACE PASTIX::
+-  DESTINATION lib/cmake/pastix
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pastix
+   )
+ 
+ # Installation
+ # ------------
+ install(TARGETS pastix_kernels
+         EXPORT pastix_kernelsTargets
+-        ARCHIVE       DESTINATION lib
+-        LIBRARY       DESTINATION lib
+-        RUNTIME       DESTINATION bin
+-        PUBLIC_HEADER DESTINATION include )
++        ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
++        LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
++        RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
++        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++)
+ 
+ ### Add generated files to the global property
+ add_documented_files(
+diff --git a/kernels/gpus/CMakeLists.txt b/kernels/gpus/CMakeLists.txt
+index 93b699b..92a59ef 100644
+--- a/kernels/gpus/CMakeLists.txt
++++ b/kernels/gpus/CMakeLists.txt
+@@ -63,8 +63,8 @@ set_source_files_properties(
+ #     ${cuda_generated_files})
+ #   cuda_add_cublas_to_target( pastix_cucores_sm${_smtarget} )
+ #   install(TARGETS pastix_cucores_sm${_smtarget}
+-#     LIBRARY DESTINATION lib
+-#     ARCHIVE DESTINATION lib )
++#     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++#     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} )
+ #   # if( NOT CMAKE_BUILD_SHARED_LIBS )
+ #   #   target_link_libraries( pastix_cucores pastix_cucores_sm${_smtarget} )
+ #   # endif()
+@@ -98,16 +98,17 @@ target_link_libraries( pastix_kernels_cuda SPM::spm )
+ # ----------------------------
+ install(EXPORT pastix_kernels_cudaTargets
+   NAMESPACE PASTIX::
+-  DESTINATION lib/cmake/pastix
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pastix
+   )
+ 
+ # Installation
+ # ------------
+ install(TARGETS pastix_kernels_cuda
+         EXPORT pastix_kernels_cudaTargets
+-        ARCHIVE       DESTINATION lib
+-        LIBRARY       DESTINATION lib
+-        RUNTIME       DESTINATION bin
+-        PUBLIC_HEADER DESTINATION include )
++        ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
++        LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
++        RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
++        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++)
+ 
+ cuda_build_clean_target()
+diff --git a/pastix.pc.in b/pastix.pc.in
+index e69fdf3..f2144bb 100644
+--- a/pastix.pc.in
++++ b/pastix.pc.in
+@@ -10,7 +10,7 @@
+ #
+ prefix=@CMAKE_INSTALL_PREFIX@
+ exec_prefix=${prefix}
+-libdir=${exec_prefix}/lib
++libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+ includedir=${exec_prefix}/include
+ 
+ Name: PaStiX
+diff --git a/pastixf.pc.in b/pastixf.pc.in
+index 8a88c42..2a93961 100644
+--- a/pastixf.pc.in
++++ b/pastixf.pc.in
+@@ -10,7 +10,7 @@
+ #
+ prefix=@CMAKE_INSTALL_PREFIX@
+ exec_prefix=${prefix}
+-libdir=${exec_prefix}/lib
++libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+ includedir=${exec_prefix}/include
+ 
+ Name: PaStiX - Fortran
+diff --git a/sopalin/parsec/CMakeLists.txt b/sopalin/parsec/CMakeLists.txt
+index 36b7dbb..da8bae1 100644
+--- a/sopalin/parsec/CMakeLists.txt
++++ b/sopalin/parsec/CMakeLists.txt
+@@ -116,7 +116,7 @@ endif (MPI_C_FOUND)
+ # ---------------------------
+ install(EXPORT pastix_parsecTargets
+   NAMESPACE PASTIX::
+-  DESTINATION lib/cmake/pastix
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pastix
+   )
+ 
+ # Installation
+@@ -124,8 +124,8 @@ install(EXPORT pastix_parsecTargets
+ install(
+   TARGETS pastix_parsec
+   EXPORT pastix_parsecTargets
+-  ARCHIVE DESTINATION lib
+-  LIBRARY DESTINATION lib
++  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+   RUNTIME DESTINATION bin )
+ 
+ ### Add non-generated documented files to the global property
+diff --git a/sopalin/starpu/CMakeLists.txt b/sopalin/starpu/CMakeLists.txt
+index c947b2e..34f5c20 100644
+--- a/sopalin/starpu/CMakeLists.txt
++++ b/sopalin/starpu/CMakeLists.txt
+@@ -124,17 +124,18 @@ endif (MPI_C_FOUND)
+ # ---------------------------
+ install(EXPORT pastix_starpuTargets
+   NAMESPACE PASTIX::
+-  DESTINATION lib/cmake/pastix
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pastix
+   )
+ 
+ # Installation
+ # ------------
+ install(TARGETS pastix_starpu
+         EXPORT pastix_starpuTargets
+-        ARCHIVE       DESTINATION lib
+-        LIBRARY       DESTINATION lib
+-        RUNTIME       DESTINATION bin
+-        PUBLIC_HEADER DESTINATION include)
++        ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
++        LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
++        RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
++        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++)
+ 
+ ### Add non-generated documented files to the global property
+ add_documented_files(
+diff --git a/wrappers/fortran90/CMakeLists.txt b/wrappers/fortran90/CMakeLists.txt
+index 668ca20..f66aeb2 100644
+--- a/wrappers/fortran90/CMakeLists.txt
++++ b/wrappers/fortran90/CMakeLists.txt
+@@ -66,17 +66,18 @@ endif()
+ # ---------------------
+ install(EXPORT pastixfTargets
+         NAMESPACE PASTIX::
+-        DESTINATION lib/cmake/pastix
++        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pastix
+         )
+ 
+ # Installation
+ # ------------
+ install(TARGETS pastixf
+   EXPORT pastixfTargets
+-  ARCHIVE DESTINATION lib
+-  LIBRARY DESTINATION lib
+-  RUNTIME DESTINATION bin
+-  PUBLIC_HEADER DESTINATION include)
++  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++)
+ 
+ # Add examples
+ # ------------
+diff --git a/wrappers/julia/CMakeLists.txt b/wrappers/julia/CMakeLists.txt
+index ae554ca..5420590 100644
+--- a/wrappers/julia/CMakeLists.txt
++++ b/wrappers/julia/CMakeLists.txt
+@@ -60,11 +60,11 @@ file(COPY
+ # Install julia package
+ install(FILES
+   ${CMAKE_CURRENT_BINARY_DIR}/PaStiX/Project.toml
+-  DESTINATION lib/julia/PaStiX )
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/julia/PaStiX )
+ install(FILES
+   ${CMAKE_CURRENT_BINARY_DIR}/PaStiX/src/PaStiX.jl
+   ${CMAKE_CURRENT_BINARY_DIR}/PaStiX/src/pastix_enums.jl
+-  DESTINATION lib/julia/PaStiX/src )
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/julia/PaStiX/src )
+ 
+ # Install julia examples
+ install(FILES
+-- 
+2.52.0
+
+From 5c43fadb041061068ee26e53a2b80ccd63350a92 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 26 Dec 2025 17:21:43 +0100
+Subject: GNUInstallDirs
+
+naive way to fix the install dirs
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/cmake_modules/morse_cmake/modules/GenPkgConfig.cmake b/cmake_modules/morse_cmake/modules/GenPkgConfig.cmake
+index 78006a1..429cd43 100644
+--- a/cmake_modules/morse_cmake/modules/GenPkgConfig.cmake
++++ b/cmake_modules/morse_cmake/modules/GenPkgConfig.cmake
+@@ -49,7 +49,7 @@
+ #     by the project for static linking.
+ #
+ # The generated files are then installed in the subdirectory
+-# lib/pkgconfig of the prefix directory.
++# ${CMAKE_INSTALL_LIBDIR}/pkgconfig of the prefix directory.
+ #
+ # generate_env_files(
+ #   [PROJECTNAME name]
+@@ -201,13 +201,13 @@ macro(generate_pkgconfig_files)
+     # ----------------
+     configure_file(
+       ${f}
+-      "${CMAKE_BINARY_DIR}/lib/pkgconfig/${fname}.pc" @ONLY)
++      "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/pkgconfig/${fname}.pc" @ONLY)
+ 
+     # installation
+     # ------------
+     install(FILES
+-      "${CMAKE_BINARY_DIR}/lib/pkgconfig/${fname}.pc"
+-      DESTINATION lib/pkgconfig )
++      "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/pkgconfig/${fname}.pc"
++      DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig )
+ 
+   endforeach()
+ 
+diff --git a/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake b/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
+index 004d341..e143ff7 100644
+--- a/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
++++ b/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
+@@ -194,7 +194,7 @@ macro(morse_create_imported_target name)
+ endmacro()
+ 
+ # export existing imported target namespace1::namespace2 in cmake file
+-# ${targetname}Targets.cmake and installed in lib/cmake/cmakesubdir/. To be used
++# ${targetname}Targets.cmake and installed in ${CMAKE_INSTALL_LIBDIR}/cmake/cmakesubdir/. To be used
+ # by "PROJECT"Config.cmake file at installation
+ macro(morse_export_imported_target namespace1 namespace2 targetname cmakesubdir)
+ 
+@@ -237,7 +237,7 @@ endif()
+ ")
+ 
+     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${targetname}Targets.cmake"
+-            DESTINATION "lib/cmake/${cmakesubdir}")
++            DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${cmakesubdir}")
+   else()
+     message(WARNING "morse_export_imported_target: try to export target "
+       "${namespace1}::${namespace2} but it does not exist.")
+-- 
+2.52.0
+
+From 5c43fadb041061068ee26e53a2b80ccd63350a92 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 26 Dec 2025 17:21:43 +0100
+Subject: GNUInstallDirs
+
+naive way to fix the install dirs
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/spm/CMakeLists.txt b/spm/CMakeLists.txt
+index b7f46ba..d64d468 100644
+--- a/spm/CMakeLists.txt
++++ b/spm/CMakeLists.txt
+@@ -119,7 +119,7 @@ set(CMAKE_SKIP_BUILD_RPATH FALSE)
+ set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+ 
+ # the RPATH to be used when installing
+-list(APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
++list(APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}")
+ 
+ # SPM depends on check libm
+ #--------------------------
+@@ -292,9 +292,9 @@ add_subdirectory(wrappers)
+ # see https://cmake.org/cmake/help/latest/module/CMakePackageConfigHelpers.html
+ include(CMakePackageConfigHelpers)
+ 
+-set(BIN_INSTALL_DIR "bin/"     CACHE STRING "where to install executables relative to prefix" )
+-set(INC_INSTALL_DIR "include/" CACHE STRING "where to install headers relative to prefix"     )
+-set(LIB_INSTALL_DIR "lib/"     CACHE STRING "where to install libraries relative to prefix"   )
++set(BIN_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}/"     CACHE STRING "where to install executables relative to prefix" )
++set(INC_INSTALL_DIR "${CMAKE_INSTALL_INCLUDEDIR}/" CACHE STRING "where to install headers relative to prefix"     )
++set(LIB_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/"     CACHE STRING "where to install libraries relative to prefix"   )
+ 
+ configure_package_config_file(cmake_modules/SPMConfig.cmake.in
+   ${CMAKE_CURRENT_BINARY_DIR}/SPMConfig.cmake
+@@ -308,7 +308,7 @@ write_basic_package_version_file(SPMConfigVersion.cmake
+ install(FILES
+   ${CMAKE_CURRENT_BINARY_DIR}/SPMConfig.cmake
+   ${CMAKE_CURRENT_BINARY_DIR}/SPMConfigVersion.cmake
+-  DESTINATION lib/cmake/spm)
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/spm)
+ 
+ ### Build pkg-config and environment file
+ include(GenPkgConfig)
+diff --git a/spm/src/CMakeLists.txt b/spm/src/CMakeLists.txt
+index ee661ef..d0d926f 100644
+--- a/spm/src/CMakeLists.txt
++++ b/spm/src/CMakeLists.txt
+@@ -137,17 +137,18 @@ endif()
+ install(EXPORT spmTargets
+         FILE spmTargets.cmake
+         NAMESPACE SPM::
+-        DESTINATION lib/cmake/spm
++        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/spm
+         )
+ 
+ # Installation
+ # ------------
+ install(TARGETS spm
+   EXPORT spmTargets
+-  RUNTIME DESTINATION bin
+-  ARCHIVE DESTINATION lib
+-  LIBRARY DESTINATION lib
+-  PUBLIC_HEADER DESTINATION include )
++  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++)
+ 
+ # Add files to the documentation
+ # ------------------------------
+diff --git a/spm/tools/spm.pc.in b/spm/tools/spm.pc.in
+index b6d9072..47b87f3 100644
+--- a/spm/tools/spm.pc.in
++++ b/spm/tools/spm.pc.in
+@@ -1,6 +1,6 @@
+ prefix=@CMAKE_INSTALL_PREFIX@
+ exec_prefix=${prefix}
+-libdir=${exec_prefix}/lib
++libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+ includedir=${exec_prefix}/include
+ 
+ Name: SPM
+diff --git a/spm/tools/spmf.pc.in b/spm/tools/spmf.pc.in
+index dc848dd..ca81f06 100644
+--- a/spm/tools/spmf.pc.in
++++ b/spm/tools/spmf.pc.in
+@@ -12,7 +12,7 @@
+ #
+ prefix=@CMAKE_INSTALL_PREFIX@
+ exec_prefix=${prefix}
+-libdir=${exec_prefix}/lib
++libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+ includedir=${exec_prefix}/include
+ 
+ Name: SPM - Fortran
+diff --git a/spm/wrappers/fortran90/CMakeLists.txt b/spm/wrappers/fortran90/CMakeLists.txt
+index 4692482..22d4f54 100644
+--- a/spm/wrappers/fortran90/CMakeLists.txt
++++ b/spm/wrappers/fortran90/CMakeLists.txt
+@@ -61,17 +61,18 @@ endif()
+ install(EXPORT spmfTargets
+         FILE spmfTargets.cmake
+         NAMESPACE SPM::
+-        DESTINATION lib/cmake/spm
++        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/spm
+         )
+ 
+ # Installation
+ # ------------
+ install(TARGETS spmf
+   EXPORT spmfTargets
+-  RUNTIME DESTINATION bin
+-  ARCHIVE DESTINATION lib
+-  LIBRARY DESTINATION lib
+-  PUBLIC_HEADER DESTINATION include)
++  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++)
+ 
+ # Add examples
+ # ------------
+diff --git a/spm/wrappers/julia/CMakeLists.txt b/spm/wrappers/julia/CMakeLists.txt
+index 1e27e59..1334083 100644
+--- a/spm/wrappers/julia/CMakeLists.txt
++++ b/spm/wrappers/julia/CMakeLists.txt
+@@ -58,17 +58,17 @@ file(COPY
+ # Install julia package
+ install(FILES
+   ${CMAKE_CURRENT_BINARY_DIR}/spm/Project.toml
+-  DESTINATION lib/julia/spm )
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/julia/spm )
+ install(FILES
+   ${CMAKE_CURRENT_BINARY_DIR}/spm/src/spm.jl
+   ${CMAKE_CURRENT_BINARY_DIR}/spm/src/spm_enums.jl
+-  DESTINATION lib/julia/spm/src )
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/julia/spm/src )
+ 
+ # Install julia examples
+ install(FILES
+   ${CMAKE_CURRENT_SOURCE_DIR}/spm_driver.jl
+   ${CMAKE_CURRENT_SOURCE_DIR}/spm_user.jl
+-  DESTINATION lib/julia/spm/examples )
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/julia/spm/examples )
+ 
+ # Documentation
+ # -------------
+-- 
+2.52.0
+
+From 5c43fadb041061068ee26e53a2b80ccd63350a92 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 26 Dec 2025 17:21:43 +0100
+Subject: GNUInstallDirs
+
+naive way to fix the install dirs
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/spm/cmake_modules/morse_cmake/modules/GenPkgConfig.cmake b/spm/cmake_modules/morse_cmake/modules/GenPkgConfig.cmake
+index 78006a1..429cd43 100644
+--- a/spm/cmake_modules/morse_cmake/modules/GenPkgConfig.cmake
++++ b/spm/cmake_modules/morse_cmake/modules/GenPkgConfig.cmake
+@@ -49,7 +49,7 @@
+ #     by the project for static linking.
+ #
+ # The generated files are then installed in the subdirectory
+-# lib/pkgconfig of the prefix directory.
++# ${CMAKE_INSTALL_LIBDIR}/pkgconfig of the prefix directory.
+ #
+ # generate_env_files(
+ #   [PROJECTNAME name]
+@@ -201,13 +201,13 @@ macro(generate_pkgconfig_files)
+     # ----------------
+     configure_file(
+       ${f}
+-      "${CMAKE_BINARY_DIR}/lib/pkgconfig/${fname}.pc" @ONLY)
++      "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/pkgconfig/${fname}.pc" @ONLY)
+ 
+     # installation
+     # ------------
+     install(FILES
+-      "${CMAKE_BINARY_DIR}/lib/pkgconfig/${fname}.pc"
+-      DESTINATION lib/pkgconfig )
++      "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/pkgconfig/${fname}.pc"
++      DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig )
+ 
+   endforeach()
+ 
+diff --git a/spm/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake b/spm/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
+index 004d341..e143ff7 100644
+--- a/spm/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
++++ b/spm/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
+@@ -194,7 +194,7 @@ macro(morse_create_imported_target name)
+ endmacro()
+ 
+ # export existing imported target namespace1::namespace2 in cmake file
+-# ${targetname}Targets.cmake and installed in lib/cmake/cmakesubdir/. To be used
++# ${targetname}Targets.cmake and installed in ${CMAKE_INSTALL_LIBDIR}/cmake/cmakesubdir/. To be used
+ # by "PROJECT"Config.cmake file at installation
+ macro(morse_export_imported_target namespace1 namespace2 targetname cmakesubdir)
+ 
+@@ -237,7 +237,7 @@ endif()
+ ")
+ 
+     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${targetname}Targets.cmake"
+-            DESTINATION "lib/cmake/${cmakesubdir}")
++            DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${cmakesubdir}")
+   else()
+     message(WARNING "morse_export_imported_target: try to export target "
+       "${namespace1}::${namespace2} but it does not exist.")
+-- 
+2.52.0
+

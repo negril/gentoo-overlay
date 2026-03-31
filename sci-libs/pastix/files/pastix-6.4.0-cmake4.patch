@@ -1,0 +1,213 @@
+From 95431a7c2829357443f6753d2e0fe903ea7772da Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 26 Dec 2025 18:06:31 +0100
+Subject: cmake4
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/.gitlab/check_link/CMakeLists.txt b/.gitlab/check_link/CMakeLists.txt
+index 2398988..43457c7 100644
+--- a/.gitlab/check_link/CMakeLists.txt
++++ b/.gitlab/check_link/CMakeLists.txt
+@@ -9,7 +9,7 @@
+ #  @date 2024-07-05
+ #
+ ###
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ 
+ project(LINK_PASTIX C Fortran)
+ 
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9b4ea3f..a82f326 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -21,7 +21,7 @@
+ #  @date 2024-07-09
+ #
+ ###
+-cmake_minimum_required (VERSION 3.5)
++cmake_minimum_required (VERSION 3.12)
+ 
+ if( ${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR} )
+   message(FATAL_ERROR "
+diff --git a/cmake_modules/CheckSubnormals.cmake b/cmake_modules/CheckSubnormals.cmake
+index d6942ee..88e7f47 100644
+--- a/cmake_modules/CheckSubnormals.cmake
++++ b/cmake_modules/CheckSubnormals.cmake
+@@ -1,5 +1,5 @@
+ # cmake modules setup
+-cmake_minimum_required (VERSION 3.5)
++cmake_minimum_required (VERSION 3.12)
+ include(CheckCSourceCompiles)
+ #
+ # Subnormals
+diff --git a/cmake_modules/CheckSystem.cmake b/cmake_modules/CheckSystem.cmake
+index 2619bdb..e851fe1 100644
+--- a/cmake_modules/CheckSystem.cmake
++++ b/cmake_modules/CheckSystem.cmake
+@@ -1,5 +1,5 @@
+ # cmake modules setup
+-cmake_minimum_required (VERSION 3.5)
++cmake_minimum_required (VERSION 3.12)
+ include (CMakeDetermineSystem)
+ include (CheckCCompilerFlag)
+ include (CheckFunctionExists)
+diff --git a/cmake_modules/morse_cmake/modules/Sanitizer.cmake b/cmake_modules/morse_cmake/modules/Sanitizer.cmake
+index fd13f89..0271f1a 100644
+--- a/cmake_modules/morse_cmake/modules/Sanitizer.cmake
++++ b/cmake_modules/morse_cmake/modules/Sanitizer.cmake
+@@ -1,4 +1,4 @@
+-cmake_minimum_required (VERSION 3.5)
++cmake_minimum_required (VERSION 3.12)
+ 
+ include (CheckCCompilerFlag)
+ include (CheckCXXCompilerFlag)
+diff --git a/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake b/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
+index e143ff7..70b3708 100644
+--- a/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
++++ b/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
+@@ -19,7 +19,7 @@
+ #  @date 13-04-2018
+ #
+ ###
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ 
+ # Macro to cleanup packages variables and avoid duplications
+ # ----------------------------------------------------------
+diff --git a/cmake_modules/morse_cmake/modules/find/LibrariesAbsolutePath.cmake b/cmake_modules/morse_cmake/modules/find/LibrariesAbsolutePath.cmake
+index 4a8b4f0..212bc4b 100644
+--- a/cmake_modules/morse_cmake/modules/find/LibrariesAbsolutePath.cmake
++++ b/cmake_modules/morse_cmake/modules/find/LibrariesAbsolutePath.cmake
+@@ -19,7 +19,7 @@
+ #  @date 13-04-2018
+ #
+ ###
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ 
+ # Transform relative path into absolute path for libraries
+ # lib_list (input/output): the name of the CMake variable containing libraries, e.g. BLAS_LIBRARIES
+diff --git a/cmake_modules/morse_cmake/modules/find/tests/CMakeLists.txt b/cmake_modules/morse_cmake/modules/find/tests/CMakeLists.txt
+index 1d53e5e..02b0d3d 100644
+--- a/cmake_modules/morse_cmake/modules/find/tests/CMakeLists.txt
++++ b/cmake_modules/morse_cmake/modules/find/tests/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ project(TEST_MORSE_CMAKE_MODULES_FIND Fortran C CXX)
+ cmake_policy(SET CMP0074 NEW)
+ 
+diff --git a/example/CTestLists.txt b/example/CTestLists.txt
+index 3087c47..909a98c 100644
+--- a/example/CTestLists.txt
++++ b/example/CTestLists.txt
+@@ -11,7 +11,7 @@
+ #  @date 2024-07-05
+ #
+ ###
+-cmake_minimum_required (VERSION 3.5)
++cmake_minimum_required (VERSION 3.12)
+ cmake_policy(SET CMP0054 NEW)
+ 
+ ### CTest execution
+diff --git a/spm/.gitlab/check_link/CMakeLists.txt b/spm/.gitlab/check_link/CMakeLists.txt
+index 810efc9..621b111 100644
+--- a/spm/.gitlab/check_link/CMakeLists.txt
++++ b/spm/.gitlab/check_link/CMakeLists.txt
+@@ -9,7 +9,7 @@
+ #  @date 2024-05-29
+ #
+ ###
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ 
+ project(LINK_SPM C Fortran)
+ 
+diff --git a/spm/cmake_modules/CheckSystem.cmake b/spm/cmake_modules/CheckSystem.cmake
+index e1128ce..c60e03b 100644
+--- a/spm/cmake_modules/CheckSystem.cmake
++++ b/spm/cmake_modules/CheckSystem.cmake
+@@ -1,5 +1,5 @@
+ # cmake modules setup
+-cmake_minimum_required (VERSION 3.5)
++cmake_minimum_required (VERSION 3.12)
+ include (CMakeDetermineSystem)
+ include (CheckCCompilerFlag)
+ include (CheckFunctionExists)
+diff --git a/spm/cmake_modules/morse_cmake/modules/Sanitizer.cmake b/spm/cmake_modules/morse_cmake/modules/Sanitizer.cmake
+index fd13f89..0271f1a 100644
+--- a/spm/cmake_modules/morse_cmake/modules/Sanitizer.cmake
++++ b/spm/cmake_modules/morse_cmake/modules/Sanitizer.cmake
+@@ -1,4 +1,4 @@
+-cmake_minimum_required (VERSION 3.5)
++cmake_minimum_required (VERSION 3.12)
+ 
+ include (CheckCCompilerFlag)
+ include (CheckCXXCompilerFlag)
+diff --git a/spm/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake b/spm/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
+index e143ff7..70b3708 100644
+--- a/spm/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
++++ b/spm/cmake_modules/morse_cmake/modules/find/FindMorseCommon.cmake
+@@ -19,7 +19,7 @@
+ #  @date 13-04-2018
+ #
+ ###
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ 
+ # Macro to cleanup packages variables and avoid duplications
+ # ----------------------------------------------------------
+diff --git a/spm/cmake_modules/morse_cmake/modules/find/LibrariesAbsolutePath.cmake b/spm/cmake_modules/morse_cmake/modules/find/LibrariesAbsolutePath.cmake
+index 4a8b4f0..212bc4b 100644
+--- a/spm/cmake_modules/morse_cmake/modules/find/LibrariesAbsolutePath.cmake
++++ b/spm/cmake_modules/morse_cmake/modules/find/LibrariesAbsolutePath.cmake
+@@ -19,7 +19,7 @@
+ #  @date 13-04-2018
+ #
+ ###
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ 
+ # Transform relative path into absolute path for libraries
+ # lib_list (input/output): the name of the CMake variable containing libraries, e.g. BLAS_LIBRARIES
+diff --git a/spm/cmake_modules/morse_cmake/modules/find/tests/CMakeLists.txt b/spm/cmake_modules/morse_cmake/modules/find/tests/CMakeLists.txt
+index 1d53e5e..02b0d3d 100644
+--- a/spm/cmake_modules/morse_cmake/modules/find/tests/CMakeLists.txt
++++ b/spm/cmake_modules/morse_cmake/modules/find/tests/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ project(TEST_MORSE_CMAKE_MODULES_FIND Fortran C CXX)
+ cmake_policy(SET CMP0074 NEW)
+ 
+diff --git a/spm/examples/CMakeLists.txt b/spm/examples/CMakeLists.txt
+index e1ebae9..f5c3640 100644
+--- a/spm/examples/CMakeLists.txt
++++ b/spm/examples/CMakeLists.txt
+@@ -10,7 +10,7 @@
+ #  @date 2024-05-29
+ #
+ ###
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ 
+ #
+ # Add examples
+diff --git a/spm/wrappers/fortran90/CMakeLists.txt b/spm/wrappers/fortran90/CMakeLists.txt
+index 22d4f54..db3c52b 100644
+--- a/spm/wrappers/fortran90/CMakeLists.txt
++++ b/spm/wrappers/fortran90/CMakeLists.txt
+@@ -10,7 +10,7 @@
+ #  @date 2024-05-29
+ #
+ ###
+-cmake_minimum_required(VERSION 3.5)
++cmake_minimum_required(VERSION 3.12)
+ 
+ if ( NOT SPM_WITH_FORTRAN )
+   return()
+-- 
+2.52.0
+

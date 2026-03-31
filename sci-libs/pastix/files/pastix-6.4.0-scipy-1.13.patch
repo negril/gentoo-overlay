@@ -1,0 +1,45 @@
+From 4fc59a505dd460ea8d0e01b80fb81e81aedc3702 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 26 Dec 2025 18:46:22 +0100
+Subject: scipy-1.13
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/wrappers/python/examples/pypastix/solver.py b/wrappers/python/examples/pypastix/solver.py
+index 8cdc41e..a88ba71 100644
+--- a/wrappers/python/examples/pypastix/solver.py
++++ b/wrappers/python/examples/pypastix/solver.py
+@@ -16,7 +16,7 @@
+ from .pastix import *
+ from .enum import *
+ import spm
+-import scipy.linalg as la
++import numpy as np
+ 
+ class solver(object):
+ 
+@@ -104,7 +104,7 @@ class solver(object):
+         self.S = np.zeros( (nschur, nschur), order='F', dtype=A.dtype )
+         getSchur( self.pastix_data, self.S )
+         if full_matrix and (self.factotype != factotype.LU):
+-            self.S += la.tril(self.S, -1).T
++            self.S += np.tril(self.S, -1).T
+ 
+     def schur_forward(self, x, solv_mode=solv_mode.Interface):
+         """
+diff --git a/wrappers/python/examples/schur.py b/wrappers/python/examples/schur.py
+index c9d9d64..54bc5c2 100755
+--- a/wrappers/python/examples/schur.py
++++ b/wrappers/python/examples/schur.py
+@@ -77,7 +77,7 @@ pastix.getSchur( pastix_data, S )
+ 
+ # Store both sides for linalg
+ if factotype != pastix.factotype.LU:
+-    S += la.tril(S, -1).T
++    S += np.tril(S, -1).T
+ 
+ schur_x = np.array( np.zeros( nschur ), order='F', dtype=spmA.dtype )
+ 
+-- 
+2.52.0
+

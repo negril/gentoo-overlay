@@ -1,7 +1,7 @@
 --- a/spm/CMakeLists.txt
 +++ b/spm/CMakeLists.txt
 @@ -10,8 +10,8 @@
- #  @date 2022-02-22
+ #  @date 2024-07-02
  #
  ###
 -cmake_minimum_required (VERSION 3.5)
