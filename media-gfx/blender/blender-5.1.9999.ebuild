@@ -69,7 +69,7 @@ SLOT="${BLENDER_BRANCH}"
 IUSE="
 	alembic +bullet +color-management cuda +cycles +cycles-bin-kernels
 	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
-	jemalloc jpeg2k man +manifold +nanovdb ndof nls +oidn openal +openexr +opengl +openpgl
+	jpeg2k man +manifold +nanovdb ndof nls +oidn openal +openexr +opengl +openpgl
 	+opensubdiv +openvdb optix osl pipewire +pdf +potrace +pugixml pulseaudio
 	renderdoc +rubberband sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
@@ -100,7 +100,6 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 	test? (
 		color-management
 		jpeg2k
-		opensubdiv
 	)
 "
 
@@ -114,7 +113,6 @@ RDEPEND="${PYTHON_DEPS}
 	app-arch/zstd
 	dev-cpp/gflags:=
 	dev-cpp/glog:=
-	dev-libs/boost:=[nls?]
 	$(python_gen_cond_dep '
 		dev-python/cattrs[${PYTHON_USEDEP}]
 		dev-python/cython[${PYTHON_USEDEP}]
@@ -127,21 +125,20 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/libjpeg-turbo:=
 	>=media-libs/libpng-1.6.50:=
 	media-libs/libsamplerate
-	>=media-libs/openimageio-3.0.9.1:=
+	>=media-libs/openimageio-3.0.9.1:=[python,${PYTHON_SINGLE_USEDEP}]
 	virtual/glu
 	virtual/libintl
 	virtual/opengl[X?]
 	virtual/zlib:=
-	alembic? ( >=media-gfx/alembic-1.8.3-r2[boost(+),hdf(+)] )
+	alembic? ( >=media-gfx/alembic-1.8.3-r2[hdf(+)] )
 	bullet? ( sci-physics/bullet:=[double-precision] )
 	color-management? ( >=media-libs/opencolorio-2.4.2:= )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	draco? ( media-libs/draco:= )
 	embree? ( media-libs/embree:=[raymask] )
-	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),libaom,jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
+	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
 	fftw? ( sci-libs/fftw:3.0=[threads] )
 	gmp? ( dev-libs/gmp:=[cxx] )
-	gnome? ( gui-libs/libdecor )
 	hip? (
 		>=dev-util/hip-6.0:=
 		hiprt? (
@@ -150,7 +147,6 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	hydra? ( media-libs/openusd )
 	jack? ( virtual/jack )
-	jemalloc? ( dev-libs/jemalloc:= )
 	jpeg2k? ( >=media-libs/openjpeg-2.5.3:2= )
 	manifold? ( >=sci-mathematics/manifold-3.2.1:= )
 	materialx? ( >=media-libs/materialx-1.39.3:= )
@@ -227,12 +223,12 @@ DEPEND="${RDEPEND}
 	dev-cpp/eigen:=
 	test? (
 		$(python_gen_cond_dep '
-			media-libs/openimageio[jpeg2k,python,${PYTHON_SINGLE_USEDEP},tools]
+			media-libs/openimageio[jpeg2k,tools]
 		')
 	)
 "
 
-if [[ "${PV}" == 9999* ]]; then
+if [[ "${PV}" == *9999* ]]; then
 DEPEND+="
 	test? (
 		experimental? (
@@ -255,13 +251,11 @@ BDEPEND="
 		dev-texlive/texlive-latex
 		dev-texlive/texlive-latexextra
 	)
-	nls? (
-		sys-devel/gettext
-	)
 	vulkan? (
 		dev-util/spirv-headers
 		dev-util/vulkan-headers
 	)
+	nls? ( sys-devel/gettext )
 	wayland? (
 		dev-util/wayland-scanner
 	)
@@ -273,7 +267,6 @@ BDEPEND="
 PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-FindClang.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
-	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
 	"${FILESDIR}/${PN}-4.3.2-system-glog.patch"
 # 	"${FILESDIR}/${PN}-4.4.0-optix-compile-flags.patch"
 )
@@ -426,12 +419,6 @@ src_prepare() {
 			-i "build_files/cmake/testing.cmake" \
 			|| die "REPLACE.*TEST_INSTALL_DIR"
 
-		# assertEquals was deprecated in Python-3.2 use assertEqual instead
-		sed \
-			-e 's/assertEquals/assertEqual/g' \
-			-i tests/python/bl_animation_action.py \
-			|| die
-
 		sed -e '1i #include <cstdint>' -i extern/gtest/src/gtest-death-test.cc || die
 	else
 		cmake_comment_add_subdirectory tests
@@ -468,7 +455,6 @@ src_configure() {
 
 		# Build Options:
 		-DWITH_ALEMBIC="$(usex alembic)"
-		-DWITH_BOOST="yes"
 		-DWITH_BULLET="$(usex bullet)"
 		-DWITH_CYCLES="$(usex cycles)"
 		-DWITH_DOC_MANPAGE="$(usex man)"
@@ -507,11 +493,10 @@ src_configure() {
 
 		# Compiler Options:
 		# -DWITH_BUILDINFO="yes"
-		# -DWITH_COMPILER_SIMD="no" # This makes it so Blender doesn't append their own -march flags
+		-DWITH_COMPILER_SIMD="no" # This makes it so Blender doesn't append their own -march flags
 
 		# System Options:
 		-DWITH_INSTALL_PORTABLE="no"
-		-DWITH_MEM_JEMALLOC="$(usex jemalloc)"
 		-DWITH_MEM_VALGRIND="$(usex valgrind)"
 
 		# GHOST Options:
@@ -552,8 +537,8 @@ src_configure() {
 		-DWITH_PYTHON_INSTALL="no"
 		-DWITH_PYTHON_INSTALL_NUMPY="no"
 		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
-		-DWITH_PYTHON_MODULE="no" # $(usex python)" # builds bpy
-		-DWITH_PYTHON_SECURITY="yes"
+		# -DWITH_PYTHON_MODULE="no"
+		-DWITH_PYTHON_SECURITY="no" # BUG
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
 		-DPYTHON_VERSION="${EPYTHON/python/}"
@@ -625,6 +610,7 @@ src_configure() {
 			# -DWITH_CYCLES_NATIVE_ONLY="yes"
 			# -DWITH_LIBMV_SCHUR_SPECIALIZATIONS="no"
 			# -DWITH_PYTHON_SAFETY="ON" # dev option
+			-DWITH_PYTHON_SAFETY="OFF"
 
 		)
 	else
@@ -654,11 +640,6 @@ src_configure() {
 		mycmakeargs+=(
 			# -DROCM_PATH="$(hipconfig -R)"
 			-DHIP_ROOT_DIR="$(hipconfig -p)"
-
-			-DHIP_HIPCC_FLAGS="-fcf-protection=none"
-
-			# -DHIP_LINKER_EXECUTABLE="$(get_llvm_prefix)/bin/clang++"
-			-DCMAKE_HIP_LINK_EXECUTABLE="$(get_llvm_prefix)/bin/clang++"
 
 			-DCYCLES_HIP_BINARIES_ARCH="$(get_amdgpu_flags)"
 		)
@@ -693,7 +674,7 @@ src_configure() {
 	if use wayland; then
 		mycmakeargs+=(
 			-DWITH_GHOST_WAYLAND_APP_ID="blender-${BV}"
-			-DWITH_GHOST_WAYLAND_LIBDECOR="$(usex gnome)"
+			-DWITH_GHOST_CSD="$(usex gnome)"
 		)
 	fi
 
@@ -803,9 +784,8 @@ src_test() {
 
 	local -x CMAKE_SKIP_TESTS=(
 		"^cycles_image_data_types_optix$"
-		"^script_pyapi_bpy_driver_secure_eval$"
+		# "^cycles_denoise_"
 		# "^imbuf_save$"
-		"^cycles_image_colorspace_cpu$"
 	)
 
 	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
@@ -860,9 +840,7 @@ src_test() {
 	# Needed if openimageio wasn't build with -DNDEBUG
 	local -x OPENIMAGEIO_DEBUG=0
 
-	local CTEST_JOBS="1"
-	# local -x CYCLESTEST_ARGS="-t 1 --gpu-vsync off --gpu-backend opengl --gpu-compilation-subprocesses 16 --offline-mode"
-	# local -x CYCLESTEST_ARGS="-t 16" #${CTEST_LOADAVG:-$(get_makeopts_loadavg)}"
+	local -x CYCLESTEST_ARGS="-t 16" #${CTEST_LOADAVG:-$(get_makeopts_loadavg)}"
 
 	# local CMAKE_RUN_TESTS=(
 	# 	"^blenkernel$"
@@ -957,16 +935,13 @@ src_install() {
 	# Fix doc installdir
 	docinto html
 	dodoc "${CMAKE_USE_DIR}/release/text/readme.html"
+	rm -r "${ED}/usr/share/doc/blender" || die
 
 	python_optimize "${ED}/usr/share/blender/${BV}/scripts"
 
-	if ! in_use python || ! use python; then
-		rm -r "${ED}/usr/share/doc/blender" || die
-
-		mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" \
-			|| die "blender-thumbnailer version rename failed"
-		mv "${ED}/usr/bin/blender" "${ED}/usr/bin/blender-${BV}" || die "blender version rename failed"
-	fi
+	mv "${ED}/usr/bin/blender-thumbnailer" "${ED}/usr/bin/blender-${BV}-thumbnailer" \
+		|| die "blender-thumbnailer version rename failed"
+	mv "${ED}/usr/bin/blender" "${ED}/usr/bin/blender-${BV}" || die "blender version rename failed"
 }
 
 pkg_postinst() {

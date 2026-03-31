@@ -20,7 +20,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {20..20} )
+LLVM_COMPAT=( {20..22} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
@@ -69,7 +69,7 @@ SLOT="${BLENDER_BRANCH}"
 IUSE="
 	alembic +bullet +color-management cuda +cycles +cycles-bin-kernels
 	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
-	jemalloc jpeg2k man +manifold +nanovdb ndof nls +oidn openal +openexr +opengl +openpgl
+	jpeg2k man +manifold +nanovdb ndof nls +oidn openal +openexr +opengl +openpgl
 	+opensubdiv +openvdb optix osl pipewire +pdf +potrace +pugixml pulseaudio
 	renderdoc +rubberband sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
@@ -113,7 +113,6 @@ RDEPEND="${PYTHON_DEPS}
 	app-arch/zstd
 	dev-cpp/gflags:=
 	dev-cpp/glog:=
-	dev-libs/boost:=[nls?]
 	$(python_gen_cond_dep '
 		dev-python/cattrs[${PYTHON_USEDEP}]
 		dev-python/cython[${PYTHON_USEDEP}]
@@ -131,7 +130,7 @@ RDEPEND="${PYTHON_DEPS}
 	virtual/libintl
 	virtual/opengl[X?]
 	virtual/zlib:=
-	alembic? ( >=media-gfx/alembic-1.8.3-r2[boost(+),hdf(+)] )
+	alembic? ( >=media-gfx/alembic-1.8.3-r2[hdf(+)] )
 	bullet? ( sci-physics/bullet:=[double-precision] )
 	color-management? ( >=media-libs/opencolorio-2.4.2:= )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
@@ -148,7 +147,6 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	hydra? ( media-libs/openusd )
 	jack? ( virtual/jack )
-	jemalloc? ( dev-libs/jemalloc:= )
 	jpeg2k? ( >=media-libs/openjpeg-2.5.3:2= )
 	manifold? ( >=sci-mathematics/manifold-3.2.1:= )
 	materialx? ( >=media-libs/materialx-1.39.3:= )
@@ -269,7 +267,6 @@ BDEPEND="
 PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-FindClang.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
-	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
 	"${FILESDIR}/${PN}-4.3.2-system-glog.patch"
 # 	"${FILESDIR}/${PN}-4.4.0-optix-compile-flags.patch"
 )
@@ -458,7 +455,6 @@ src_configure() {
 
 		# Build Options:
 		-DWITH_ALEMBIC="$(usex alembic)"
-		-DWITH_BOOST="yes"
 		-DWITH_BULLET="$(usex bullet)"
 		-DWITH_CYCLES="$(usex cycles)"
 		-DWITH_DOC_MANPAGE="$(usex man)"
@@ -501,7 +497,6 @@ src_configure() {
 
 		# System Options:
 		-DWITH_INSTALL_PORTABLE="no"
-		-DWITH_MEM_JEMALLOC="$(usex jemalloc)"
 		-DWITH_MEM_VALGRIND="$(usex valgrind)"
 
 		# GHOST Options:
@@ -592,6 +587,10 @@ src_configure() {
 		-DWITH_RUBBERBAND="$(usex rubberband)"
 		# -DPOSTINSTALL_SCRIPT:PATH=""
 		# -DPOSTCONFIGURE_SCRIPT:PATH=""
+
+		# We disable these to respect the user's choice of linker.
+		-DWITH_LINKER_MOLD="no"
+		-DWITH_LINKER_LLD="no"
 	)
 
 	if has_version ">=dev-python/numpy-2"; then
@@ -685,13 +684,6 @@ src_configure() {
 	# WITH_ASSERT_RELEASE filters this
 	append-cflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
 	append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
-
-	if tc-is-gcc; then
-		# We disable these to respect the user's choice of linker.
-		mycmakeargs+=(
-			-DWITH_LINKER_GOLD="no"
-		)
-	fi
 
 	if tc-is-clang || use osl; then
 		mycmakeargs+=(
@@ -791,6 +783,9 @@ src_test() {
 	fi
 
 	local -x CMAKE_SKIP_TESTS=(
+		# "^cycles_image_data_types_optix$"
+		# "^cycles_denoise_"
+		# "^imbuf_save$"
 	)
 
 	if [[ "${RUN_FAILING_TESTS:-0}" -eq 0 ]]; then
@@ -845,7 +840,16 @@ src_test() {
 	# Needed if openimageio wasn't build with -DNDEBUG
 	local -x OPENIMAGEIO_DEBUG=0
 
-	local -x CYCLESTEST_ARGS="-t 0"
+	local -x CYCLESTEST_ARGS="-t 16" #${CTEST_LOADAVG:-$(get_makeopts_loadavg)}"
+
+	# local CMAKE_RUN_TESTS=(
+	# 	"^blenkernel$"
+	# 	"^io_fbx_import$"
+	# 	"^io_gltf_roundtrip$"
+	# 	"^modifiers$"
+	# )
+
+	# myctestargs+=( -R '('$( IFS='|'; echo "${CMAKE_RUN_TESTS[*]}")')'  )
 
 	if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
 		einfo "running expensive tests EXPENSIVE_TESTS=${EXPENSIVE_TESTS}"
