@@ -20,14 +20,14 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{11..13} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {15..19} )
+LLVM_COMPAT=( {18..19} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
 
 inherit cuda rocm llvm-r1
-inherit eapi9-pipestatus check-reqs flag-o-matic multiprocessing pax-utils python-single-r1 toolchain-funcs virtualx
-inherit cmake xdg
+inherit eapi9-pipestatus check-reqs flag-o-matic pax-utils python-single-r1 toolchain-funcs virtualx
+inherit cmake xdg-utils
 
 DESCRIPTION="3D Creation/Animation/Publishing System"
 HOMEPAGE="https://www.blender.org"
@@ -53,6 +53,9 @@ else
 	SRC_URI="
 		https://download.blender.org/source/${P}.tar.xz
 		https://github.com/negril/gentoo-overlay-vendored/raw/refs/heads/blobs/blender-assets-${PV}.tar.xz
+		https://projects.blender.org/blender/blender/pulls/129136.patch -> ${PN}-pr-129136.patch
+		https://projects.blender.org/blender/blender/pulls/132361.patch -> ${PN}-pr-132361.patch
+		https://projects.blender.org/blender/blender/pulls/132654.patch -> ${PN}-pr-132654.patch
 	"
 	# BUG upstream returns LFS references instead of files
 	# SRC_URI+="
@@ -72,8 +75,8 @@ SLOT="${BLENDER_BRANCH}"
 # potentially mirror cpu_flags_x86 + REQUIRED_USE
 IUSE="
 	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
-	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
-	jemalloc jpeg2k man +nanovdb ndof nls +oidn oneapi openal +openexr +opengl +openmp +openpgl
+	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip jack
+	jemalloc jpeg2k man +nanovdb ndof nls +oidn openal +openexr +opengl +openmp +openpgl
 	+opensubdiv +openvdb optix osl +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
 "
@@ -90,7 +93,6 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 	fluid? ( tbb )
 	gnome? ( wayland )
 	hip? ( cycles )
-	hiprt? ( hip )
 	nanovdb? ( openvdb )
 	openvdb? ( tbb openexr )
 	optix? ( cuda )
@@ -105,9 +107,9 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 # build_files/build_environment/cmake/versions.cmake
 RDEPEND="${PYTHON_DEPS}
 	app-arch/zstd
-	dev-libs/boost:=[nls?]
 	dev-cpp/gflags:=
 	dev-cpp/glog:=
+	dev-libs/boost:=[nls?]
 	dev-libs/lzo:2=
 	$(python_gen_cond_dep '
 		dev-python/cython[${PYTHON_USEDEP}]
@@ -132,14 +134,11 @@ RDEPEND="${PYTHON_DEPS}
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	embree? ( media-libs/embree:=[raymask] )
 	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
-	fftw? ( sci-libs/fftw:3.0= )
+	fftw? ( sci-libs/fftw:3.0=[threads] )
 	gmp? ( dev-libs/gmp[cxx] )
 	gnome? ( gui-libs/libdecor )
 	hip? (
 		>=dev-util/hip-5.7:=
-		hiprt? (
-			>=dev-libs/hiprt-2.5:=
-		)
 	)
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
@@ -151,7 +150,6 @@ RDEPEND="${PYTHON_DEPS}
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
 	oidn? ( >=media-libs/oidn-2.1.0 )
-	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
@@ -164,7 +162,7 @@ RDEPEND="${PYTHON_DEPS}
 	)
 	optix? ( <dev-libs/optix-9:= )
 	osl? (
-		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
+		<media-libs/osl-1.14:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
 	)
 	pdf? ( media-libs/libharu )
@@ -247,7 +245,9 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-FindClang.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
+	"${FILESDIR}/${PN}-4.2.9-python3.12.patch"
 	"${FILESDIR}/${PN}-4.2.9-python3.13.patch"
+	"${FILESDIR}/${PN}-4.2.9-python3.12_1.patch"
 	"${FILESDIR}/${PN}-4.3.2-ffmpeg7.patch"
 	"${FILESDIR}/${PN}-4.3.2-openvdb-12.patch"
 	"${FILESDIR}/${PN}-4.3.2-optix-8.1.0.patch"
@@ -288,18 +288,6 @@ blender_get_version() {
 
 pkg_pretend() {
 	blender_check_requirements
-
-	if use oneapi; then
-		einfo "The Intel oneAPI support is rudimentary."
-		einfo ""
-		einfo "Please report any bugs you find to https://bugs.gentoo.org/"
-		if ! command -v icpx &>/dev/null && ! command -v dpcpp &>/dev/null; then
-			eerror "Could not find icpx or dpcpp."
-			eerror "You need SYCL/DCP++ to enable oneapi support."
-			eerror "Try sys-devel/DPC++::science"
-			die "FindSYCL would fail. Aborting."
-		fi
-	fi
 }
 
 pkg_setup() {
@@ -334,11 +322,6 @@ src_prepare() {
 	cmake_src_prepare
 
 	blender_get_version
-
-	# Disable MS Windows help generation. The variable doesn't do what it
-	# it sounds like.
-	sed -e "s|GENERATE_HTMLHELP      = YES|GENERATE_HTMLHELP      = NO|" \
-		-i doc/doxygen/Doxyfile || die
 
 	# Prepare icons and .desktop files for slotting.
 	sed \
@@ -460,11 +443,6 @@ src_configure() {
 		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
 		-DWITH_CYCLES_HIP_BINARIES=$(usex hip $(usex cycles-bin-kernels))
 
-		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
-		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi "$(usex cycles-bin-kernels)")"
-
-		-DWITH_CYCLES_DEVICE_HIPRT="$(usex hiprt)"
-
 		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
 		-DWITH_CYCLES_EMBREE="$(usex embree)"
 		-DWITH_CYCLES_OSL=$(usex osl)
@@ -571,25 +549,6 @@ src_configure() {
 
 			-DCYCLES_HIP_BINARIES_ARCH="$(get_amdgpu_flags)"
 		)
-
-		if use hiprt; then
-			# # TODO pkgconfig file
-			# local hiprt_pn hiprt_pv
-			# hiprt_pn="dev-libs/hiprt"
-			# hiprt_pv="$(best_version "${hiprt_pn}")"
-			# if [[ -z "${hiprt_version}" ]]; then
-			# 	die "could not find hiprt"
-			# fi
-			# hiprt_pv="$(ver_cut 1-2 "${hiprt_pv/#${hiprt_pn}-/}")"
-			# hiprt_pv="$(ver_rs 1-2 ' ' "${hiprt_pv}")"
-			# hiprt_pv="$(eval printf "%02d%03d" "${hiprt_pv}")"
-			mycmakeargs+=(
-				# -DHIPRT_ROOT_DIR="${ESYSROOT}/usr/include/hiprt/${hiprt_pv}/"
-				-DHIPRT_ROOT_DIR="$(hipconfig -p)"
-				-DHIPRT_COMPILER_PARALLEL_JOBS="$(makeopts_jobs)"
-			)
-			# unset hiprt_pn hiprt_pv
-		fi
 	fi
 
 	if use optix; then
@@ -801,9 +760,16 @@ src_install() {
 	blender_get_version
 
 	# Pax mark blender for hardened support.
-	pax-mark m "${BUILD_DIR}/bin/blender"
+	pax-mark m "${BUILD_DIR}"/bin/blender
 
 	cmake_src_install
+
+	# X-KDE-RunOnDiscreteGpu is obsolete, so trim it
+	sed \
+		-e "s/=blender/=${P}/" \
+		-e "s/Name=Blender/Name=Blender Bin ${PV}/" \
+		-e "/X-KDE-RunOnDiscreteGpu.*/d" \
+		-i "${ED}/usr/share/applications/blender-${BV}.desktop" || die
 
 	if use man; then
 		# Slot the man page
@@ -884,9 +850,17 @@ pkg_postinst() {
 		elog "Bug: https://bugs.gentoo.org/737388"
 		elog
 	fi
+
+	xdg_icon_cache_update
+	xdg_mimeinfo_database_update
+	xdg_desktop_database_update
 }
 
 pkg_postrm() {
+	xdg_icon_cache_update
+	xdg_mimeinfo_database_update
+	xdg_desktop_database_update
+
 	if [[ -z "${REPLACED_BY_VERSION}" ]]; then
 		ewarn
 		ewarn "You may want to remove the following directories"
