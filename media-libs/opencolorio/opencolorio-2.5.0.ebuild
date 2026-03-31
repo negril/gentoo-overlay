@@ -1,28 +1,36 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{10..13} )
+# TODO rename apps -> tools
+
+PYTHON_COMPAT=( python3_{12..14} )
 
 inherit cmake python-single-r1 virtualx
 
 DESCRIPTION="Color management framework for visual effects and animation"
 HOMEPAGE="https://opencolorio.org https://github.com/AcademySoftwareFoundation/OpenColorIO"
-SRC_URI="https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz"
-S="${WORKDIR}/OpenColorIO-${PV}"
+
+if [[ ${PV} == *9999* ]] ; then
+	inherit git-r3
+	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/OpenColorIO.git"
+else
+	SRC_URI="https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz"
+	S="${WORKDIR}/OpenColorIO-${PV}"
+	# minizip-ng: ~arm ~arm64 ~ppc64 ~riscv
+	# osl: ~riscv
+	KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
+fi
 
 LICENSE="BSD"
 SLOT="0/$(ver_cut 1-2)"
-# minizip-ng: ~arm ~arm64 ~ppc64 ~riscv
-# osl: ~riscv
-KEYWORDS="~amd64 ~arm ~arm64 ~ppc64 ~riscv ~x86"
 CPU_USE=(
 	x86_{avx,avx2,avx512f,f16c,sse2,sse3,sse4_1,sse4_2,ssse3}
 	# requires https://github.com/DLTcollab/sse2neon
 	# arm_neon
 )
-IUSE="apps ${CPU_USE[*]/#/cpu_flags_} doc opengl python test"
+IUSE="apps ${CPU_USE[*]/#/cpu_flags_} debug doc opengl python test"
 # TODO: drop opengl? It does nothing without building either the apps or the testsuite
 REQUIRED_USE="
 	apps? ( opengl )
@@ -31,16 +39,16 @@ REQUIRED_USE="
 	test? ( opengl )
 "
 
+# versions from share/cmake/modules/FindExtPackages.cmake
 RDEPEND="
-	dev-cpp/pystring
-	>=dev-cpp/yaml-cpp-0.7.0:=
-	dev-libs/expat
-	>=dev-libs/imath-3.1.5:=
-	sys-libs/minizip-ng
-	sys-libs/zlib
+	>=dev-cpp/pystring-1.1.4:=
+	>=dev-cpp/yaml-cpp-0.8.0:=
+	>=dev-libs/expat-2.7.2
+	media-libs/glu
+	>=sys-libs/minizip-ng-4.0.10:=
 	apps? (
-		media-libs/lcms:2
-		>=media-libs/openexr-3.1.5:=
+		>=media-libs/lcms-2.17:2
+		>=media-libs/openexr-3.4.0:=
 	)
 	opengl? (
 		media-libs/freeglut
@@ -49,12 +57,21 @@ RDEPEND="
 	)
 	python? (
 		${PYTHON_DEPS}
-		$(python_gen_cond_dep 'dev-python/pybind11[${PYTHON_USEDEP}]')
+		$(python_gen_cond_dep '
+			>=dev-python/pybind11-3.0.1[${PYTHON_USEDEP}]
+		')
 	)
 "
-DEPEND="${RDEPEND}"
 # TODO: OSL tests would need OIIO, leading to a circular dependency. If OIIO
 # isn't found this test will be skipped (automagic if found?)
+DEPEND="${RDEPEND}
+	>=dev-libs/imath-3.2.1:=
+"
+# 	test? (
+# 		>=media-libs/openimageio-3
+# 		>=media-libs/osl-1.14
+# 	)
+# "
 BDEPEND="
 	virtual/pkgconfig
 	doc? (
@@ -75,22 +92,17 @@ BDEPEND="
 		media-libs/libglvnd
 	)
 "
-# 	test? (
-# 		>=media-libs/openimageio-2.2.14
-# 		>=media-libs/osl-1.11
-# 	)
-# "
 
 # Restricting tests, bugs #439790 and #447908
 # compares floating point numbers for bit equality
 # compares floating point number string representations for equality
 # https://github.com/AcademySoftwareFoundation/OpenColorIO/issues/1361 Apr 4, 2021
 # https://github.com/AcademySoftwareFoundation/OpenColorIO/issues/1784 Apr 3, 2023
-RESTRICT="test" #"!test? ( test )"
+# https://github.com/AcademySoftwareFoundation/OpenColorIO/issues/2146 Apr 14, 2025
+RESTRICT="!test? ( test )"
 
 PATCHES=(
 	"${FILESDIR}/${PN}-2.2.1-adjust-python-installation.patch"
-	"${FILESDIR}/${PN}-2.3.2-include-cstdint.patch"
 )
 
 pkg_setup() {
@@ -102,7 +114,7 @@ src_prepare() {
 
 	# Avoid automagic test dependency on OSL, bug #833933
 	# Can cause problems during e.g. OpenEXR unsplitting migration
-	cmake_run_in tests cmake_comment_add_subdirectory osl
+# 	cmake_run_in tests cmake_comment_add_subdirectory osl
 }
 
 src_configure() {
@@ -111,19 +123,19 @@ src_configure() {
 	# - Java bindings was not tested, so disabled
 	# Notes:
 	# - OpenImageIO or OpenEXR (default) is required for building ociodisplay and
-	#	ocioconvert (USE opengl)
+	#	ocioconvert (USE opengl)q
 	# - OpenGL, GLUT and GLEW is required for building ociodisplay (USE opengl)
 	local mycmakeargs=(
+		-DCMAKE_CXX_STANDARD="17"
 		"-DOCIO_BUILD_APPS=$(usex apps)"
 		"-DOCIO_BUILD_DOCS=$(usex doc)"
-		"-DOCIO_BUILD_FROZEN_DOCS=$(usex doc)"
 		"-DOCIO_BUILD_GPU_TESTS=$(usex test)"
 		"-DOCIO_BUILD_JAVA=OFF"
 		"-DOCIO_BUILD_PYTHON=$(usex python)"
 		"-DOCIO_BUILD_TESTS=$(usex test)"
 		"-DOCIO_INSTALL_EXT_PACKAGES=NONE"
 		# allow the user to tell OCIO to display more information when searching and building the dependencies.
-		# "-DOCIO_VERBOSE=YES"
+		# "-DOCIO_VERBOSE=$(usex debug)"
 
 		"-DOCIO_USE_SIMD=ON"
 	)
@@ -159,6 +171,22 @@ src_configure() {
 }
 
 src_test() {
+	[[ -c /dev/udmabuf ]] && addwrite /dev/udmabuf
+
+	local CMAKE_SKIP_TESTS=(
+		"^test_cpu$"
+		"^test_cpu_no_accel$"
+		"^test_cpu_sse2$"
+		"^test_cpu_avx$"
+		"^test_cpu_avx\+f16c$"
+		"^test_cpu_avx2$"
+		"^test_cpu_avx2\+f16c$"
+		"^test_cpu_avx512$"
+		"^test_cpu_avx512\+f16c$"
+
+		"^test_gpu"
+	)
+
 	local myctestargs=(
 		-j1
 	)
@@ -172,5 +200,9 @@ src_install() {
 		# there are already files in ${ED}/usr/share/doc/${PF}
 		mv "${ED}/usr/share/doc/OpenColorIO/"* "${ED}/usr/share/doc/${PF}" || die
 		rmdir "${ED}/usr/share/doc/OpenColorIO" || die
+	fi
+
+	if use python; then
+		python_optimize
 	fi
 }
