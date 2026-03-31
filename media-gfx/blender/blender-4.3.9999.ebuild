@@ -105,9 +105,9 @@ REQUIRED_USE="${PYTHON_REQUIRED_USE}
 # build_files/build_environment/cmake/versions.cmake
 RDEPEND="${PYTHON_DEPS}
 	app-arch/zstd
+	dev-libs/boost:=[nls?]
 	dev-cpp/gflags:=
 	dev-cpp/glog:=
-	dev-libs/boost:=[nls?]
 	dev-libs/lzo:2=
 	$(python_gen_cond_dep '
 		dev-python/cython[${PYTHON_USEDEP}]
@@ -126,7 +126,7 @@ RDEPEND="${PYTHON_DEPS}
 	virtual/libintl
 	virtual/opengl[X?]
 	alembic? ( >=media-gfx/alembic-1.8.3-r2[boost(+),hdf(+)] )
-	bullet? ( sci-physics/bullet:= )
+	bullet? ( sci-physics/bullet:=[double-precision] )
 	collada? ( >=media-libs/opencollada-1.6.68 )
 	color-management? ( media-libs/opencolorio:= )
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
@@ -151,7 +151,7 @@ RDEPEND="${PYTHON_DEPS}
 	nls? ( virtual/libiconv )
 	openal? ( media-libs/openal )
 	oidn? ( >=media-libs/oidn-2.1.0 )
-	oneapi? ( dev-libs/intel-compute-runtime[l0] )
+	oneapi? ( dev-libs/intel-compute-runtime:=[l0] )
 	openexr? (
 		>=dev-libs/imath-3.1.7:=
 		>=media-libs/openexr-3.2.1:0=
@@ -162,7 +162,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
 	)
-	optix? ( dev-libs/optix )
+	optix? ( <dev-libs/optix-9:= )
 	osl? (
 		>=media-libs/osl-1.13:=[${LLVM_USEDEP}]
 		media-libs/mesa[${LLVM_USEDEP}]
@@ -247,9 +247,11 @@ PATCHES=(
 	"${FILESDIR}/${PN}-4.0.2-FindClang.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
+	"${FILESDIR}/${PN}-4.2.9-python3.13.patch"
 	"${FILESDIR}/${PN}-4.3.2-ffmpeg7.patch"
 	"${FILESDIR}/${PN}-4.3.2-openvdb-12.patch"
-	"${FILESDIR}/${PN}-4.3.2-system-gtest.patch"
+	"${FILESDIR}/${PN}-4.3.2-optix-8.1.0.patch"
+	"${FILESDIR}/${PN}-4.3.2-system-glog.patch"
 	"${FILESDIR}/${PN}-4.4.0-optix-compile-flags.patch"
 )
 
@@ -318,10 +320,11 @@ src_unpack() {
 	else
 		default
 
-		if use test; then
-			mkdir -p "${S}/tests/data/" || die
-			mv blender-test-data/* "${S}/tests/data/" || die
-		fi
+		# BUG upstream returns LFS references instead of files
+		# if use test; then
+		# 	mkdir -p "${S}/tests/data/" || die
+		# 	mv blender-test-data/* "${S}/tests/data/" || die
+		# fi
 	fi
 }
 
@@ -405,7 +408,9 @@ src_prepare() {
 		cmake_comment_add_subdirectory tests
 	fi
 
-	rm "${WORKDIR}/blender-assets/publish/LICENSE" || die
+	if [[ "${PV}" != *9999* ]]; then
+		rm "${WORKDIR}/blender-assets/publish/LICENSE" || die
+	fi
 
 	# TODO HUH?
 	if use vulkan; then
@@ -432,26 +437,28 @@ src_configure() {
 		-DWITH_INSTALL_PORTABLE="no"
 		-DWITH_CPU_CHECK="no"
 
+		-DWITH_STRICT_BUILD_OPTIONS="yes"
 		-DWITH_LIBS_PRECOMPILED="no"
-		-DBUILD_SHARED_LIBS="no" # this over-ridden by cmake.eclass
+		-DBUILD_SHARED_LIBS="no" # quadriflow only?
+		-DWITH_STATIC_LIBS=OFF
 
 		-DPYTHON_INCLUDE_DIR="$(python_get_includedir)"
 		-DPYTHON_LIBRARY="$(python_get_library_path)"
 		-DPYTHON_VERSION="${EPYTHON/python/}"
-		-DWITH_ALEMBIC="$(usex alembic)"
-		-DWITH_BOOST="yes"
-		-DWITH_BULLET="$(usex bullet)"
-		-DWITH_CODEC_FFMPEG="$(usex ffmpeg)"
-		-DWITH_CODEC_SNDFILE="$(usex sndfile)"
+		-DWITH_ALEMBIC=$(usex alembic)
+		-DWITH_BOOST=yes
+		-DWITH_BULLET=$(usex bullet)
+		-DWITH_CODEC_FFMPEG=$(usex ffmpeg)
+		-DWITH_CODEC_SNDFILE=$(usex sndfile)
 
-		-DWITH_CYCLES="$(usex cycles)"
+		-DWITH_CYCLES=$(usex cycles)
 
-		-DWITH_CYCLES_DEVICE_CUDA="$(usex cuda)"
-		-DWITH_CYCLES_CUDA_BINARIES="$(usex cuda "$(usex cycles-bin-kernels)")"
-		-DWITH_CYCLES_DEVICE_OPTIX="$(usex optix)"
+		-DWITH_CYCLES_DEVICE_CUDA=$(usex cuda)
+		-DWITH_CYCLES_CUDA_BINARIES="$(usex cuda $(usex cycles-bin-kernels))"
+		-DWITH_CYCLES_DEVICE_OPTIX=$(usex optix)
 
 		-DWITH_CYCLES_DEVICE_HIP="$(usex hip)"
-		-DWITH_CYCLES_HIP_BINARIES="$(usex hip "$(usex cycles-bin-kernels)")"
+		-DWITH_CYCLES_HIP_BINARIES=$(usex hip $(usex cycles-bin-kernels))
 
 		-DWITH_CYCLES_DEVICE_ONEAPI="$(usex oneapi)"
 		-DWITH_CYCLES_ONEAPI_BINARIES="$(usex oneapi "$(usex cycles-bin-kernels)")"
@@ -460,60 +467,61 @@ src_configure() {
 
 		-DWITH_CYCLES_HYDRA_RENDER_DELEGATE="no" # TODO: package Hydra
 		-DWITH_CYCLES_EMBREE="$(usex embree)"
-		-DWITH_CYCLES_OSL="$(usex osl)"
-		-DWITH_CYCLES_PATH_GUIDING="$(usex openpgl)"
-		-DWITH_CYCLES_STANDALONE="no"
-		-DWITH_CYCLES_STANDALONE_GUI="no"
+		-DWITH_CYCLES_OSL=$(usex osl)
+		-DWITH_CYCLES_PATH_GUIDING=$(usex openpgl)
+		-DWITH_CYCLES_STANDALONE=no
+		-DWITH_CYCLES_STANDALONE_GUI=no
 
-		-DWITH_DOC_MANPAGE="$(usex man)"
+		-DWITH_DOC_MANPAGE=$(usex man)
 		-DWITH_DRACO="no" # TODO: Package Draco
-		-DWITH_FFTW3="$(usex fftw)"
-		-DWITH_GHOST_WAYLAND="$(usex wayland)"
+		-DWITH_FFTW3=$(usex fftw)
+		-DWITH_GHOST_WAYLAND=$(usex wayland)
 		-DWITH_GHOST_WAYLAND_DYNLOAD="no"
-		-DWITH_GHOST_X11="$(usex X)"
-		-DWITH_GMP="$(usex gmp)"
-		-DWITH_GTESTS="$(usex test)"
+		-DWITH_GHOST_X11=$(usex X)
+		-DWITH_GMP=$(usex gmp)
+		-DWITH_GTESTS=$(usex test)
 		-DWITH_HARFBUZZ="$(usex truetype)"
-		-DWITH_HARU="$(usex pdf)"
-		-DWITH_HEADLESS="$(usex !X "$(use !wayland)")"
+		-DWITH_HARU=$(usex pdf)
+		-DWITH_HEADLESS="$(usex !X "$(usex !wayland)")"
 		-DWITH_HYDRA="no" # TODO: Package Hydra
-		-DWITH_IMAGE_OPENEXR="$(usex openexr)"
-		-DWITH_IMAGE_OPENJPEG="$(usex jpeg2k)"
-		-DWITH_IMAGE_WEBP="$(usex webp)"
-		-DWITH_INPUT_NDOF="$(usex ndof)"
-		-DWITH_INTERNATIONAL="$(usex nls)"
-		-DWITH_JACK="$(usex jack)"
+		-DWITH_IMAGE_OPENEXR=$(usex openexr)
+		-DWITH_IMAGE_OPENJPEG=$(usex jpeg2k)
+		-DWITH_IMAGE_WEBP=$(usex webp)
+		-DWITH_INPUT_NDOF=$(usex ndof)
+		-DWITH_INTERNATIONAL=$(usex nls)
+		-DWITH_JACK=$(usex jack)
 		-DWITH_MATERIALX="no" # TODO: Package MaterialX
-		-DWITH_MEM_JEMALLOC="$(usex jemalloc)"
-		-DWITH_MEM_VALGRIND="$(usex valgrind)"
-		-DWITH_MOD_FLUID="$(usex fluid)"
-		-DWITH_MOD_OCEANSIM="$(usex fftw)"
-		-DWITH_NANOVDB="$(usex nanovdb)"
-		-DWITH_OPENAL="$(usex openal)"
-		-DWITH_OPENCOLLADA="$(usex collada)"
-		-DWITH_OPENCOLORIO="$(usex color-management)"
-		-DWITH_OPENGL_BACKEND="$(usex opengl)"
-		-DWITH_OPENIMAGEDENOISE="$(usex oidn)"
-		-DWITH_OPENMP="$(usex openmp)"
-		-DWITH_OPENSUBDIV="$(usex opensubdiv)"
-		-DWITH_OPENVDB="$(usex openvdb)"
-		-DWITH_OPENVDB_BLOSC="$(usex openvdb)"
-		-DWITH_POTRACE="$(usex potrace)"
-		-DWITH_PUGIXML="$(usex pugixml)"
-		-DWITH_PULSEAUDIO="$(usex pulseaudio)"
-		-DWITH_PYTHON_INSTALL="no"
-		-DWITH_PYTHON_INSTALL_NUMPY="no"
-		-DWITH_PYTHON_INSTALL_ZSTANDARD="no"
+		-DWITH_MEM_JEMALLOC=$(usex jemalloc)
+		-DWITH_MEM_VALGRIND=$(usex valgrind)
+		-DWITH_MOD_FLUID=$(usex fluid)
+		-DWITH_MOD_OCEANSIM=$(usex fftw)
+		-DWITH_NANOVDB=$(usex nanovdb)
+		-DWITH_OPENAL=$(usex openal)
+		-DWITH_OPENCOLLADA=$(usex collada)
+		-DWITH_OPENCOLORIO=$(usex color-management)
+		-DWITH_OPENGL_BACKEND=$(usex opengl)
+		-DWITH_OPENIMAGEDENOISE=$(usex oidn)
+		-DWITH_OPENMP=$(usex openmp)
+		-DWITH_OPENSUBDIV=$(usex opensubdiv)
+		-DWITH_OPENVDB=$(usex openvdb)
+		-DWITH_OPENVDB_BLOSC=$(usex openvdb)
+		-DWITH_POTRACE=$(usex potrace)
+		-DWITH_PUGIXML=$(usex pugixml)
+		-DWITH_PULSEAUDIO=$(usex pulseaudio)
+		-DWITH_PYTHON_INSTALL=no
+		-DWITH_PYTHON_INSTALL_NUMPY=no
+		-DWITH_PYTHON_INSTALL_ZSTANDARD=no
 		-DWITH_RENDERDOC="$(usex renderdoc)"
-		-DWITH_SDL="$(usex sdl)"
-		-DWITH_STATIC_LIBS="no"
-		-DWITH_STRICT_BUILD_OPTIONS="yes"
-		-DWITH_SYSTEM_EIGEN3="yes"
-		-DWITH_SYSTEM_FREETYPE="yes"
-		-DWITH_SYSTEM_LZO="yes"
-		-DWITH_TBB="$(usex tbb)"
+		-DWITH_SDL=$(usex sdl)
+		-DWITH_SYSTEM_BULLET="yes"
+		-DWITH_SYSTEM_EIGEN3=yes
+		-DWITH_SYSTEM_FREETYPE=yes
+		-DWITH_SYSTEM_GFLAGS="yes"
+		-DWITH_SYSTEM_GLOG="yes"
+		-DWITH_SYSTEM_LZO=yes
+		-DWITH_TBB=$(usex tbb)
 		-DWITH_USD="no" # TODO: Package USD
-		-DWITH_XR_OPENXR="no"
+		-DWITH_XR_OPENXR=no
 		-DWITH_UNITY_BUILD="no"
 	)
 
@@ -537,20 +545,16 @@ src_configure() {
 	fi
 
 	if use cuda; then
-		if [[ -z "${CUDAARCHS}" ]]; then
-			CUDAARCHS="all-major"
-		else
-			CUDAARCHS="$(echo "${CUDAARCHS}" | sed -e 's/^/sm_/g' -e 's/;/;sm_/g')"
-		fi
-
-		mycmakeargs+=(
-			-DCYCLES_CUDA_BINARIES_ARCH="${CUDAARCHS}"
-		)
-
 		# Ease compiling with required gcc similar to cuda_sanitize but for cmake
 		if use cycles-bin-kernels; then
 			local -x CUDAHOSTCXX="$(cuda_gccdir)"
 			local -x CUDAHOSTLD="$(tc-getCXX)"
+
+			if [[ -n "${CUDAARCHS}" ]]; then
+				mycmakeargs+=(
+					-DCYCLES_CUDA_BINARIES_ARCH="$(echo "${CUDAARCHS}" | sed -e 's/^/sm_/g' -e 's/;/;sm_/g')"
+				)
+			fi
 		fi
 	fi
 
@@ -567,7 +571,7 @@ src_configure() {
 
 			-DCYCLES_HIP_BINARIES_ARCH="$(get_amdgpu_flags)"
 		)
-		unset hiprt_pn hiprt_pv
+
 		if use hiprt; then
 			# # TODO pkgconfig file
 			# local hiprt_pn hiprt_pv
@@ -611,14 +615,14 @@ src_configure() {
 	if tc-is-gcc; then
 		# We disable these to respect the user's choice of linker.
 		mycmakeargs+=(
-			-DWITH_LINKER_GOLD="no"
+			-DWITH_LINKER_GOLD=no
 		)
 	fi
 
 	if tc-is-clang || use osl; then
 		mycmakeargs+=(
-			-DWITH_CLANG="yes"
-			-DWITH_LLVM="yes"
+			-DWITH_CLANG=yes
+			-DWITH_LLVM=yes
 		)
 	fi
 
@@ -638,6 +642,8 @@ src_configure() {
 		if [[ "${EXPENSIVE_TESTS:-0}" -gt 0 ]]; then
 			mycmakeargs+=(
 				-DWITH_COMPOSITOR_REALTIME_TESTS="yes"
+
+				-DWITH_CYCLES_TEST_OSL="$(usex osl)"
 
 				-DWITH_GPU_DRAW_TESTS="yes"
 
@@ -675,7 +681,7 @@ src_test() {
 
 	# Sanity check that the script and datafile path is valid.
 	# If they are not valid, blender will fallback to the default path which is not what we want.
-	[[ -d "$BLENDER_SYSTEM_RESOURCES" ]] || die "The custom resources path is invalid, fix the ebuild!"
+	[[ -d "${BLENDER_SYSTEM_RESOURCES}" ]] || die "The custom resources path is invalid, fix the ebuild!"
 
 	# TODO only picks first card
 	addwrite "/dev/dri/card0"
@@ -809,37 +815,39 @@ src_install() {
 		# (Because the data is in the image directory and it will default to look in /usr/share)
 		local -x BLENDER_SYSTEM_RESOURCES="${ED}/usr/share/blender/${BV}"
 
-		# Workaround for binary drivers. # TODO
+		# Workaround for binary drivers.
 		addpredict /dev/ati
 		addpredict /dev/dri
 		addpredict /dev/nvidiactl
 
 		einfo "Generating Blender C/C++ API docs ..."
-		cd "${CMAKE_USE_DIR}/doc/doxygen" || die
+		cd "${CMAKE_USE_DIR}"/doc/doxygen || die
 		doxygen -u Doxyfile || die
 		doxygen || die "doxygen failed to build API docs."
 
 		cd "${CMAKE_USE_DIR}" || die
 		einfo "Generating (BPY) Blender Python API docs ..."
-		"${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio || die "sphinx failed."
+		"${BUILD_DIR}"/bin/blender --background --python doc/python_api/sphinx_doc_gen.py -noaudio || die "sphinx failed."
 
-		cd "${CMAKE_USE_DIR}/doc/python_api" || die
+		cd "${CMAKE_USE_DIR}"/doc/python_api || die
 		sphinx-build sphinx-in BPY_API || die "sphinx failed."
 
 		docinto "html/API/python"
-		dodoc -r "${CMAKE_USE_DIR}/doc/python_api/BPY_API/"
+		dodoc -r "${CMAKE_USE_DIR}"/doc/python_api/BPY_API/.
 
 		docinto "html/API/blender"
-		dodoc -r "${CMAKE_USE_DIR}/doc/doxygen/html/"
+		dodoc -r "${CMAKE_USE_DIR}"/doc/doxygen/html/.
 	fi
 
-	insinto "/usr/share/blender/${BV}/datafiles/assets"
-	doins -r "${WORKDIR}/blender-assets/publish/"*
+	if [[ "${PV}" != *9999* ]]; then
+		insinto "/usr/share/blender/${BV}/datafiles/assets"
+		doins -r "${WORKDIR}/blender-assets/publish/"*
+	fi
 
 	# Fix doc installdir
 	docinto html
-	dodoc "${CMAKE_USE_DIR}/release/text/readme.html"
-	rm -r "${ED}/usr/share/doc/blender" || die
+	dodoc "${CMAKE_USE_DIR}"/release/text/readme.html
+	rm -r "${ED}"/usr/share/doc/blender || die
 
 	python_optimize "${ED}/usr/share/blender/${BV}/scripts"
 
@@ -881,8 +889,9 @@ pkg_postinst() {
 pkg_postrm() {
 	if [[ -z "${REPLACED_BY_VERSION}" ]]; then
 		ewarn
-		ewarn "You may want to remove the following directory."
-		ewarn "~/.config/${PN}/${BV}/cache/"
+		ewarn "You may want to remove the following directories"
+		ewarn "- ~/.config/${PN}/${BV}/cache/"
+		ewarn "- ~/.cache/cycles/"
 		ewarn "It may contain extra render kernels not tracked by portage"
 		ewarn
 	fi
