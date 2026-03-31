@@ -24,6 +24,8 @@ if [[ ${PV} == *9999* ]]; then
 else
 	SRC_URI="
 		https://github.com/${MY_PN}/${MY_PN}/archive/refs/tags/${PV}.tar.gz -> ${P}.tar.gz
+		https://github.com/FreeCAD/FreeCAD/commit/d91b3e051789623f0bc1eff65947c361e7a661d0.patch -> ${PN}-20710.patch
+		https://github.com/FreeCAD/FreeCAD/commit/9ea0f32692e13eee85b1e74bd42514942d357906.patch -> ${PN}-21433.patch
 	"
 	KEYWORDS="~amd64"
 	S="${WORKDIR}/FreeCAD-${PV}"
@@ -106,12 +108,8 @@ RDEPEND="
 		sci-libs/vtk:=
 	)
 "
-# TODO why?
-RDEPEND+="
-	dev-libs/icu:=
-"
 DEPEND="${RDEPEND}
-	dev-cpp/eigen:=
+	<dev-cpp/eigen-5:=
 	dev-cpp/ms-gsl
 	test? (
 		$(python_gen_impl_dep '-debug')
@@ -139,11 +137,11 @@ BDEPEND="
 "
 
 PATCHES=(
-	"${FILESDIR}"/${PN}-9999-Gentoo-specific-don-t-check-vcs.patch
-	"${FILESDIR}"/${PN}-9999-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch
-	"${FILESDIR}/${PN}-1.0.0-r4-error-cannot-convert-bool-to-App-DocumentInitFlags.patch"
+	"${FILESDIR}"/${PN}-1.0.0-r1-Gentoo-specific-don-t-check-vcs.patch
+	"${FILESDIR}"/${PN}-1.0.1-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch
 	"${FILESDIR}/${PN}-1.0.2-pybind11-latent-slots-macro-conflicts-with-Qt.patch" # fixed in pybind-3.0.1
-	"${FILESDIR}/${PN}-9999-fastsignals-disconnect.patch"
+	"${DISTDIR}/${PN}-20710.patch" # DESTDIR in env
+	"${DISTDIR}/${PN}-21433.patch" # FindHDF5 fails to find HDF5 after a failing pkg_search_module
 )
 
 DOCS=( CODE_OF_CONDUCT.md README.md )
@@ -267,15 +265,6 @@ src_prepare() {
 	# d9e731ca94abc14808ebeed208617116f6d5ea4a
 	sed -e 's#pcl/point_traits.h#pcl/type_traits.h#g' -i src/Mod/ReverseEngineering/App/SurfaceTriangulation.cpp || die
 
-	# band-aid fix for botched version check, needs to be revisited for VTK-10
-	sed -e 's/vtkVersion.GetVTKMajorVersion() > 9/vtkVersion.GetVTKMajorVersion() >= 9/g' \
-		-i src/Mod/Fem/femguiutils/data_extraction.py || die
-
-	sed \
-		-e '/include( ccache )/s/^/# /g' \
-		-e '/include( ClangFormat )/s/^/# /g' \
-		-i src/3rdParty/libE57Format/CMakeLists.txt || die
-
 	# removed bundled pycxx
 	if [[ ${PV} != *9999* ]]; then
 		rm -r src/CXX || die "remove bundled pycxx"
@@ -298,8 +287,6 @@ src_configure() {
 
 	local mycmakeargs=(
 		-DFREECAD_USE_CCACHE="no" # Do not use CCache
-
-		"$(cmake_use_find_package "spacenav" "Spnav")"
 
 		-DCMAKE_POLICY_DEFAULT_CMP0144="OLD" # FLANN_ROOT
 		-DCMAKE_POLICY_DEFAULT_CMP0167="OLD" # FindBoost
@@ -372,7 +359,6 @@ src_configure() {
 		-DFREECAD_USE_EXTERNAL_FMT="yes"
 		-DFREECAD_USE_EXTERNAL_KDL=OFF # https://github.com/FreeCAD/FreeCAD/commit/9f98866
 		-DFREECAD_USE_FREETYPE=ON
-		-Dfreetype_DIR="${ESYSROOT}/usr"
 		-DFREECAD_USE_OCC_VARIANT:STRING="Official Version"
 		-DFREECAD_USE_PCL=$(usex pcl)
 		-DFREECAD_USE_PYBIND11=ON
@@ -600,8 +586,6 @@ src_install() {
 
 	if [[ -f src/Tools/freecad-thumbnailer ]]; then
 		dobin src/Tools/freecad-thumbnailer
-	else
-		dosym -r "/usr/$(get_libdir)/${PN}/bin/freecad-thumbnailer" "/usr/bin/freecad-thumbnailer"
 	fi
 
 	for dir in share/{applications,icons,metainfo,mime,pixmaps,thumbnailers}; do

@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..13} )
 
 # https://github.com/FreeCAD/FreeCAD/issues/19066
 # The added asserts break on mem leaks, so tests fail.
@@ -24,6 +24,8 @@ if [[ ${PV} == *9999* ]]; then
 else
 	SRC_URI="
 		https://github.com/${MY_PN}/${MY_PN}/archive/refs/tags/${PV}.tar.gz -> ${P}.tar.gz
+		https://github.com/FreeCAD/FreeCAD/commit/d91b3e051789623f0bc1eff65947c361e7a661d0.patch -> ${PN}-20710.patch
+		https://github.com/FreeCAD/FreeCAD/commit/3d2b7dc9c7ac898b30fe469b7cbd424ed1bca0a2.patch -> ${PN}-22221.patch
 	"
 	KEYWORDS="~amd64"
 	S="${WORKDIR}/FreeCAD-${PV}"
@@ -72,8 +74,7 @@ RDEPEND="
 	virtual/zlib:=
 	$(python_gen_cond_dep '
 		dev-python/numpy[${PYTHON_USEDEP}]
-		dev-python/pybind11[${PYTHON_USEDEP}]
-		dev-python/pycxx[${PYTHON_USEDEP}]
+		<dev-python/pybind11-3[${PYTHON_USEDEP}]
 		dev-python/pyyaml[${PYTHON_USEDEP}]
 	')
 	assembly? ( sci-libs/ondselsolver )
@@ -106,12 +107,8 @@ RDEPEND="
 		sci-libs/vtk:=
 	)
 "
-# TODO why?
-RDEPEND+="
-	dev-libs/icu:=
-"
 DEPEND="${RDEPEND}
-	dev-cpp/eigen:=
+	<dev-cpp/eigen-5:=
 	dev-cpp/ms-gsl
 	test? (
 		$(python_gen_impl_dep '-debug')
@@ -139,11 +136,10 @@ BDEPEND="
 "
 
 PATCHES=(
-	"${FILESDIR}"/${PN}-9999-Gentoo-specific-don-t-check-vcs.patch
-	"${FILESDIR}"/${PN}-9999-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch
-	"${FILESDIR}/${PN}-1.0.0-r4-error-cannot-convert-bool-to-App-DocumentInitFlags.patch"
-	"${FILESDIR}/${PN}-1.0.2-pybind11-latent-slots-macro-conflicts-with-Qt.patch" # fixed in pybind-3.0.1
-	"${FILESDIR}/${PN}-9999-fastsignals-disconnect.patch"
+	"${FILESDIR}"/${PN}-1.0.0-r1-Gentoo-specific-don-t-check-vcs.patch
+	"${FILESDIR}"/${PN}-1.0.1-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch
+	"${DISTDIR}/${PN}-20710.patch" # DESTDIR in env
+	"${DISTDIR}/${PN}-22221.patch" # vtk-9.5
 )
 
 DOCS=( CODE_OF_CONDUCT.md README.md )
@@ -263,25 +259,12 @@ src_prepare() {
 	# deprecated in python-3.11 removed in python-3.13
 	sed -e '/import imghdr/d' -i src/Mod/CAM/CAMTests/TestCAMSanity.py || die
 
-	# The PCL point_traits.h header was renamed (and deprecated) since 1.11.0 and removed in 1.15.0.
-	# d9e731ca94abc14808ebeed208617116f6d5ea4a
-	sed -e 's#pcl/point_traits.h#pcl/type_traits.h#g' -i src/Mod/ReverseEngineering/App/SurfaceTriangulation.cpp || die
-
-	# band-aid fix for botched version check, needs to be revisited for VTK-10
-	sed -e 's/vtkVersion.GetVTKMajorVersion() > 9/vtkVersion.GetVTKMajorVersion() >= 9/g' \
-		-i src/Mod/Fem/femguiutils/data_extraction.py || die
-
-	sed \
-		-e '/include( ccache )/s/^/# /g' \
-		-e '/include( ClangFormat )/s/^/# /g' \
-		-i src/3rdParty/libE57Format/CMakeLists.txt || die
-
-	# removed bundled pycxx
-	if [[ ${PV} != *9999* ]]; then
-		rm -r src/CXX || die "remove bundled pycxx"
-	fi
-
 	cmake_src_prepare
+
+	if ! grep -q TKExpress cMake/FindOCC.cmake ; then
+		eqawarn "Applying opencascade-7.9.0 patch"
+		eapply -l "${FILESDIR}/${PN}-1.0.1-opencascade-7.9.0.patch"
+	fi
 }
 
 src_configure() {
@@ -299,15 +282,10 @@ src_configure() {
 	local mycmakeargs=(
 		-DFREECAD_USE_CCACHE="no" # Do not use CCache
 
-		"$(cmake_use_find_package "spacenav" "Spnav")"
-
 		-DCMAKE_POLICY_DEFAULT_CMP0144="OLD" # FLANN_ROOT
 		-DCMAKE_POLICY_DEFAULT_CMP0167="OLD" # FindBoost
 		-DCMAKE_POLICY_DEFAULT_CMP0175="OLD" # add_custom_command
 		-DCMAKE_POLICY_DEFAULT_CMP0153="OLD" # exec_program
-
-		-DPYCXX_INCLUDE_DIR="${ESYSROOT}/usr/include/${PYTHON_SINGLE_TARGET/_/.}"
-		-DPYCXX_SOURCE_DIR="${ESYSROOT}/usr/share/${PYTHON_SINGLE_TARGET/_/.}/CXX"
 
 		-DBUILD_DESIGNER_PLUGIN=$(usex designer)
 		-DBUILD_FORCE_DIRECTORY=ON				# force building in a dedicated directory
@@ -372,7 +350,6 @@ src_configure() {
 		-DFREECAD_USE_EXTERNAL_FMT="yes"
 		-DFREECAD_USE_EXTERNAL_KDL=OFF # https://github.com/FreeCAD/FreeCAD/commit/9f98866
 		-DFREECAD_USE_FREETYPE=ON
-		-Dfreetype_DIR="${ESYSROOT}/usr"
 		-DFREECAD_USE_OCC_VARIANT:STRING="Official Version"
 		-DFREECAD_USE_PCL=$(usex pcl)
 		-DFREECAD_USE_PYBIND11=ON
@@ -478,31 +455,6 @@ src_test() {
 		)
 	fi
 
-	# local -x EPYTEST_DESELECT=(
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_check_python_version_bad"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_check_python_version_bad"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_dependency_failure_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_failure_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_handle_disallowed_python"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_install"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_no_pip_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_no_python_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_report_missing_workbenches_multiple"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_report_missing_workbenches_single"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_success_dialog"
-	#
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_confirmation_dialog_cancel"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_confirmation_dialog_yes"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_failure_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_progress_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_success_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_timer_launches_progress_dialog"
-	# )
-
-	local -x CMAKE_SKIP_TESTS=(
-		"^ConstraintPointsAccess."
-	)
-
 	local -x FREECAD_USER_HOME="${HOME}"
 	local -x FREECAD_USER_DATA="${T}/data"
 	local -x FREECAD_USER_TEMP="${T}/temp"
@@ -600,8 +552,6 @@ src_install() {
 
 	if [[ -f src/Tools/freecad-thumbnailer ]]; then
 		dobin src/Tools/freecad-thumbnailer
-	else
-		dosym -r "/usr/$(get_libdir)/${PN}/bin/freecad-thumbnailer" "/usr/bin/freecad-thumbnailer"
 	fi
 
 	for dir in share/{applications,icons,metainfo,mime,pixmaps,thumbnailers}; do
