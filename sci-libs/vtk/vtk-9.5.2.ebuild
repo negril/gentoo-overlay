@@ -13,7 +13,7 @@ PYTHON_REQ_USE="tk?"
 WEBAPP_OPTIONAL=yes
 WEBAPP_MANUAL_SLOT=yes
 
-inherit check-reqs cmake cuda java-pkg-opt-2 multiprocessing python-single-r1 toolchain-funcs webapp xdg-utils
+inherit check-reqs cmake cuda java-pkg-opt-2 multiprocessing python-single-r1 toolchain-funcs virtualx webapp xdg-utils
 
 # Short package version
 MY_PV="$(ver_cut 1-2)"
@@ -43,9 +43,12 @@ SLOT="0/${MY_PV}"
 KEYWORDS="~amd64 ~arm ~arm64 ~x86"
 
 # TODO: Like to simplify these. Mostly the flags related to Groups.
-IUSE="all-modules boost +cgns cuda debug doc egl examples ffmpeg gdal gles2 imaging
+IUSE="
+	all-modules boost +cgns cuda debug doc egl examples ffmpeg gdal gles2 imaging
 	java +logging minimal mpi mysql +netcdf odbc opencascade openmp openvdb pdal postgres
-	python qt6 +rendering tbb test +threads tk +truetype video_cards_nvidia +views vtkm web"
+	python qt6 +rendering tbb test +threads tk +truetype video_cards_nvidia +views vtkm web
+	+video_cards_zink
+"
 
 IUSE+="
 	hip kokkos
@@ -53,6 +56,7 @@ IUSE+="
 
 RESTRICT="!test? ( test )"
 
+# we can't test egl or gles2 without hardware access
 REQUIRED_USE="
 	all-modules? (
 		boost cgns ffmpeg gdal imaging mysql netcdf odbc opencascade openvdb pdal
@@ -68,10 +72,13 @@ REQUIRED_USE="
 	tk? ( python rendering )
 	web? ( python )
 	rendering? ( truetype views )
+	test? ( !egl !gles2 )
 "
 
 # eigen, nlohmann_json, pegtl and utfcpp are referenced in the cmake files
 # and need to be available when VTK consumers configure the dependencies.
+# opencascade does things with gles2/opengl detection so we need to align both
+# python uses in1d which is obsolete and removed in numpy-2.4, fixed in 9.6
 RDEPEND="
 	app-arch/lz4:=
 	app-arch/xz-utils
@@ -117,12 +124,13 @@ RDEPEND="
 	netcdf? ( sci-libs/netcdf:=[mpi=] )
 	odbc? ( dev-db/unixODBC )
 	openvdb? ( media-gfx/openvdb:= )
-	opencascade? ( sci-libs/opencascade:= )
+	opencascade? ( sci-libs/opencascade:=[gles2=] )
 	pdal? ( sci-libs/pdal:= )
 	postgres? ( dev-db/postgresql:= )
 	python? (
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
+			<dev-python/numpy-2.4[${PYTHON_USEDEP}]
 			mpi? ( dev-python/mpi4py[${PYTHON_USEDEP}] )
 			rendering? ( dev-python/matplotlib[${PYTHON_USEDEP}] )
 		')
@@ -164,7 +172,7 @@ DEPEND="
 	dev-cpp/cli11
 	test? (
 		media-libs/glew
-		media-libs/mesa[llvm]
+		media-libs/mesa[llvm,video_cards_zink?]
 		x11-libs/libXcursor
 		rendering? ( media-libs/freeglut )
 	)
@@ -522,7 +530,7 @@ src_configure() {
 		-DVTK_MODULE_ENABLE_VTK_pegtl="YES"
 		-DVTK_MODULE_ENABLE_VTK_png="YES"
 		-DVTK_MODULE_ENABLE_VTK_pugixml="YES"
-		# -DVTK_MODULE_ENABLE_VTK_scn
+		-DVTK_MODULE_ENABLE_VTK_scn="$(usex test "YES" "NO")"
 		-DVTK_MODULE_ENABLE_VTK_sqlite="YES"
 		-DVTK_MODULE_ENABLE_VTK_theora="$(usex minimal "NO" "YES")"
 		-DVTK_MODULE_ENABLE_VTK_tiff="YES"
@@ -804,26 +812,27 @@ src_configure() {
 			-DVTK_OPENGL_USE_GLES="$(usex gles2)"
 
 			-DVTK_ENABLE_OSPRAY=OFF
+
+			-DVTK_MODULE_ENABLE_VTK_IOExportGL2PS="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingAnari="NO"  # no package in ::gentoo
 			-DVTK_MODULE_ENABLE_VTK_RenderingAnnotation="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingContext2D="YES"
+			-DVTK_MODULE_ENABLE_VTK_RenderingContextOpenGL2="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingCore="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingExternal="YES"
+			-DVTK_MODULE_ENABLE_VTK_RenderingGL2PSOpenGL2="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingHyperTreeGrid="YES"
+			-DVTK_MODULE_ENABLE_VTK_RenderingLICOpenGL2="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingLOD="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingLabel="YES"
+			-DVTK_MODULE_ENABLE_VTK_RenderingOpenGL2="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingRayTracing="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingSceneGraph="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingUI="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingVolume="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingVolumeAMR="YES"
-			-DVTK_MODULE_ENABLE_VTK_IOExportGL2PS="YES"
-			-DVTK_MODULE_ENABLE_VTK_RenderingGL2PSOpenGL2="YES"
-			-DVTK_MODULE_ENABLE_VTK_gl2ps="YES"
-			-DVTK_MODULE_ENABLE_VTK_RenderingContextOpenGL2="YES"
-			-DVTK_MODULE_ENABLE_VTK_RenderingLICOpenGL2="YES"
-			-DVTK_MODULE_ENABLE_VTK_RenderingOpenGL2="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingVolumeOpenGL2="YES"
+			-DVTK_MODULE_ENABLE_VTK_gl2ps="YES"
 		)
 
 		use python && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_RenderingMatplotlib="YES" )
@@ -925,6 +934,9 @@ src_compile() {
 }
 
 src_test() {
+	local -x LIBGL_ALWAYS_SOFTWARE="true"
+	local -x __GLX_VENDOR_LIBRARY_NAME="mesa"
+
 	vtk_add_sandbox
 
 	# TODO why?
@@ -936,91 +948,327 @@ src_test() {
 
 	# local -x VTK_SMP_BACKEND_IN_USE="STDThread"
 
-	# see VTK_SMP_IMPLEMENTATION_TYPE
-	if use tbb; then
-		local -x VTK_SMP_BACKEND_IN_USE="TBB"
-	# # FIXME Times out under openmp
-	# elif use openmp; then
-	# 	local -x VTK_SMP_BACKEND_IN_USE="OpenMP"
-	elif use threads; then
-		local -x VTK_SMP_BACKEND_IN_USE="STDThread"
-	else
-		local -x VTK_SMP_BACKEND_IN_USE="Sequential"
-	fi
-
 	local -a CMAKE_SKIP_TESTS
 
 	if [[ "${CMAKE_RUN_OPTIONAL_TESTS:=no}" != "yes" ]]; then
 		local -a REALLY_BAD_TESTS BAD_TESTS RANDOM_FAIL_TESTS
+
 		# don't work at all
 		REALLY_BAD_TESTS=(
-			"^VTK::RenderingFreeTypeFontConfigCxx-TestSystemFontRendering$" # (Failed) VTK::RenderingFreeTypeFontConfig
-			"^VTK::RenderingExternalCxx-TestGLUTRenderWindow$" # (Failed) VTK::RenderingExternal
+			# (Failed)
+			"VTK::ChartsCoreCxx-TestLinePlot3D$"
+			"VTK::CommonDataModelCxx-TestHyperTreeGridGeometricLocator$"
+			"VTK::FiltersCoreCxx-TestImplicitPolyDataDistanceCube$"
+			"VTK::FiltersCorePython-TestSphereTreeFilter$"
+			"VTK::FiltersFlowPathsCxx-TestEvenlySpacedStreamlines2D$"
+			"VTK::FiltersFlowPathsCxx-TestParticleTracers$"
+			"VTK::FiltersGeneralCxx-TestContourTriangulatorHoles$"
+			"VTK::IOExportGL2PSCxx-TestGL2PSBillboardTextActor3D"
+			"VTK::IOExportGL2PSCxx-TestGL2PSExporterRaster"
+			"VTK::IOExportGL2PSCxx-TestGL2PSExporterVolumeRaster"
+			"VTK::IOExportGL2PSCxx-TestGL2PSLabeledDataMapper"
+			"VTK::IOExportGL2PSCxx-TestGL2PSTextActor"
+			"VTK::IOExportGL2PSCxx-TestGL2PSTextMapper"
+			"VTK::RenderingCorePython-pickImageData$"
+			"VTK::RenderingExternalCxx-TestGLUTRenderWindow$"
+			"VTK::RenderingFreeTypeFontConfigCxx-TestSystemFontRendering$"
+			"VTK::RenderingOpenGL2Cxx-TestGlyph3DMapperPickability$"
 
+			# (Failed)
+			"^VTK::FiltersParallelDIY2Cxx-MPI-TestProbeLineFilter$"
+
+			# (Subprocess aborted)
 			# File missing? ExternalData/Testing/Data/MotionFX/position_file/Sprocket_New.prn
-			"^VTK::IOMotionFXCxx-TestMotionFXCFGReaderPositionFile$" # (Subprocess aborted) VTK::IOMotionFX
+			"VTK::IOMotionFXCxx-TestMotionFXCFGReaderPositionFile$"
+		)
 
-			"^VTK::IOExportGL2PSCxx-TestGL2PSBillboardTextActor3D" # (Failed) VTK::IOExportGL2PS
-			"^VTK::IOExportGL2PSCxx-TestGL2PSLabeledDataMapper" # (Failed) VTK::IOExportGL2PS
-			"^VTK::IOExportGL2PSCxx-TestGL2PSTextActor" # (Failed) VTK::IOExportGL2PS
-			"^VTK::IOExportGL2PSCxx-TestGL2PSTextMapper" # (Failed) VTK::IOExportGL2PS
-			"^VTK::IOExportGL2PSCxx-TestGL2PSExporterRaster" # (Failed) VTK::IOExportGL2PS
-			"^VTK::IOExportGL2PSCxx-TestGL2PSExporterVolumeRaster" # (Failed) VTK::IOExportGL2PS
+		# don't work in src_test but when on their own
+		BAD_TESTS=(
+			# (Failed)
+			"^VTK::FiltersCoreCxx-TestQuadricDecimationMaximumError$"
+			"^VTK::GUISupportQtCxx-TestQVTKOpenGLNativeWidgetWithChartHistogram2D$"
+			"^VTK::GUISupportQtCxx-TestQVTKOpenGLStereoWidgetWithDisabledInteractor$"
+			"^VTK::GUISupportQtCxx-TestQVTKOpenGLWidgetWithChartHistogram2D$"
+			"^VTK::GUISupportQtCxx-TestQVTKOpenGLWindowWithDisabledInteractor$"
+			"^VTK::GUISupportQtCxx-TestQVTKRenderWidgetWithChartHistogram2D$"
+			"^VTK::GUISupportQtQuickCxx-TestQQuickVTKItem_1$" # QT-6.10.3 maybe?
+			"^VTK::GUISupportQtQuickCxx-TestQQuickVTKItem_2$" # QT-6.10.3 maybe?
+			"^VTK::GUISupportQtQuickCxx-TestQQuickVTKItem_3$" # QT-6.10.3 maybe?
+			"^VTK::InteractionWidgetsCxx-TestFinitePlaneWidget$"
+			"^VTK::InteractionWidgetsCxx-TestResliceCursorWidget2$"
+			"^VTK::InteractionWidgetsCxx-TestResliceCursorWidget3$"
+			"^VTK::InteractionWidgetsPython-TestTensorWidget2$"
+			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperCameraShiftScale$"
+			"^VTK::RenderingOpenGL2Cxx-TestCameraShiftScale$"
+			"^VTK::RenderingOpenGL2Cxx-TestFluidMapper$"
 
-			"^VTK::ChartsCoreCxx-TestLinePlot3D$" # (Failed)::ChartsCore vtkChartsCore
-			"^VTK::CommonDataModelCxx-TestHyperTreeGridGeometricLocator$" # (Failed) VTK::CommonDataModel
-			"^VTK::FiltersCoreCxx-TestImplicitPolyDataDistanceCube$" # (Failed) VTK::FiltersCore
-			"^VTK::FiltersCoreCxx-TestQuadricDecimationMaximumError$" # (Failed) VTK::FiltersCore  # test alone
-			"^VTK::FiltersCorePython-TestSphereTreeFilter$" # (Failed) VTK::FiltersCore
-			"^VTK::FiltersFlowPathsCxx-TestEvenlySpacedStreamlines2D$" # (Failed) VTK::FiltersFlowPaths
-			"^VTK::FiltersFlowPathsCxx-TestParticleTracers$" # (Failed) VTK::FiltersFlowPaths
-			"^VTK::FiltersGeneralCxx-TestContourTriangulatorHoles$" # (Failed) VTK::FiltersGeneral
-			"^VTK::InteractionWidgetsCxx-TestFinitePlaneWidget$" # (Failed) VTK::InteractionWidgets  # test alone
-			"^VTK::InteractionWidgetsPython-TestTensorWidget2$" # (Failed) VTK::InteractionWidgets  # fails under xvfb
-			"^VTK::RenderingCorePython-pickImageData$" # (Failed) VTK::RenderingCore
-			"^VTK::RenderingOpenGL2Cxx-TestFluidMapper$" # (Subprocess aborted) VTK::RenderingOpenGL2  # test alone
-			"^VTK::RenderingOpenGL2Cxx-TestGlyph3DMapperPickability$" # (Failed) VTK::RenderingOpenGL2
+			# The following tests did not run:
+			"^VTK::RenderingCoreCxx-TestInteractorTimers$"
+
+			# The following tests FAILED:
+			# (Subprocess aborted)
+			"^VTK::CommonDataModelCxx-quadraticIntersection$"
+			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperBlockOpacities$"
+			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperToggleScalarVisibilities$"
 		)
 
 		if use egl; then
 			REALLY_BAD_TESTS+=(
 				# The following tests did not run:
-				"^VTK::IOMovieCxx-TestAVIWriter$" # (Skipped)
-				"^VTK::IOMovieCxx-TestMP4Writer$" # (Skipped)
+				# (Skipped)
+				"^VTK::IOMovieCxx-TestAVIWriter$"
+				"^VTK::IOMovieCxx-TestMP4Writer$"
+			)
+		else
+			BAD_TESTS+=(
+				# (Failed)
+				# needs OSMesa or gles?
+				"^VTK::CommonDataModelCxx-TestBezier$"
 			)
 		fi
 
-		# don't work in src_test but when on their own
-		BAD_TESTS=(
-			"^VTK::GUISupportQtCxx-TestQVTKOpenGLStereoWidgetWithDisabledInteractor$" # (Failed) VTK::GUISupportQt
-			"^VTK::GUISupportQtCxx-TestQVTKOpenGLWindowWithDisabledInteractor$" # (Failed) VTK::GUISupportQt
-			"^VTK::InteractionWidgetsCxx-TestResliceCursorWidget2$" # (Failed) VTK::InteractionWidgets
-			"^VTK::InteractionWidgetsCxx-TestResliceCursorWidget3$" # (Failed) VTK::InteractionWidgets
-			"^VTK::RenderingOpenGL2Cxx-TestCameraShiftScale$" # (Failed) VTK::RenderingOpenGL2
-			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperCameraShiftScale$" # (Failed) VTK::RenderingCore
+		if use gles2; then
+			BAD_TESTS+=(
+				# (Failed)
+				"^VTK::RenderingVolumeOpenGL2Cxx-TestGPURayCastDepthPeelingBoxWidget$"
+				"^VTK::IOImportCxx-OBJImport-MixedOrder1$"
+				"^VTK::IOImportCxx-OBJImport-MTLwithoutTextureFile$"
+				"^VTK::GUISupportQtCxx-TestQVTKOpenGLStereoWidgetWithMSAA$"
+				"^VTK::GUISupportQtCxx-TestQVTKOpenGLNativeWidgetWithMSAA$"
+				"^VTK::GUISupportQtCxx-TestQVTKOpenGLWindowWithMSAA$"
+				"^VTK::GUISupportQtCxx-TestQVTKRenderWidgetWithMSAA$"
+				"^VTK::GUISupportQtCxx-TestQVTKOpenGLWidgetWithMSAA$"
+				"^VTK::InteractionWidgetsCxx-BoxWidget$"
+				"^VTK::InteractionWidgetsCxx-BoxWidget2$"
+				"^VTK::InteractionWidgetsCxx-TestBrokenLineWidget$"
+				"^VTK::InteractionWidgetsCxx-TestCamera3DWidget$"
+				"^VTK::InteractionWidgetsCxx-TestLightWidget$"
+				"^VTK::InteractionWidgetsCxx-TestPickingManagerSeedWidget$"
+				"^VTK::InteractionWidgetsCxx-TestSphereWidget2CenterCursor$"
+				"^VTK::InteractionWidgetsCxx-TestSphereWidgetZoomInOut$"
+				"^VTK::InteractionWidgetsCxx-TestSplineWidget$"
+				"^VTK::InteractionWidgetsCxx-TestTextRepresentationWithBorders$"
+				"^VTK::InteractionWidgetsCxx-TestDijkstraGraphGeodesicPath$"
+				"^VTK::RenderingVolumeCxx-TestGPURayCastMapperRectilinearGrid$"
+				"^VTK::RenderingAnnotationCxx-TestAxisActor2D$"
+				"^VTK::RenderingAnnotationCxx-TestCubeAxes2DMode$"
+				"^VTK::RenderingAnnotationCxx-TestPolarAxes2D$"
+				"^VTK::RenderingAnnotationCxx-TestPolarAxes2DDefault$"
+				"^VTK::RenderingAnnotationCxx-TestXYPlotActor$"
+				"^VTK::FiltersGeometryPreviewCxx-TestPointSetStreamer$"
+				"^VTK::FiltersFlowPathsCxx-TestBSPTree$"
+				"^VTK::FiltersFlowPathsCxx-TestBSPTreeWithGhostArrays$"
+				"^VTK::FiltersFlowPathsCxx-TestStreamSurface$"
+				"^VTK::FiltersFlowPathsCxx-TestVectorFieldTopology$"
+				"^VTK::FiltersFlowPathsCxx-TestVectorFieldTopologyAMR$"
+				"^VTK::FiltersModelingCxx-TestQuadRotationalExtrusion$"
+				"^VTK::FiltersModelingCxx-TestQuadRotationalExtrusionMultiBlock$"
+				"^VTK::FiltersModelingCxx-TestRotationalExtrusion$"
+				"^VTK::FiltersModelingCxx-TestRotationalExtrusion2$"
+				"^VTK::RenderingOpenGL2Cxx-TestCoincident$"
+				"^VTK::RenderingOpenGL2Cxx-TestMultiTexturing$"
+				"^VTK::RenderingOpenGL2Cxx-TestMultiTexturingInterpolateScalars$"
+				"^VTK::RenderingOpenGL2Cxx-TestPBRClearCoat$"
+				"^VTK::RenderingOpenGL2Cxx-TestSpherePoints$"
+				"^VTK::RenderingOpenGL2Cxx-TestSphereVertex$"
+				"^VTK::RenderingOpenGL2Cxx-TestValuePassFloatingPoint$"
+				"^VTK::RenderingOpenGL2Cxx-TestValuePassFloatingPoint2$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2D$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionXCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionYCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionYCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DIJK$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DMaterialIJK$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVector$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVectorAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVectorAxisReflectionYCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary3DContour$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary3DContourDecomposePolyhedra$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary3DContourImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2D$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DBiMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DFullMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisClipBox$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionXCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DCellCenters$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DCellCentersMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DClip$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DContour$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DContourMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DDualContour$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DDualContourMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutterDual$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutterDualMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernarySphereMaterial$"
+				"^VTK::RenderingCoreCxx-RGrid$"
+				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperPartialFieldData$"
+				"^VTK::RenderingCoreCxx-TestEdgeFlags$"
+				"^VTK::RenderingCoreCxx-TestGlyph3DMapperOrientationArray$"
+				"^VTK::RenderingCoreCxx-TestGlyph3DMapperQuaternionArray$"
+				"^VTK::RenderingCoreCxx-TestPolyDataMapperNormals$"
+				"^VTK::RenderingCoreCxx-TestRenderLinesAsTubes$"
+				"^VTK::FiltersSourcesCxx-TestRandomHyperTreeGridSource$"
+				"^VTK::AcceleratorsVTKmFiltersCxx-TestVTKMPolyDataNormals$"
+				"^VTK::FiltersGeneralCxx-TestYoungsMaterialInterface$"
+				"^VTK::FiltersGeometryCxx-TestLinearToQuadraticCellsFilter$"
+				"^VTK::CommonDataModelCxx-TestKdTreeRepresentation$"
+			)
+		fi
 
-			# The following tests did not run:
-			"^VTK::RenderingCoreCxx-TestInteractorTimers$" # Skipped
+		if use video_cards_zink; then
+			local -x MESA_LOADER_DRIVER_OVERRIDE="zink"
+		else
+			REALLY_BAD_TESTS+=(
+				# these fail when run using OpenGL4.5, e.g. llvmpipe
+				# (Failed)
+				"^VTK::FiltersGeneralCxx-TestLoopBooleanPolyDataFilter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGrid3DIntercepts$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGrid3DInterface$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2D$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisClipBox$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisClipEllipse$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisClipPlanes$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionXCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionYCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DDepthLimiter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DDepthLimiterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdDeep$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdMaterialDeep$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdMaterialImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVectorAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVectorAxisReflectionYCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary3DGeometry$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2D$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DBiMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisClipCylinder$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisClipPlanes$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisCut$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisCutMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionXCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionYZCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionYZCenterMaterial$"
+				"^VTK::ViewsInfovisCxx-TestIcicleView$"
+				"^VTK::ViewsInfovisCxx-TestInteractorStyleTreeMapHover$"
+				"^VTK::ViewsInfovisCxx-TestNetworkViews$"
+				"^VTK::ViewsInfovisCxx-TestRenderView$"
+				"^VTK::ViewsInfovisCxx-TestTreeMapView$"
+				"^VTK::ViewsInfovisCxx-TestTreeRingView$"
+			)
 
-			# The following tests FAILED:
-			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperBlockOpacities$" #(Subprocess aborted) VTK::RenderingCore
-			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperToggleScalarVisibilities$" # (Subprocess aborted) VTK::RenderingCore
-			"^VTK::CommonDataModelCxx-quadraticIntersection$" # (Subprocess aborted) VTK::CommonDataModel
-		)
+			BAD_TESTS+=(
+				"^VTK::FiltersAMRCxx-TestAMRSliceFilterCellData$"
+				"^VTK::FiltersCoreCxx-Test3DLinearGridPlaneCutterCellData$"
+				"^VTK::FiltersCoreCxx-TestPolyDataTangents$"
+				"^VTK::FiltersExtractionCxx-TestExtraction$"
+				"^VTK::FiltersExtractionCxx-TestExtractionExpression$"
+				"^VTK::FiltersGeneralCxx-TestClipClosedSurface1$"
+				"^VTK::FiltersGeneralCxx-TestClipClosedSurface2$"
+				"^VTK::FiltersGeneralCxx-TestDateToNumeric$"
+				"^VTK::FiltersGeneralCxx-TestYoungsMaterialInterface$"
+				"^VTK::FiltersGeometryCxx-TestDataSetRegionSurfaceFilter$"
+				"^VTK::FiltersHybridCxx-TemporalStatistics$"
+				"^VTK::FiltersHybridCxx-TestDepthSortPolyData$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridBinary2DAdaptiveDataSetSurfaceFilter$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridBinary2DAdaptiveDataSetSurfaceFilterMaterial$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridTernary3DAdaptiveDataSetSurfaceFilter$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridTernary3DAdaptiveDataSetSurfaceFilterMaterial$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridTernary3DToUnstructuredAdaptiveDataSetSurfaceFilter$"
+				"^VTK::FiltersHybridCxx-TestTemporalFractal$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGrid2DInterfaceShift$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionYCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DCellCenters$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DCellCentersMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DContour$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DContourMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DIJK$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DInterfaceMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DMaterialIJK$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThreshold$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVector$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinaryClipPlanes$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinaryEllipseMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinaryHyperbolicParaboloidMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DFullMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DGeometry$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DGeometryMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DGeometryMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThreshold$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdDeep$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdMaterialDeep$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdMaterialImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DUnstructured$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DUnstructuredMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernaryHyperbola$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernarySphereMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernarySphereMaterialReflections$"
+				"^VTK::FiltersModelingCxx-TestCollisionDetectionAllContacts$"
+				"^VTK::FiltersModelingCxx-TestCollisionDetectionHalfContacts$"
+				"^VTK::FiltersModelingCxx-TestLinearCellExtrusion$"
+				"^VTK::FiltersModelingCxx-TestNamedColorsIntegration$"
+				"^VTK::IOChemistryCxx-TestVASPTessellationReader$"
+				"^VTK::IOGeometryCxx-TestOpenFOAMReaderFaceZone$"
+				"^VTK::IOIOSSCxx-TestIOSSExodusParallelWriter$"
+				"^VTK::IOOCCTCxx-TestOCCTReader$"
+				"^VTK::IOXMLCxx-TestXMLHyperTreeGridIOInterface$"
+				"^VTK::IOXMLCxx-TestXMLPieceDistribution$"
+				"^VTK::InfovisLayoutCxx-TestCirclePackLayoutStrategy$"
+				"^VTK::InfovisLayoutCxx-TestTreeMapLayoutStrategy$"
+				"^VTK::InteractionWidgetsCxx-TestButtonWidgetMultipleViewports$"
+				"^VTK::InteractionWidgetsCxx-TestDisplaySizedImplicitPlaneWidget$"
+				"^VTK::InteractionWidgetsCxx-TestHandleWidget$"
+				"^VTK::InteractionWidgetsCxx-TestImplicitPlaneWidget$"
+				"^VTK::InteractionWidgetsCxx-TestImplicitPlaneWidget2$"
+				"^VTK::InteractionWidgetsCxx-TestImplicitPlaneWidget2LockNormalToCamera$"
+				"^VTK::InteractionWidgetsCxx-TestImplicitPlaneWidget2b$"
+				"^VTK::RenderingAnnotationCxx-TestScalarBarAboveBelow$"
+				"^VTK::RenderingCoreCxx-TestColorByCellDataStringArray$"
+				"^VTK::RenderingCoreCxx-TestColorByStringArrayDefaultLookupTable$"
+				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperOverrideLUT$"
+				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperOverrideScalarArray$"
+				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperPartialFieldData$"
+				"^VTK::RenderingCoreCxx-TestMixedGeometryCellScalars$"
+				"^VTK::RenderingCoreCxx-TestTilingCxx$"
+			)
+		fi
 
 		if use vtkm && use cuda; then
 			REALLY_BAD_TESTS+=(
-				# vtkm + cuda
-				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMAbort$" # (Subprocess aborted) VTK::AcceleratorsVTKmFilters
-				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMClip$" # (Subprocess aborted) VTK::AcceleratorsVTKmFilters
-				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMClipWithImplicitFunction$" # (Subprocess aborted) VTK::AcceleratorsVTKmFilters
-				"VTK::AcceleratorsVTKmFiltersPython-TestVTKMSlice$" # (Subprocess aborted) VTK::AcceleratorsVTKmFilters
+				# (Subprocess aborted)
+				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMAbort$" #
+				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMClip$" #
+				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMClipWithImplicitFunction$" #
+				"VTK::AcceleratorsVTKmFiltersPython-TestVTKMSlice$" #
+
+				# cuda-13?
+				"^VTK::AcceleratorsVTKmFiltersCxx-TestVTKMSlice$"
 			)
 		fi
 
 		RANDOM_FAIL_TESTS=(
-			# (Failed) VTK::FiltersVerdict
+			# (Failed)
 			"VTK::FiltersVerdictCxx-TestCellQuality$"
+
+			# (Subprocess aborted)
+			"^VTK::RenderingLICOpenGL2Cxx-SurfaceLICCurvedContrastEnhancedColorMappedSmallGrainMask$"
+			"^VTK::RenderingLICOpenGL2Cxx-SurfaceLICPlanarContrastEnhanced$"
 		)
 
 		CMAKE_SKIP_TESTS+=(
@@ -1034,6 +1282,18 @@ src_test() {
 		# requires VTK_USE_MICROSOFT_MEDIA_FOUNDATION
 		"^VTK::IOMovieCxx-Test" # Skipped
 	)
+
+	# see VTK_SMP_IMPLEMENTATION_TYPE
+	if use tbb; then
+		local -x VTK_SMP_BACKEND_IN_USE="TBB"
+	# # FIXME Times out under openmp
+	# elif use openmp; then
+	# 	local -x VTK_SMP_BACKEND_IN_USE="OpenMP"
+	elif use threads; then
+		local -x VTK_SMP_BACKEND_IN_USE="STDThread"
+	else
+		local -x VTK_SMP_BACKEND_IN_USE="Sequential"
+	fi
 
 	if use openmp; then
 		CMAKE_SKIP_TESTS+=(
@@ -1067,7 +1327,7 @@ src_test() {
 		# of XDG_SESSION_TYPE should be respected
 		# local -x XDG_SESSION_TYPE="wayland"
 		# local -x GDK_BACKEND="wayland"
-		local -x QT_QPA_PLATFORM="wayland-egl"
+		# local -x QT_QPA_PLATFORM="wayland-egl"
 		# local -x MOZ_ENABLE_WAYLAND=1
 
 		xdg_environment_reset
@@ -1086,27 +1346,36 @@ src_test() {
 		local compositor=$!
 
 		eqawarn "running at ${compositor}"
-	elif use qt6; then
-		local -x QT_QPA_PLATFORM="offscreen"
+	# elif use qt6; then
+	# 	local -x QT_QPA_PLATFORM="offscreen"
 	fi
 
-	# local -x MESA_SHADER_CACHE_DISABLE=true
+	local -x MESA_SHADER_CACHE_DISABLE=true
+
+	eqawarn "MESA_LOADER_DRIVER_OVERRIDE: ${MESA_LOADER_DRIVER_OVERRIDE}"
+	eqawarn "VTK_DEFAULT_OPENGL_WINDOW:   ${VTK_DEFAULT_OPENGL_WINDOW}"
 
 	# local -x WL=tinywl
-
-	# virtx \
+	if use egl; then
 		cmake_src_test
+	else
+		virtx \
+			cmake_src_test
+	fi
 
-	unset CMAKE_SKIP_TESTS
-	myctestargs=( -N )
-	cmake_src_test
+	# unset CMAKE_SKIP_TESTS
+	# myctestargs=( -N )
+	# cmake_src_test
 
 	if use egl; then
 		eqawarn "killing ${compositor}"
 		kill "${compositor}" || die
 	fi
 
-	die "the end"
+	eqawarn "MESA_LOADER_DRIVER_OVERRIDE: ${MESA_LOADER_DRIVER_OVERRIDE}"
+	eqawarn "VTK_DEFAULT_OPENGL_WINDOW:   ${VTK_DEFAULT_OPENGL_WINDOW}"
+
+	# die "the end"
 }
 
 src_install() {
@@ -1150,4 +1419,10 @@ pkg_postinst() {
 
 pkg_prerm() {
 	use web && webapp_pkg_prerm
+}
+
+pkg_info() {
+	if [[ -v DISPLAY ]]; then
+		nonfatal "${ESYSROOT}/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
+	fi
 }
