@@ -19,7 +19,7 @@ fi
 LICENSE="GPL-3 MIT"
 SLOT="0/$(ver_cut 1-2)"
 IUSE="+aom dav1d +de265 doc ffmpeg gdk-pixbuf gui +jpeg +jpeg2k +kvazaar openh264 rav1e svt-av1 test test-full +threads tools +webp x264 x265"
-# IUSE+=" vvdec vvenc"
+# IUSE+=" uvg266 vvdec vvenc"
 REQUIRED_USE="test-full? ( test )"
 RESTRICT="!test? ( test )"
 
@@ -50,6 +50,7 @@ DEPEND="
 	x264? ( media-libs/x264:=[${MULTILIB_USEDEP}] )
 	x265? ( media-libs/x265:=[${MULTILIB_USEDEP}] )
 "
+# 	uvg266? ( media-libs/uvg266:=[${MULTILIB_USEDEP}] )
 # 	vvdec? ( >=media-libs/vvdec-3.0.0:=::guru[${MULTILIB_USEDEP}] )
 # 	vvenc? ( media-libs/vvenc:=::guru[${MULTILIB_USEDEP}] )
 RDEPEND="${DEPEND}"
@@ -87,6 +88,7 @@ multilib_src_configure() {
 		-DWITH_RAV1E=$(multilib_native_usex rav1e)
 		-DWITH_SvtEnc=$(usex svt-av1)
 		-DWITH_LIBSHARPYUV=$(usex webp)
+		# -DWITH_UVG266=$(usex uvg266) # uvg266 not yet packaged
 		# -DWITH_VVDEC=$(usex vvdec) # vvdec not yet packaged, in ::guru
 		# -DWITH_VVENC=$(usex vvenc) # vvenc not yet packaged, in ::guru
 		-DWITH_X264=$(usex x264)
