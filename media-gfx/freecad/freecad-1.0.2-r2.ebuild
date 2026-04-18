@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -95,7 +95,7 @@ RDEPEND="
 		$(python_gen_cond_dep '
 			dev-python/matplotlib[${PYTHON_USEDEP}]
 			>=dev-python/pivy-0.6.5[${PYTHON_USEDEP}]
-			dev-python/pyside:6=[uitools(-),gui,svg,${PYTHON_USEDEP}]
+			>=dev-python/pyside-6.10.1-r5:6=[uitools(-),gui,svg,${PYTHON_USEDEP}]
 		' )
 		virtual/opengl
 		spacenav? ( dev-libs/libspnav[X?] )
@@ -142,6 +142,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-1.0.2-pybind11-latent-slots-macro-conflicts-with-Qt.patch" # fixed in pybind-3.0.1
 	"${DISTDIR}/${PN}-20710.patch" # DESTDIR in env
 	"${DISTDIR}/${PN}-21433.patch" # FindHDF5 fails to find HDF5 after a failing pkg_search_module
+	"${FILESDIR}"/${P}-boost-1.89.patch # bug 969041
 )
 
 DOCS=( CODE_OF_CONDUCT.md README.md )
