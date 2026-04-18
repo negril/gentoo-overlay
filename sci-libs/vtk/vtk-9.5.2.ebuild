@@ -20,27 +20,38 @@ MY_PV="$(ver_cut 1-2)"
 
 DESCRIPTION="The Visualization Toolkit"
 HOMEPAGE="https://www.vtk.org/"
-SRC_URI="
-	https://www.vtk.org/files/release/${MY_PV}/VTK-${PV}.tar.gz
-	doc? (
-		https://www.vtk.org/files/release/${MY_PV}/vtkDocHtml-${PV}.tar.gz
-	)
-	examples? (
-		https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
-		https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
-	)
-	test? (
-		https://www.vtk.org/files/release/${MY_PV}/VTKData-${PV}.tar.gz
-		https://www.vtk.org/files/release/${MY_PV}/VTKDataFiles-${PV}.tar.gz
-		https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
-		https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
-	)
-"
-S="${WORKDIR}/VTK-${PV}"
+
+if [[ ${PV} = *9999* ]] ; then
+	inherit git-r3
+
+	EGIT_REPO_URI="
+		https://github.com/Kitware/VTK.git
+		https://gitlab.kitware.com/vtk/vtk.git
+	"
+else
+	SRC_URI="
+		https://www.vtk.org/files/release/${MY_PV}/VTK-${PV}.tar.gz
+		doc? (
+			https://www.vtk.org/files/release/${MY_PV}/vtkDocHtml-${PV}.tar.gz
+		)
+		examples? (
+			https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
+			https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
+		)
+		test? (
+			https://www.vtk.org/files/release/${MY_PV}/VTKData-${PV}.tar.gz
+			https://www.vtk.org/files/release/${MY_PV}/VTKDataFiles-${PV}.tar.gz
+			https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
+			https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
+		)
+	"
+	S="${WORKDIR}/VTK-${PV}"
+	KEYWORDS="~amd64 ~arm ~arm64 ~x86"
+fi
+
 
 LICENSE="BSD LGPL-2"
 SLOT="0/${MY_PV}"
-KEYWORDS="~amd64 ~arm ~arm64 ~x86"
 
 # TODO: Like to simplify these. Mostly the flags related to Groups.
 IUSE="
@@ -956,30 +967,28 @@ src_test() {
 		# don't work at all
 		REALLY_BAD_TESTS=(
 			# (Failed)
-			"VTK::ChartsCoreCxx-TestLinePlot3D$"
-			"VTK::CommonDataModelCxx-TestHyperTreeGridGeometricLocator$"
-			"VTK::FiltersCoreCxx-TestImplicitPolyDataDistanceCube$"
-			"VTK::FiltersCorePython-TestSphereTreeFilter$"
-			"VTK::FiltersFlowPathsCxx-TestEvenlySpacedStreamlines2D$"
-			"VTK::FiltersFlowPathsCxx-TestParticleTracers$"
-			"VTK::FiltersGeneralCxx-TestContourTriangulatorHoles$"
-			"VTK::IOExportGL2PSCxx-TestGL2PSBillboardTextActor3D"
-			"VTK::IOExportGL2PSCxx-TestGL2PSExporterRaster"
-			"VTK::IOExportGL2PSCxx-TestGL2PSExporterVolumeRaster"
-			"VTK::IOExportGL2PSCxx-TestGL2PSLabeledDataMapper"
-			"VTK::IOExportGL2PSCxx-TestGL2PSTextActor"
-			"VTK::IOExportGL2PSCxx-TestGL2PSTextMapper"
-			"VTK::RenderingCorePython-pickImageData$"
-			"VTK::RenderingExternalCxx-TestGLUTRenderWindow$"
-			"VTK::RenderingFreeTypeFontConfigCxx-TestSystemFontRendering$"
-			"VTK::RenderingOpenGL2Cxx-TestGlyph3DMapperPickability$"
-
-			# (Failed)
+			"^VTK::ChartsCoreCxx-TestLinePlot3D$"
+			"^VTK::CommonDataModelCxx-TestHyperTreeGridGeometricLocator$"
+			"^VTK::FiltersCoreCxx-TestImplicitPolyDataDistanceCube$"
+			"^VTK::FiltersCorePython-TestSphereTreeFilter$"
+			"^VTK::FiltersFlowPathsCxx-TestEvenlySpacedStreamlines2D$"
+			"^VTK::FiltersFlowPathsCxx-TestParticleTracers$"
+			"^VTK::FiltersGeneralCxx-TestContourTriangulatorHoles$"
+			"^VTK::IOExportGL2PSCxx-TestGL2PSBillboardTextActor3D"
+			"^VTK::IOExportGL2PSCxx-TestGL2PSExporterRaster"
+			"^VTK::IOExportGL2PSCxx-TestGL2PSExporterVolumeRaster"
+			"^VTK::IOExportGL2PSCxx-TestGL2PSLabeledDataMapper"
+			"^VTK::IOExportGL2PSCxx-TestGL2PSTextActor"
+			"^VTK::IOExportGL2PSCxx-TestGL2PSTextMapper"
+			"^VTK::RenderingCorePython-pickImageData$"
+			"^VTK::RenderingExternalCxx-TestGLUTRenderWindow$"
+			"^VTK::RenderingFreeTypeFontConfigCxx-TestSystemFontRendering$"
+			"^VTK::RenderingOpenGL2Cxx-TestGlyph3DMapperPickability$"
 			"^VTK::FiltersParallelDIY2Cxx-MPI-TestProbeLineFilter$"
 
 			# (Subprocess aborted)
 			# File missing? ExternalData/Testing/Data/MotionFX/position_file/Sprocket_New.prn
-			"VTK::IOMotionFXCxx-TestMotionFXCFGReaderPositionFile$"
+			"^VTK::IOMotionFXCxx-TestMotionFXCFGReaderPositionFile$"
 		)
 
 		# don't work in src_test but when on their own
@@ -1252,10 +1261,10 @@ src_test() {
 		if use vtkm && use cuda; then
 			REALLY_BAD_TESTS+=(
 				# (Subprocess aborted)
-				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMAbort$" #
-				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMClip$" #
-				"VTK::AcceleratorsVTKmFiltersCxx-TestVTKMClipWithImplicitFunction$" #
-				"VTK::AcceleratorsVTKmFiltersPython-TestVTKMSlice$" #
+				"^VTK::AcceleratorsVTKmFiltersCxx-TestVTKMAbort$"
+				"^VTK::AcceleratorsVTKmFiltersCxx-TestVTKMClip$"
+				"^VTK::AcceleratorsVTKmFiltersCxx-TestVTKMClipWithImplicitFunction$"
+				"^VTK::AcceleratorsVTKmFiltersPython-TestVTKMSlice$"
 
 				# cuda-13?
 				"^VTK::AcceleratorsVTKmFiltersCxx-TestVTKMSlice$"
