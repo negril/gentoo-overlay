@@ -88,6 +88,7 @@ multilib_src_configure() {
 		# -DWITH_UVG266=$(usex uvg266) # uvg266 not yet packaged
 		# -DWITH_VVDEC=$(usex vvdec) # vvdec not yet packaged, in ::guru
 		# -DWITH_VVENC=$(usex vvenc) # vvenc not yet packaged, in ::guru
+		-DWITH_WEBCODECS="no" # requires emscripten "$(usex de265)"
 		-DWITH_X264=$(usex x264)
 		-DWITH_X265=$(usex x265)
 		-DWITH_KVAZAAR=$(usex kvazaar)
