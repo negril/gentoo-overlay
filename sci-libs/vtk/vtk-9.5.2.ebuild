@@ -7,7 +7,7 @@ EAPI=8
 # - add USE flag for remote modules? Those modules can be downloaded properly before building.
 # - vtkm was renamed to viskores. Rename once usemove is implemented.
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..13} )
 PYTHON_REQ_USE="tk?"
 
 WEBAPP_OPTIONAL=yes
@@ -48,7 +48,6 @@ else
 	S="${WORKDIR}/VTK-${PV}"
 	KEYWORDS="~amd64 ~arm ~arm64 ~x86"
 fi
-
 
 LICENSE="BSD LGPL-2"
 SLOT="0/${MY_PV}"
@@ -1432,6 +1431,6 @@ pkg_prerm() {
 
 pkg_info() {
 	if [[ -v DISPLAY ]]; then
-		nonfatal "${ESYSROOT}/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
+		nonfatal "/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
 	fi
 }

@@ -7,7 +7,7 @@ EAPI=8
 # - add USE flag for remote modules? Those modules can be downloaded properly before building.
 # - vtkm was renamed to viskores. Rename once usemove is implemented.
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..13} )
 PYTHON_REQ_USE="tk?"
 
 WEBAPP_OPTIONAL=yes
@@ -49,7 +49,6 @@ else
 	S="${WORKDIR}/VTK-${PV}"
 	KEYWORDS="~amd64 ~arm ~arm64 ~x86"
 fi
-
 
 LICENSE="BSD LGPL-2"
 SLOT="0/${MY_PV}"
@@ -142,7 +141,9 @@ RDEPEND="
 	python? (
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
-			<dev-python/numpy-2.4[${PYTHON_USEDEP}]
+			dev-python/cftime[${PYTHON_USEDEP}]
+			dev-python/numpy[${PYTHON_USEDEP}]
+			dev-python/xarray[${PYTHON_USEDEP}]
 			mpi? ( dev-python/mpi4py[${PYTHON_USEDEP}] )
 			rendering? ( dev-python/matplotlib[${PYTHON_USEDEP}] )
 		')
@@ -450,6 +451,8 @@ src_prepare() {
 #	VTK_BUILD_SCALED_SOA_ARRAYS
 #	VTK_DISPATCH_{AOS,SOA,TYPED}_ARRAYS
 src_configure() {
+	filter-lto
+
 	local mycmakeargs=(
 		-DCMAKE_DISABLE_FIND_PACKAGE_Git="yes"
 		-DVTK_GIT_DESCRIBE="v${PV}"
@@ -1318,8 +1321,8 @@ src_test() {
 	local -x CXX="$(tc-getCXX)"
 
 	myctestargs=(
-		# -j1
-		# # -N
+		-j1
+		# -N
 		# --test-load 16
 		# --test-timeout 300
 		--output-on-failure
@@ -1435,6 +1438,6 @@ pkg_prerm() {
 
 pkg_info() {
 	if [[ -v DISPLAY ]]; then
-		nonfatal "${ESYSROOT}/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
+		nonfatal "/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
 	fi
 }
