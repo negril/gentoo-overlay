@@ -1,13 +1,15 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..13} )
 
 # https://github.com/FreeCAD/FreeCAD/issues/19066
 # The added asserts break on mem leaks, so tests fail.
 # PYTHON_REQ_USE="-debug"
+
+# pyNastran missing
 
 inherit check-reqs cmake cuda edo flag-o-matic optfeature python-single-r1 qmake-utils toolchain-funcs xdg virtualx
 
@@ -19,14 +21,12 @@ MY_PN=FreeCAD
 if [[ ${PV} == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/${MY_PN}/${MY_PN}.git"
-	EGIT_SUBMODULES=( 'src/Mod/AddonManager' )
-	S="${WORKDIR}/freecad-${PV}"
+	EGIT_SUBMODULES=( '-*' )
 else
 	SRC_URI="
-		https://github.com/${MY_PN}/${MY_PN}/archive/refs/tags/${PV}.tar.gz -> ${P}.tar.gz
+		https://github.com/${MY_PN}/${MY_PN}/releases/download/${PV}/freecad_source_${PV}.tar.gz
 	"
 	KEYWORDS="~amd64"
-	S="${WORKDIR}/FreeCAD-${PV}"
 fi
 
 # code is licensed LGPL-2
@@ -72,7 +72,7 @@ RDEPEND="
 	virtual/zlib:=
 	$(python_gen_cond_dep '
 		dev-python/numpy[${PYTHON_USEDEP}]
-		dev-python/pybind11[${PYTHON_USEDEP}]
+		>=dev-python/pybind11-3.0.1[${PYTHON_USEDEP}]
 		dev-python/pycxx[${PYTHON_USEDEP}]
 		dev-python/pyyaml[${PYTHON_USEDEP}]
 	')
@@ -118,6 +118,12 @@ DEPEND="${RDEPEND}
 		$(python_gen_cond_dep '
 			sci-libs/vtk[python,${PYTHON_SINGLE_USEDEP}]
 		' )
+		fem? (
+			sci-libs/calculix-ccx
+			$(python_gen_cond_dep '
+				sci-libs/gmsh[${PYTHON_USEDEP}]
+			' )
+		)
 		gui? (
 			$(python_gen_cond_dep '
 				dev-python/pyside:6[tools(-),${PYTHON_USEDEP}]
@@ -139,11 +145,11 @@ BDEPEND="
 "
 
 PATCHES=(
-	"${FILESDIR}"/${PN}-9999-Gentoo-specific-don-t-check-vcs.patch
+	"${FILESDIR}/${PN}-9999-Gentoo-specific-don-t-check-vcs.patch"
 	"${FILESDIR}"/${PN}-9999-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch
 	"${FILESDIR}/${PN}-1.0.0-r4-error-cannot-convert-bool-to-App-DocumentInitFlags.patch"
-	"${FILESDIR}/${PN}-1.0.2-pybind11-latent-slots-macro-conflicts-with-Qt.patch" # fixed in pybind-3.0.1
 	"${FILESDIR}/${PN}-9999-fastsignals-disconnect.patch"
+	"${FILESDIR}/${PN}-1.1.0-boost_system.patch"
 )
 
 DOCS=( CODE_OF_CONDUCT.md README.md )
@@ -259,6 +265,22 @@ pkg_setup() {
 	python-single-r1_pkg_setup
 }
 
+src_unpack() {
+	if [[ ${PV} == *9999* ]]; then
+		# only fetch/unpack if used
+		if use addonmgr; then
+			EGIT_SUBMODULES+=( 'src/Mod/AddonManager' )
+		fi
+
+		git-r3_src_unpack
+	else
+		# release archive does not contain a top-level directory...
+		mkdir -p "${S}" || die
+		cd "${S}" || die
+		unpack ${A}
+	fi
+}
+
 src_prepare() {
 	# deprecated in python-3.11 removed in python-3.13
 	sed -e '/import imghdr/d' -i src/Mod/CAM/CAMTests/TestCAMSanity.py || die
@@ -278,7 +300,7 @@ src_prepare() {
 
 	# removed bundled pycxx
 	if [[ ${PV} != *9999* ]]; then
-		rm -r src/CXX || die "remove bundled pycxx"
+		rm -r src/3rdParty/PyCXX || die "remove bundled pycxx"
 	fi
 
 	cmake_src_prepare
@@ -300,14 +322,6 @@ src_configure() {
 		-DFREECAD_USE_CCACHE="no" # Do not use CCache
 
 		"$(cmake_use_find_package "spacenav" "Spnav")"
-
-		-DCMAKE_POLICY_DEFAULT_CMP0144="OLD" # FLANN_ROOT
-		-DCMAKE_POLICY_DEFAULT_CMP0167="OLD" # FindBoost
-		-DCMAKE_POLICY_DEFAULT_CMP0175="OLD" # add_custom_command
-		-DCMAKE_POLICY_DEFAULT_CMP0153="OLD" # exec_program
-
-		-DPYCXX_INCLUDE_DIR="${ESYSROOT}/usr/include/${PYTHON_SINGLE_TARGET/_/.}"
-		-DPYCXX_SOURCE_DIR="${ESYSROOT}/usr/share/${PYTHON_SINGLE_TARGET/_/.}/CXX"
 
 		-DBUILD_DESIGNER_PLUGIN=$(usex designer)
 		-DBUILD_FORCE_DIRECTORY=ON				# force building in a dedicated directory
@@ -400,6 +414,9 @@ src_configure() {
 
 			-DPACKAGE_WCREF="${PVR} (gentoo)"
 			-DPACKAGE_WCURL="git://github.com/FreeCAD/FreeCAD.git ${PV}"
+
+			-DPYCXX_INCLUDE_DIRS="${ESYSROOT}/usr/include/${PYTHON_SINGLE_TARGET/_/.}"
+			-DPYCXX_SOURCE_DIR="${ESYSROOT}/usr/share/${PYTHON_SINGLE_TARGET/_/.}/CXX"
 		)
 	fi
 
@@ -447,18 +464,26 @@ src_configure() {
 # for two reasons:
 # 1. It works out of the box with USE=-gui as well, not needing a guard
 # 2. We don't need virtualx.eclass and its dependencies
-# The environment variables are needed, so that FreeCAD knows
-# where to save its temporary files, and where to look and write its
-# configuration. Without those, there is a sandbox violation, when it
-# tries to create /var/lib/portage/home/.FreeCAD directory.
 src_test() {
-	cd "${BUILD_DIR}" || die
+	# Fails because translated names are used otherwise
+	# Why LANGUAGE?
+	local LANGUAGE="en"
 
-	[[ -c "/dev/udmabuf" ]] && addwrite "/dev/udmabuf"
+	# The environment variables are needed, so that FreeCAD knows
+	# where to save its temporary files, and where to look and write its
+	# configuration. Without those, there is a sandbox violation, when it
+	# tries to create /var/lib/portage/home/.FreeCAD directory.
+	local -x FREECAD_USER_HOME="${T}/home"
+	local -x FREECAD_USER_DATA="${T}/data"
+	local -x FREECAD_USER_TEMP="${T}/temp"
+
+	mkdir -p "${FREECAD_USER_HOME}" "${FREECAD_USER_DATA}" "${FREECAD_USER_TEMP}" || die
+
+	cd "${BUILD_DIR}" || die
 
 	if use bim; then
 		# No module named 'ifcopenshell' #940465
-		rm "${BUILD_DIR}/Mod/BIM/nativeifc/ifc_performance_test.py" || die
+		rm "Mod/BIM/nativeifc/ifc_performance_test.py" || die
 	fi
 
 	if use cam; then
@@ -467,10 +492,6 @@ src_test() {
 		sed -e '/test47/a \        return' -i "Mod/CAM/CAMTests/TestPathOpUtil.py" || die
 	fi
 
-	local -x EPYTEST_IGNORE=(
-		"Mod/BIM/nativeifc/ifc_performance_test.py"
-	)
-
 	if ! use openscad ; then
 		EPYTEST_IGNORE+=(
 			"Mod/OpenSCAD/OpenSCADTest/app/test_importCSG.py"
@@ -478,107 +499,149 @@ src_test() {
 		)
 	fi
 
-	# local -x EPYTEST_DESELECT=(
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_check_python_version_bad"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_check_python_version_bad"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_dependency_failure_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_failure_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_handle_disallowed_python"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_install"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_no_pip_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_no_python_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_report_missing_workbenches_multiple"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_report_missing_workbenches_single"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_installer_gui.py::TestInstallerGui::test_success_dialog"
-	#
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_confirmation_dialog_cancel"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_confirmation_dialog_yes"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_failure_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_progress_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_success_dialog"
-	# 	"Mod/AddonManager/AddonManagerTest/gui/test_uninstaller_gui.py::TestUninstallerGUI::test_timer_launches_progress_dialog"
-	# )
+	# # TODO coin? pivy?
+	# sed \
+	# 	-e '/self.assertTrue(pc.getTriangleCount/i \        print(pc.getTriangleCount())' \
+	# 	-e '/self.assertTrue(pc.getTriangleCount/s/self/# /' \
+	# 	-i Mod/Mesh/MeshTestsApp.py || die
 
-	local -x CMAKE_SKIP_TESTS=(
-		"^ConstraintPointsAccess."
+	local -x EPYTEST_IGNORE=(
+		"Mod/BIM/nativeifc/ifc_performance_test.py"
 	)
 
-	local -x FREECAD_USER_HOME="${HOME}"
-	local -x FREECAD_USER_DATA="${T}/data"
-	local -x FREECAD_USER_TEMP="${T}/temp"
-
-	mkdir -p "${FREECAD_USER_DATA}" "${FREECAD_USER_TEMP}" || die
+	local CMAKE_SKIP_TESTS=(
+		"^TestLineFormat.setQColorKeepsOpaqueColorsOpaque$"
+		"^TestLineFormat.setQColorPreservesAlphaValue$"
+	)
 
 	local failed=()
-	local run
 
-	# nonfatal \
-	# edo "${BUILD_DIR}/bin/FreeCADCmd" \
-	# 	--set-config AppHomePath="${BUILD_DIR}/" \
-	# 	--dump-config &> "${T}/FreeCADCmd_config.log"
+	run_freecad() {
+		if [[ $# -ne 1 && $# -ne 2  ]]; then
+			eerror "$0: usage <cmd> [<runner>]"
+			die "$0: usage <cmd> <runner>"
+		fi
 
-	if \
-		! nonfatal \
-		edo \
-		"${BUILD_DIR}/bin/FreeCADCmd" \
-			--run-test 0 \
-			--set-config AppHomePath="${BUILD_DIR}/" \
-			--log-file "${T}/FreeCADCmd.log"; then
-		ret=$?
-		eerror "FreeCADCmd failed $ret"
-		failed+=( "FreeCADCmd" )
-	fi
+		local cmd="${1}"
+		local run="${2}"
 
-	if use gui; then
-# 		local -x QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
-
-# 		virtx "${BUILD_DIR}/bin/FreeCAD" --dump-config &> "${T}/FreeCAD_config.log"
-
-		addpredict "/dev/char/"
-		addwrite "/dev/dri/renderD128"
-		addwrite "/dev/dri/card0"
-
-		[[ -c "/dev/nvidiactl" ]] && addwrite "/dev/nvidiactl"
-		[[ -c "/dev/nvidia-uvm" ]] && addwrite "/dev/nvidia-uvm"
-		[[ -c "/dev/nvidia-uvm-tools" ]] && addwrite "/dev/nvidia-uvm-tools"
-		[[ -c "/dev/nvidia0" ]] && addwrite "/dev/nvidia0"
-
-		[[ -c "/dev/udmabuf" ]] && addwrite "/dev/udmabuf"
-
-		# QT_QPA_PLATFORM="offscreen" \
-		# nonfatal \
-		# virtx \
-		# "${BUILD_DIR}/bin/FreeCAD" \
-		# 	--dump-config &> "${T}/FreeCAD_config.log"
+		if use debug; then
+			nonfatal \
+			${run} \
+			edo \
+			"${BUILD_DIR}/bin/${cmd}" \
+				--set-config AppHomePath="${BUILD_DIR}/" \
+				--dump-config &> "${T}/${cmd}_config.log"
+		fi
 
 		if \
 			! nonfatal \
-			virtx \
+			${run} \
 			edo \
-			"${BUILD_DIR}/bin/FreeCAD" \
+			"${BUILD_DIR}/bin/${cmd}" \
 				--run-test 0 \
 				--set-config AppHomePath="${BUILD_DIR}/" \
-				--log-file "${T}/FreeCAD.log" ; then
+				--log-file "${T}/${cmd}.log"
+		then
 			ret=$?
-			eerror "FreeCAD failed $ret"
-			failed+=( "FreeCAD" )
+			eerror "${cmd} failed ${ret}"
+			die "${cmd} failed ${ret}"
+			failed+=( "${cmd}" )
+		fi
+	}
+
+	if ! use gui; then
+		run_freecad "FreeCADCmd"
+	else
+		run="virtx"
+
+		addwrite "/dev/dri/renderD128"
+		addwrite "/dev/dri/card0"
+
+		[[ -c "/dev/udmabuf" ]] && addwrite "/dev/udmabuf"
+
+		if [[ -c "/dev/nvidiactl" ]]; then
+			addwrite "/dev/nvidiactl"
+			addpredict "/dev/char/"
+			[[ -c "/dev/nvidia-uvm" ]] && addwrite "/dev/nvidia-uvm"
+			[[ -c "/dev/nvidia-uvm-tools" ]] && addwrite "/dev/nvidia-uvm-tools"
+			[[ -c "/dev/nvidia0" ]] && addwrite "/dev/nvidia0"
 		fi
 
-		run="virtx"
+		# run_freecad "FreeCAD" virtx
+
+		# this runs only the gui tests
+		if \
+			! nonfatal \
+				virtx \
+				${PYTHON} "${S}/.github/scripts/run_gui_tests.py" "${BUILD_DIR}"
+		then
+			ret=$?
+			eerror "$run_gui_tests.py failed ${ret}"
+			die "run_gui_tests.py failed ${ret}"
+			failed+=( "run_gui_tests.py" )
+		fi
 	fi
 
 	if [[ ${PV} == *9999* ]]; then
+		# # requires ENABLE_DEVELOPER_TESTS
+		# if [[ ${PV} == *9999* ]]; then
+		# 	runAllTests() {
+		# 		mkdir -p "${T}/reports" || die
+		# 		local CPPTest
+		# 		local CPPTests=(
+		# 			Assembly
+		# 			App
+		# 			Base
+		# 			Gui
+		# 			Material
+		# 			# Material # Measure
+		# 			Mesh
+		# 			# Mesh # MeshPart
+		# 			Misc
+		# 			Part
+		# 			PartDesign
+		# 			Points
+		# 			Sketcher
+		# 			# Sketcher # Spreadsheet
+		# 			Start
+		# 		)
+		# 		for CPPTest in "${CPPTests[@]}"; do
+		# 			if ! nonfatal \
+		# 				edo \
+		# 					"${BUILD_DIR}/tests/${CPPTest}_tests_run" \
+		# 					--gtest_output="json:${T}/reports/$(basename "${CPPTest}")_gtest_results.json"
+		# 			then
+		# 				ret=$?
+		# 				eerror "${CPPTest} failed ${ret}"
+		# 				die "${CPPTest} failed ${ret}"
+		# 				failed+=( "${CPPTest}" )
+		# 			fi
+		# 		done
+		# 	}
+		# 	${run} runAllTests
+		# fi
+
+		local myctestargs=(
+			# for YamlParameterSourceTest
+			-j1
+		)
 		if ! nonfatal \
-			"${run}" \
-			cmake_src_test; then
-			eerror "cmake failed $?"
-			failed+=( "cmake" )
+			${run} \
+			cmake_src_test
+		then
+			ret=$?
+			eerror "cmake_src_test failed ${ret}"
+			die "cmake_src_test failed ${ret}"
+			failed+=( "cmake_src_test" )
 		fi
 	fi
 
 	if [[ "${#failed[@]}" -gt 0 ]]; then
 		eerror "Tests ${failed[*]} failed"
-		if ! use debug && [[ ${PV} != *9999* ]]; then
+		# Tests _will_ fail with USE=debug as the reference values change
+		# We want test failures to be fatal for keyworded versions
+		if ! use debug || [[ ${PV} != *9999* ]]; then
 			die "${failed[@]}"
 		fi
 	fi
@@ -589,7 +652,7 @@ src_install() {
 
 	if use gui; then
 		newbin - FreeCAD <<- _EOF_
-			#!/bin/sh
+			#!/usr/bin/env sh
 			# https://github.com/coin3d/coin/issues/451
 			: "\${QT_QPA_PLATFORM:=xcb}"
 			export QT_QPA_PLATFORM
@@ -619,19 +682,25 @@ src_install() {
 pkg_postinst() {
 	xdg_pkg_postinst
 
-	einfo "You can load a lot of additional workbenches using the integrated"
-	einfo "AddonManager."
+	einfo ""
+	einfo "You can load a lot of additional workbenches using the integrated AddonManager."
+	einfo ""
+	einfo "There are a lot of additional tools, for which FreeCAD has builtin support."
+	einfo "Some of them are available in Gentoo."
+	einfo "Take a look at:"
+	einfo "  https://wiki.freecad.org/Installing_additional_components"
+	einfo ""
 
-	einfo "There are a lot of additional tools, for which FreeCAD has builtin"
-	einfo "support. Some of them are available in Gentoo. Take a look at"
-	einfo "https://wiki.freecad.org/Installing_additional_components"
 	optfeature_header "External programs used by FreeCAD"
 	optfeature "dependency graphs" media-gfx/graphviz
 	optfeature "importing and exporting 2D AutoCAD DWG files" media-gfx/libredwg
 	optfeature "importing OpenSCAD files, Mesh booleans" media-gfx/openscad
-	use bim && optfeature "working with COLLADA documents" dev-python/pycollada
+	if use bim; then
+		optfeature "working with COLLADA documents" dev-python/pycollada
+	fi
 	if use fem || use mesh; then
 		optfeature "mesh generation" sci-libs/gmsh
+		optfeature "mesh solver" sci-libs/calculix-ccx
 	fi
 
 	if use python_single_target_python3_13; then
