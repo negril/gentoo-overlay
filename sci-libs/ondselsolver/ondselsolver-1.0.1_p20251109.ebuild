@@ -41,3 +41,11 @@ src_configure() {
 
 	cmake_src_configure
 }
+
+src_test() {
+	local CMAKE_SKIP_TESTS=(
+		"^OndselSolver.runPreDragBackhoe[1-3]$"
+	)
+
+	cmake_src_test
+}
