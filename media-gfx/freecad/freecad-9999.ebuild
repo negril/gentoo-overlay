@@ -111,7 +111,7 @@ RDEPEND+="
 	dev-libs/icu:=
 "
 DEPEND="${RDEPEND}
-	>=dev-cpp/eigen-3.3.1:3
+	dev-cpp/eigen:=
 	dev-cpp/ms-gsl
 	test? (
 		$(python_gen_impl_dep '-debug')
