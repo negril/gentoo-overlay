@@ -10,6 +10,14 @@
 # tests are finicky for 3/3.4
 dev-cpp/eigen:3/3.4 test
 
+# Paul Zander <negril.nx+gentoo@gmail.com> (2026-03-13)
+# opengl is broken
+# pastix is broken, metis requires pastix
+# blas and lapack are poorly maintained
+# dev-cpp/eigen blas lapack
+dev-cpp/eigen opengl
+dev-cpp/eigen metis pastix
+
 # Paul Zander <negril.nx+gentoo@gmail.com> (2025-12-17)
 # no dev-util/emscripten
 media-libs/draco javascript
