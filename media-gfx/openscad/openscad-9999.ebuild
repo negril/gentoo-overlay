@@ -94,7 +94,7 @@ RDEPEND="
 "
 DEPEND="
 	${RDEPEND}
-	dev-cpp/eigen:3
+	dev-cpp/eigen:3=
 "
 BDEPEND="
 	app-alternatives/yacc
