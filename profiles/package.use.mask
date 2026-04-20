@@ -18,6 +18,10 @@ dev-cpp/eigen:3/3.4 test
 dev-cpp/eigen opengl
 dev-cpp/eigen metis pastix
 
+# Paul Zander <negril.nx+gentoo@gmail.com> (2026-03-13)
+# uses MeDiPack
+~sci-libs/adolc-9999 -mpi
+
 # Paul Zander <negril.nx+gentoo@gmail.com> (2025-12-17)
 # no dev-util/emscripten
 media-libs/draco javascript
