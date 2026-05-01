@@ -96,7 +96,6 @@ RDEPEND="
 	dev-cpp/eigen:=
 	dev-cpp/nlohmann_json
 	dev-db/sqlite:3
-	dev-libs/double-conversion:=
 	dev-libs/expat
 	dev-libs/jsoncpp:=
 	>=dev-libs/libfmt-8.1.1:=
@@ -166,7 +165,7 @@ RDEPEND="
 	tbb? ( dev-cpp/tbb:= )
 	tk? ( dev-lang/tk:= )
 	truetype? ( media-libs/fontconfig )
-	video_cards_nvidia? ( x11-drivers/nvidia-drivers[tools,static-libs] )
+	video_cards_nvidia? ( x11-drivers/nvidia-drivers )
 	views? (
 		x11-libs/libX11
 	)
@@ -178,6 +177,8 @@ RDEPEND="
 	)
 	web? ( ${WEBAPP_DEPEND} )
 "
+	# video_cards_nvidia? ( x11-drivers/nvidia-drivers[tools,static-libs] )
+
 
 # we need OpenGL 3.2 or later -> llvmpipe -> mesa[llvm]
 DEPEND="
@@ -354,6 +355,7 @@ vtk_add_sandbox() {
 			# # "/dev/nvidia-caps-imex-channels/channel%d"
 			# "/dev/nvidia-caps-imex-channels/"
 		)
+
 		addpredict "/dev/char/"
 	fi
 
@@ -514,7 +516,6 @@ src_configure() {
 		-DVTK_MODULE_ENABLE_VTK_cgns="$(usex cgns "YES" "NO")"
 		# -DVTK_MODULE_ENABLE_VTK_cli11
 		# -DVTK_MODULE_ENABLE_VTK_dy2
-		-DVTK_MODULE_ENABLE_VTK_doubleconversion="YES"
 		-DVTK_MODULE_ENABLE_VTK_eigen="YES"
 		# -DVTK_MODULE_ENABLE_VTK_exodusII
 		-DVTK_MODULE_ENABLE_VTK_expat="YES"
@@ -619,8 +620,6 @@ src_configure() {
 
 	if use cuda; then
 		cuda_add_sandbox -w
-		addwrite "/proc/self/task"
-		addpredict "/dev/char/"
 
 		if ! test -w /dev/nvidiactl; then
 			# eqawarn "Can't access the GPU at /dev/nvidiactl."
@@ -651,9 +650,9 @@ src_configure() {
 			)
 		fi
 
-		mycmakeargs+=(
-			-DCMAKE_CUDA_FLAGS_RELWITHDEBINFO="-DNDEBUG"
-		)
+		# mycmakeargs+=(
+		# 	-DCMAKE_CUDA_FLAGS_RELWITHDEBINFO="-DNDEBUG"
+		# )
 	fi
 
 	if use debug; then
@@ -963,6 +962,18 @@ src_test() {
 
 	# local -x VTK_SMP_BACKEND_IN_USE="STDThread"
 
+	# see VTK_SMP_IMPLEMENTATION_TYPE
+	if use tbb; then
+		local -x VTK_SMP_BACKEND_IN_USE="TBB"
+	# # FIXME Times out under openmp
+	# elif use openmp; then
+	# 	local -x VTK_SMP_BACKEND_IN_USE="OpenMP"
+	elif use threads; then
+		local -x VTK_SMP_BACKEND_IN_USE="STDThread"
+	else
+		local -x VTK_SMP_BACKEND_IN_USE="Sequential"
+	fi
+
 	local -a CMAKE_SKIP_TESTS
 
 	if [[ "${CMAKE_RUN_OPTIONAL_TESTS:=no}" != "yes" ]]; then
@@ -978,9 +989,6 @@ src_test() {
 			"^VTK::FiltersFlowPathsCxx-TestEvenlySpacedStreamlines2D$"
 			"^VTK::FiltersFlowPathsCxx-TestParticleTracers$"
 			"^VTK::FiltersGeneralCxx-TestContourTriangulatorHoles$"
-			"^VTK::FiltersParallelDIY2Cxx-MPI-TestProbeLineFilter$"
-			"^VTK::FiltersStatisticsCxx-TestLengthDistribution$"
-			"^VTK::IOExportCxx-TestVRMLExporterCellData$"
 			"^VTK::IOExportGL2PSCxx-TestGL2PSBillboardTextActor3D"
 			"^VTK::IOExportGL2PSCxx-TestGL2PSExporterRaster"
 			"^VTK::IOExportGL2PSCxx-TestGL2PSExporterVolumeRaster"
@@ -992,20 +1000,26 @@ src_test() {
 			"^VTK::RenderingFreeTypeFontConfigCxx-TestSystemFontRendering$"
 			"^VTK::RenderingOpenGL2Cxx-TestGlyph3DMapperPickability$"
 
-			# (Timeout)
-			"^VTK::FiltersSourcesCxx-MPI-TestRandomHyperTreeGridSourceMPI3$"
+			# (Failed)
+			"^VTK::FiltersParallelDIY2Cxx-MPI-TestProbeLineFilter$"
 
 			# (Subprocess aborted)
 			# File missing? ExternalData/Testing/Data/MotionFX/position_file/Sprocket_New.prn
-			"^VTK::IOMotionFXCxx-TestMotionFXCFGReaderPositionFile$"
+			"VTK::IOMotionFXCxx-TestMotionFXCFGReaderPositionFile$"
 		)
 
 		# don't work in src_test but when on their own
 		BAD_TESTS=(
 			# (Failed)
 			"^VTK::FiltersCoreCxx-TestQuadricDecimationMaximumError$"
+			"^VTK::GUISupportQtCxx-TestQVTKOpenGLNativeWidgetWithChartHistogram2D$"
 			"^VTK::GUISupportQtCxx-TestQVTKOpenGLStereoWidgetWithDisabledInteractor$"
+			"^VTK::GUISupportQtCxx-TestQVTKOpenGLWidgetWithChartHistogram2D$"
 			"^VTK::GUISupportQtCxx-TestQVTKOpenGLWindowWithDisabledInteractor$"
+			"^VTK::GUISupportQtCxx-TestQVTKRenderWidgetWithChartHistogram2D$"
+			"^VTK::GUISupportQtQuickCxx-TestQQuickVTKItem_1$" # QT-6.10.3 maybe?
+			"^VTK::GUISupportQtQuickCxx-TestQQuickVTKItem_2$" # QT-6.10.3 maybe?
+			"^VTK::GUISupportQtQuickCxx-TestQQuickVTKItem_3$" # QT-6.10.3 maybe?
 			"^VTK::InteractionWidgetsCxx-TestFinitePlaneWidget$"
 			"^VTK::InteractionWidgetsCxx-TestResliceCursorWidget2$"
 			"^VTK::InteractionWidgetsCxx-TestResliceCursorWidget3$"
@@ -1013,7 +1027,253 @@ src_test() {
 			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperCameraShiftScale$"
 			"^VTK::RenderingOpenGL2Cxx-TestCameraShiftScale$"
 			"^VTK::RenderingOpenGL2Cxx-TestFluidMapper$"
+
+			# The following tests did not run:
+			"^VTK::RenderingCoreCxx-TestInteractorTimers$"
+
+			# The following tests FAILED:
+			# (Subprocess aborted)
+			"^VTK::CommonDataModelCxx-quadraticIntersection$"
+			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperBlockOpacities$"
+			"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperToggleScalarVisibilities$"
 		)
+
+		if use egl; then
+			REALLY_BAD_TESTS+=(
+				# The following tests did not run:
+				# (Skipped)
+				"^VTK::IOMovieCxx-TestAVIWriter$"
+				"^VTK::IOMovieCxx-TestMP4Writer$"
+			)
+		else
+			BAD_TESTS+=(
+				# (Failed)
+				# needs OSMesa or gles?
+				"^VTK::CommonDataModelCxx-TestBezier$"
+			)
+		fi
+
+		if use gles2; then
+			BAD_TESTS+=(
+				# (Failed)
+				"^VTK::RenderingVolumeOpenGL2Cxx-TestGPURayCastDepthPeelingBoxWidget$"
+				"^VTK::IOImportCxx-OBJImport-MixedOrder1$"
+				"^VTK::IOImportCxx-OBJImport-MTLwithoutTextureFile$"
+				"^VTK::GUISupportQtCxx-TestQVTKOpenGLStereoWidgetWithMSAA$"
+				"^VTK::GUISupportQtCxx-TestQVTKOpenGLNativeWidgetWithMSAA$"
+				"^VTK::GUISupportQtCxx-TestQVTKOpenGLWindowWithMSAA$"
+				"^VTK::GUISupportQtCxx-TestQVTKRenderWidgetWithMSAA$"
+				"^VTK::GUISupportQtCxx-TestQVTKOpenGLWidgetWithMSAA$"
+				"^VTK::InteractionWidgetsCxx-BoxWidget$"
+				"^VTK::InteractionWidgetsCxx-BoxWidget2$"
+				"^VTK::InteractionWidgetsCxx-TestBrokenLineWidget$"
+				"^VTK::InteractionWidgetsCxx-TestCamera3DWidget$"
+				"^VTK::InteractionWidgetsCxx-TestLightWidget$"
+				"^VTK::InteractionWidgetsCxx-TestPickingManagerSeedWidget$"
+				"^VTK::InteractionWidgetsCxx-TestSphereWidget2CenterCursor$"
+				"^VTK::InteractionWidgetsCxx-TestSphereWidgetZoomInOut$"
+				"^VTK::InteractionWidgetsCxx-TestSplineWidget$"
+				"^VTK::InteractionWidgetsCxx-TestTextRepresentationWithBorders$"
+				"^VTK::InteractionWidgetsCxx-TestDijkstraGraphGeodesicPath$"
+				"^VTK::RenderingVolumeCxx-TestGPURayCastMapperRectilinearGrid$"
+				"^VTK::RenderingAnnotationCxx-TestAxisActor2D$"
+				"^VTK::RenderingAnnotationCxx-TestCubeAxes2DMode$"
+				"^VTK::RenderingAnnotationCxx-TestPolarAxes2D$"
+				"^VTK::RenderingAnnotationCxx-TestPolarAxes2DDefault$"
+				"^VTK::RenderingAnnotationCxx-TestXYPlotActor$"
+				"^VTK::FiltersGeometryPreviewCxx-TestPointSetStreamer$"
+				"^VTK::FiltersFlowPathsCxx-TestBSPTree$"
+				"^VTK::FiltersFlowPathsCxx-TestBSPTreeWithGhostArrays$"
+				"^VTK::FiltersFlowPathsCxx-TestStreamSurface$"
+				"^VTK::FiltersFlowPathsCxx-TestVectorFieldTopology$"
+				"^VTK::FiltersFlowPathsCxx-TestVectorFieldTopologyAMR$"
+				"^VTK::FiltersModelingCxx-TestQuadRotationalExtrusion$"
+				"^VTK::FiltersModelingCxx-TestQuadRotationalExtrusionMultiBlock$"
+				"^VTK::FiltersModelingCxx-TestRotationalExtrusion$"
+				"^VTK::FiltersModelingCxx-TestRotationalExtrusion2$"
+				"^VTK::RenderingOpenGL2Cxx-TestCoincident$"
+				"^VTK::RenderingOpenGL2Cxx-TestMultiTexturing$"
+				"^VTK::RenderingOpenGL2Cxx-TestMultiTexturingInterpolateScalars$"
+				"^VTK::RenderingOpenGL2Cxx-TestPBRClearCoat$"
+				"^VTK::RenderingOpenGL2Cxx-TestSpherePoints$"
+				"^VTK::RenderingOpenGL2Cxx-TestSphereVertex$"
+				"^VTK::RenderingOpenGL2Cxx-TestValuePassFloatingPoint$"
+				"^VTK::RenderingOpenGL2Cxx-TestValuePassFloatingPoint2$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2D$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionXCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionYCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionYCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DIJK$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DMaterialIJK$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVector$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVectorAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVectorAxisReflectionYCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary3DContour$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary3DContourDecomposePolyhedra$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary3DContourImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2D$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DBiMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DFullMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisClipBox$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionXCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DCellCenters$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DCellCentersMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DClip$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DContour$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DContourMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DDualContour$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DDualContourMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutterDual$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutterDualMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernarySphereMaterial$"
+				"^VTK::RenderingCoreCxx-RGrid$"
+				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperPartialFieldData$"
+				"^VTK::RenderingCoreCxx-TestEdgeFlags$"
+				"^VTK::RenderingCoreCxx-TestGlyph3DMapperOrientationArray$"
+				"^VTK::RenderingCoreCxx-TestGlyph3DMapperQuaternionArray$"
+				"^VTK::RenderingCoreCxx-TestPolyDataMapperNormals$"
+				"^VTK::RenderingCoreCxx-TestRenderLinesAsTubes$"
+				"^VTK::FiltersSourcesCxx-TestRandomHyperTreeGridSource$"
+				"^VTK::AcceleratorsVTKmFiltersCxx-TestVTKMPolyDataNormals$"
+				"^VTK::FiltersGeneralCxx-TestYoungsMaterialInterface$"
+				"^VTK::FiltersGeometryCxx-TestLinearToQuadraticCellsFilter$"
+				"^VTK::CommonDataModelCxx-TestKdTreeRepresentation$"
+			)
+		fi
+
+		if use video_cards_zink; then
+			local -x MESA_LOADER_DRIVER_OVERRIDE="zink"
+		else
+			REALLY_BAD_TESTS+=(
+				# these fail when run using OpenGL4.5, e.g. llvmpipe
+				# (Failed)
+				"^VTK::FiltersGeneralCxx-TestLoopBooleanPolyDataFilter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGrid3DIntercepts$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGrid3DInterface$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2D$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisClipBox$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisClipEllipse$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisClipPlanes$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionXCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionYCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DDepthLimiter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DDepthLimiterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdDeep$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdMaterialDeep$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThresholdMaterialImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVectorAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVectorAxisReflectionYCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary3DGeometry$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2D$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DBiMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisClipCylinder$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisClipPlanes$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisCut$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisCutMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionXCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionXCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionYZCenter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DAxisReflectionYZCenterMaterial$"
+				"^VTK::ViewsInfovisCxx-TestIcicleView$"
+				"^VTK::ViewsInfovisCxx-TestInteractorStyleTreeMapHover$"
+				"^VTK::ViewsInfovisCxx-TestNetworkViews$"
+				"^VTK::ViewsInfovisCxx-TestRenderView$"
+				"^VTK::ViewsInfovisCxx-TestTreeMapView$"
+				"^VTK::ViewsInfovisCxx-TestTreeRingView$"
+			)
+
+			BAD_TESTS+=(
+				"^VTK::FiltersAMRCxx-TestAMRSliceFilterCellData$"
+				"^VTK::FiltersCoreCxx-Test3DLinearGridPlaneCutterCellData$"
+				"^VTK::FiltersCoreCxx-TestPolyDataTangents$"
+				"^VTK::FiltersExtractionCxx-TestExtraction$"
+				"^VTK::FiltersExtractionCxx-TestExtractionExpression$"
+				"^VTK::FiltersGeneralCxx-TestClipClosedSurface1$"
+				"^VTK::FiltersGeneralCxx-TestClipClosedSurface2$"
+				"^VTK::FiltersGeneralCxx-TestDateToNumeric$"
+				"^VTK::FiltersGeneralCxx-TestYoungsMaterialInterface$"
+				"^VTK::FiltersGeometryCxx-TestDataSetRegionSurfaceFilter$"
+				"^VTK::FiltersHybridCxx-TemporalStatistics$"
+				"^VTK::FiltersHybridCxx-TestDepthSortPolyData$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridBinary2DAdaptiveDataSetSurfaceFilter$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridBinary2DAdaptiveDataSetSurfaceFilterMaterial$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridTernary3DAdaptiveDataSetSurfaceFilter$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridTernary3DAdaptiveDataSetSurfaceFilterMaterial$"
+				"^VTK::FiltersHybridCxx-TestHyperTreeGridTernary3DToUnstructuredAdaptiveDataSetSurfaceFilter$"
+				"^VTK::FiltersHybridCxx-TestTemporalFractal$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGrid2DInterfaceShift$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DAxisReflectionYCenterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DCellCenters$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DCellCentersMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DContour$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DContourMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DIJK$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DInterfaceMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DMaterialIJK$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DThreshold$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinary2DVector$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinaryClipPlanes$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinaryEllipseMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridBinaryHyperbolicParaboloidMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DFullMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary2DMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DGeometry$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DGeometryMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DGeometryMaterialBits$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutter$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DPlaneCutterMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThreshold$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdDeep$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdMaterialDeep$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DThresholdMaterialImplicit$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DUnstructured$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernary3DUnstructuredMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernaryHyperbola$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernarySphereMaterial$"
+				"^VTK::FiltersHyperTreeCxx-TestHyperTreeGridTernarySphereMaterialReflections$"
+				"^VTK::FiltersModelingCxx-TestCollisionDetectionAllContacts$"
+				"^VTK::FiltersModelingCxx-TestCollisionDetectionHalfContacts$"
+				"^VTK::FiltersModelingCxx-TestLinearCellExtrusion$"
+				"^VTK::FiltersModelingCxx-TestNamedColorsIntegration$"
+				"^VTK::IOChemistryCxx-TestVASPTessellationReader$"
+				"^VTK::IOGeometryCxx-TestOpenFOAMReaderFaceZone$"
+				"^VTK::IOIOSSCxx-TestIOSSExodusParallelWriter$"
+				"^VTK::IOOCCTCxx-TestOCCTReader$"
+				"^VTK::IOXMLCxx-TestXMLHyperTreeGridIOInterface$"
+				"^VTK::IOXMLCxx-TestXMLPieceDistribution$"
+				"^VTK::InfovisLayoutCxx-TestCirclePackLayoutStrategy$"
+				"^VTK::InfovisLayoutCxx-TestTreeMapLayoutStrategy$"
+				"^VTK::InteractionWidgetsCxx-TestButtonWidgetMultipleViewports$"
+				"^VTK::InteractionWidgetsCxx-TestDisplaySizedImplicitPlaneWidget$"
+				"^VTK::InteractionWidgetsCxx-TestHandleWidget$"
+				"^VTK::InteractionWidgetsCxx-TestImplicitPlaneWidget$"
+				"^VTK::InteractionWidgetsCxx-TestImplicitPlaneWidget2$"
+				"^VTK::InteractionWidgetsCxx-TestImplicitPlaneWidget2LockNormalToCamera$"
+				"^VTK::InteractionWidgetsCxx-TestImplicitPlaneWidget2b$"
+				"^VTK::RenderingAnnotationCxx-TestScalarBarAboveBelow$"
+				"^VTK::RenderingCoreCxx-TestColorByCellDataStringArray$"
+				"^VTK::RenderingCoreCxx-TestColorByStringArrayDefaultLookupTable$"
+				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperOverrideLUT$"
+				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperOverrideScalarArray$"
+				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperPartialFieldData$"
+				"^VTK::RenderingCoreCxx-TestMixedGeometryCellScalars$"
+				"^VTK::RenderingCoreCxx-TestTilingCxx$"
+		)
+		fi
 
 		if use vtkm && use cuda; then
 			REALLY_BAD_TESTS+=(
@@ -1031,6 +1291,10 @@ src_test() {
 		RANDOM_FAIL_TESTS=(
 			# (Failed)
 			"VTK::FiltersVerdictCxx-TestCellQuality$"
+
+			# (Subprocess aborted)
+			"^VTK::RenderingLICOpenGL2Cxx-SurfaceLICCurvedContrastEnhancedColorMappedSmallGrainMask$"
+			"^VTK::RenderingLICOpenGL2Cxx-SurfaceLICPlanarContrastEnhanced$"
 		)
 
 		CMAKE_SKIP_TESTS+=(
@@ -1044,18 +1308,6 @@ src_test() {
 		# requires VTK_USE_MICROSOFT_MEDIA_FOUNDATION
 		"^VTK::IOMovieCxx-Test" # Skipped
 	)
-
-	# see VTK_SMP_IMPLEMENTATION_TYPE
-	if use tbb; then
-		local -x VTK_SMP_BACKEND_IN_USE="TBB"
-	# # FIXME Times out under openmp
-	# elif use openmp; then
-	# 	local -x VTK_SMP_BACKEND_IN_USE="OpenMP"
-	elif use threads; then
-		local -x VTK_SMP_BACKEND_IN_USE="STDThread"
-	else
-		local -x VTK_SMP_BACKEND_IN_USE="Sequential"
-	fi
 
 	if use openmp; then
 		CMAKE_SKIP_TESTS+=(
@@ -1184,7 +1436,15 @@ pkg_prerm() {
 }
 
 pkg_info() {
-	if [[ -v DISPLAY ]]; then
-		nonfatal "/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
-	fi
+	# if [[ -v DISPLAY ]]; then
+		# for virtx
+		xdg_environment_reset
+
+		if use video_cards_zink; then
+			local -x MESA_LOADER_DRIVER_OVERRIDE="zink"
+		fi
+
+		vtk_add_sandbox
+		nonfatal virtx "/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
+	# fi
 }

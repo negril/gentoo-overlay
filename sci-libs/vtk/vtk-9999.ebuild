@@ -96,7 +96,6 @@ RDEPEND="
 	dev-cpp/eigen:=
 	dev-cpp/nlohmann_json
 	dev-db/sqlite:3
-	dev-libs/double-conversion:=
 	dev-libs/expat
 	dev-libs/jsoncpp:=
 	>=dev-libs/libfmt-8.1.1:=
@@ -354,6 +353,7 @@ vtk_add_sandbox() {
 			# # "/dev/nvidia-caps-imex-channels/channel%d"
 			# "/dev/nvidia-caps-imex-channels/"
 		)
+
 		addpredict "/dev/char/"
 	fi
 
@@ -619,8 +619,6 @@ src_configure() {
 
 	if use cuda; then
 		cuda_add_sandbox -w
-		addwrite "/proc/self/task"
-		addpredict "/dev/char/"
 
 		if ! test -w /dev/nvidiactl; then
 			# eqawarn "Can't access the GPU at /dev/nvidiactl."
@@ -1437,7 +1435,15 @@ pkg_prerm() {
 }
 
 pkg_info() {
-	if [[ -v DISPLAY ]]; then
-		nonfatal "/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
-	fi
+	# if [[ -v DISPLAY ]]; then
+		# for virtx
+		xdg_environment_reset
+
+		if use video_cards_zink; then
+			local -x MESA_LOADER_DRIVER_OVERRIDE="zink"
+		fi
+
+		vtk_add_sandbox
+		nonfatal virtx "/usr/bin/vtkProbeOpenGLVersion-$(ver_cut 1-2)"
+	# fi
 }
