@@ -71,8 +71,8 @@ src_configure() {
 		$(use_enable mpi ampi)
 		$(use_enable sparse)
 		$(use_with boost)
-		$(use_with sparse colpack "${EPREFIX}"/usr)
-		--prefix="${ED}/usr"
+		$(use_with sparse colpack "${ESYSROOT}"/usr)
+		--prefix="${EPREFIX}/usr"
 	)
 
 	CONFIG_SHELL="${BROOT}/bin/bash" econf "${myeconfargs[@]}"
@@ -86,5 +86,6 @@ src_test() {
 
 src_install() {
 	default
+
 	find "${ED}" -name '*.la' -delete || die
 }
