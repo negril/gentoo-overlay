@@ -567,9 +567,9 @@ src_compile() {
 		if use cuda || use hip; then
 			targets+=( buildtests_gpu )
 		fi
-		# tests generate random data, which
-		# obviously fails for some seeds
-		export EIGEN_SEED=712808
+
+		# tests generate random data, which obviously fails for some seeds
+		# export EIGEN_SEED=712808
 	fi
 
 	# we add doc last to capture results for buildtests
