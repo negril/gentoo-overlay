@@ -114,6 +114,10 @@ REQUIRED_USE="
 	)
 	test? (
 		|| ( ${IUSE_TEST_BACKENDS[*]} )
+		cuda-clang? (
+			!openmp
+			${LLVM_REQUIRED_USE}
+		)
 	)
 "
 
@@ -193,7 +197,8 @@ DEPEND="
 			)
 			cuda-clang? (
 				$(llvm_gen_dep '
-					llvm-core/clang:${LLVM_SLOT}[llvm_targets_NVPTX]
+					llvm-core/clang:${LLVM_SLOT}
+					llvm-runtimes/clang-runtime:${LLVM_SLOT}[llvm_targets_NVPTX,offload,openmp]
 				')
 			)
 		)
@@ -236,16 +241,13 @@ cuda_set_CUDAHOSTCXX() {
 			break
 		fi
 		CUDAHOSTCXX_test="$(
-			dirname "$(
-				realpath "$(
-					which "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
-				)"
-			)"
+			which "${compiler}-$(echo "${version}" | grep -oP "(?<=${package}-)[0-9]*")"
 		)"
 		version="<${version}"
 	do ! echo "int main(){}" | nvcc "-ccbin ${CUDAHOSTCXX_test}" - -x cu &>/dev/null; done
 
 	export CUDAHOSTCXX
+	echo "${CUDAHOSTCXX}"
 }
 
 pkg_pretend() {
@@ -385,6 +387,16 @@ src_configure() {
 			# we do this so we can skip failing subtests
 			-DEIGEN_SPLIT_LARGE_TESTS="yes" # Split large tests into smaller executables
 
+			-DEIGEN_TEST_CUDA="$(usex cuda)" # Enable CUDA support in unit tests
+			-DEIGEN_TEST_CUDA_CLANG="$(usex cuda "$(usex cuda-clang)")" # Use clang instead of nvcc to compile the CUDA tests
+			# Use nvc++ (NVHPC) instead of nvcc to compile the CUDA tests
+			# -DEIGEN_TEST_CUDA_NVC="$(usex cuda "$(usex cuda-nvc)")"
+
+			-DEIGEN_TEST_HIP="$(usex hip)" # Add HIP support.
+
+			# -DEIGEN_TEST_SYCL="$(usex sycl)" # Add Sycl support.
+			# -DEIGEN_SYCL_TRISYCL="no" # Use the triSYCL Sycl implementation (ComputeCPP by default).
+
 			$(cmake_use_find_package adolc Adolc)
 			$(cmake_use_find_package boost Boost)
 			$(cmake_use_find_package cholmod CHOLMOD)
@@ -457,48 +469,72 @@ src_configure() {
 			)
 		fi
 
-		mycmakeargs+=(
-			-DEIGEN_TEST_CUDA="$(usex cuda)" # Enable CUDA support in unit tests
-			-DEIGEN_TEST_CUDA_CLANG="$(usex cuda "$(usex cuda-clang)")" # Use clang instead of nvcc to compile the CUDA tests
-
-			-DEIGEN_TEST_HIP="$(usex hip)" # Add HIP support.
-
-			# -DEIGEN_TEST_SYCL=no # Add Sycl support.
-			# -DEIGEN_SYCL_TRISYCL=no # Use the triSYCL Sycl implementation (ComputeCPP by default).
-		)
-
 		if use cuda; then
 			cuda_add_sandbox -w
+
 			if use cuda-clang; then
 				local llvm_prefix
 				llvm_prefix="$(get_llvm_prefix -b)"
-				export CC="${llvm_prefix}/bin/clang"
-				export CXX="${llvm_prefix}/bin/clang++"
-				export LIBRARY_PATH="${ESYSROOT}/usr/$(get_libdir)"
+
+				# NVCCFLAGS gets injected into CMAKE_CXX_FLAGS, which means we need to use clang as gcc will fail with
+				# error: unrecognized command-line option
+				if ! tc-is-clang; then
+					export CC="${CHOST}-clang-${LLVM_SLOT}"
+					export CXX="${CHOST}-clang++-${LLVM_SLOT}"
+				fi
+
+				NVCCFLAGS="${NVCCFLAGS:+${NVCCFLAGS} }--libomptarget-nvptx-bc-path=${llvm_prefix}/$(get_libdir)/nvptx64-nvidia-cuda/libomptarget-nvptx.bc"
+
 				mycmakeargs+=(
-					-DCUDA_HOST_COMPILER="${llvm_prefix}/bin/clang++"
+					-DCUDA_HOST_COMPILER="${CHOST}-clang++-${LLVM_SLOT}"
 				)
 			else
 				cuda_set_CUDAHOSTCXX
+
 				mycmakeargs+=(
 					-DCUDA_HOST_COMPILER="${CUDAHOSTCXX}"
 				)
+				if [[ -v CUDACXX ]]; then
+					mycmakeargs+=(
+						-DCUDA_NVCC_EXECUTABLE="${CUDACXX}"
+						-DCMAKE_POLICY_DEFAULT_CMP0146="OLD" # FindCUDA
+					)
+				fi
 			fi
+
 			if [[ "${CUDA_VERBOSE}" == true ]]; then
 				mycmakeargs+=(
-					-DCUDA_VERBOSE_BUILD=yes
+					-DCUDA_VERBOSE_BUILD="yes"
 				)
 				NVCCFLAGS+=" -v"
 			fi
 
-			export CUDAFLAGS="${NVCCFLAGS}"
-
 			[[ -z "${CUDAARCHS}" ]] && einfo "trying to determine host CUDAARCHS"
-			: "${CUDAARCHS:=$(__nvcc_device_query)}"
+			if use cuda-clang; then
+				: "${CUDAARCHS:=$(nvptx-arch || die "nvptx-arch")}"
+				CUDAARCHS="${CUDAARCHS//sm_/}"
+			else
+				: "${CUDAARCHS:=$(__nvcc_device_query || die "__nvcc_device_query")}"
+			fi
 			export CUDAARCHS
 
+			# CUDAFLAGS is used by cmake
+			# NVCCFLAGS is used by cuda.eclass
 			mycmakeargs+=(
-				-DEIGEN_CUDA_COMPUTE_ARCH="${CUDAARCHS}"
+				-DEIGEN_CUDA_COMPUTE_ARCH="${CUDAARCHS}" # TODO this needs to be lowest first
+
+				# TODO
+				# for test/CMakeLists.txt
+				# -DEIGEN_TEST_CUSTOM_CXX_FLAGS="${NVCCFLAGS}"
+
+				# for {,unsupported/}test/CMakeLists.txt
+				# affects nvcc and cuda-clang
+				-DEIGEN_CUDA_CXX_FLAGS="${NVCCFLAGS}"
+				# affects nvcc only
+				# -DCUDA_NVCC_FLAGS=
+
+				# -DCUDA_PROPAGATE_HOST_FLAGS="yes"
+				-DCUDA_USE_STATIC_CUDA_RUNTIME="yes"
 			)
 		fi
 
