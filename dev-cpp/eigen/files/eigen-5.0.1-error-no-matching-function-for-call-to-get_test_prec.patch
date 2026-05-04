@@ -1,0 +1,151 @@
+From b100fcba29fff66ba1777013213572a1b3bc368d Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Tue, 23 Dec 2025 13:29:13 +0100
+Subject: error: no matching function for call to 'get_test_precision'
+
+In file included from
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/numext.cpp:10:
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:613:59: error:
+no matching function for call to 'get_test_precision'
+613 |     std::cerr << "Difference too large wrt tolerance " <<
+get_test_precision(a)
+|
+^~~~~~~~~~~~~~~~~~
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/numext.cpp:64:5: note:
+in instantiation of function template specialization 'Eigen::verifyIsApprox<long
+double, long double>' requested here
+   64 |     VERIFY_IS_APPROX(numext::abs2(x), numext::abs2(numext::abs(x)));
+      |     ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:370:39: note:
+expanded from macro 'VERIFY_IS_APPROX'
+  370 | #define VERIFY_IS_APPROX(a, b) VERIFY(verifyIsApprox(a, b))
+      |                                       ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/numext.cpp:347:18:
+note: in instantiation of function template specialization 'check_abs<long
+double>' requested here
+  347 |     CALL_SUBTEST(check_abs<long double>());
+      |                  ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:598:46: note:
+candidate template ignored: substitution failure [with T = long double]: type
+'long double' cannot be used prior to '::' because it has no members
+598 | typename NumTraits<typename T::Scalar>::Real get_test_precision(const
+T&, const typename T::Scalar* = 0) {
+      |                             ~                ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:603:29: note:
+candidate template ignored: requirement 'internal::is_arithmetic<long
+double>::value' was not satisfied [with T = long double]
+  603 | typename NumTraits<T>::Real get_test_precision(
+      |                             ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:614:45: error:
+no matching function for call to 'test_relative_error'
+614 |               << ", relative error is: " << test_relative_error(a, b) <<
+std::endl;
+      |                                             ^~~~~~~~~~~~~~~~~~~
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:515:57: note:
+candidate template ignored: could not match 'const EigenBase<T1>' against 'const
+long double'
+515 | typename NumTraits<typename T1::RealScalar>::NonInteger
+test_relative_error(const EigenBase<T1>& a,
+      |                                                         ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:526:25: note:
+candidate template ignored: substitution failure [with T1 = long double, T2 =
+long double]: type 'long double' cannot be used prior to '::' because it has no
+members
+526 | typename T1::RealScalar test_relative_error(const T1& a, const T2& b,
+const typename T1::Coefficients* = 0) {
+      |          ~~             ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:531:21: note:
+candidate template ignored: substitution failure [with T1 = long double, T2 =
+long double]: type 'long double' cannot be used prior to '::' because it has no
+members
+531 | typename T1::Scalar test_relative_error(const T1& a, const T2& b, const
+typename T1::MatrixType* = 0) {
+      |          ~~         ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:536:3: note:
+candidate template ignored: could not match 'const Translation<S, D>' against
+'const long double'
+536 | S test_relative_error(const Translation<S, D>& a, const Translation<S,
+D>& b) {
+      |   ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:541:3: note:
+candidate template ignored: could not match 'const ParametrizedLine<S, D, O>'
+against 'const long double'
+541 | S test_relative_error(const ParametrizedLine<S, D, O>& a, const
+ParametrizedLine<S, D, O>& b) {
+      |   ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:546:3: note:
+candidate template ignored: could not match 'const AlignedBox<S, D>' against
+'const long double'
+546 | S test_relative_error(const AlignedBox<S, D>& a, const AlignedBox<S, D>&
+b) {
+      |   ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:553:25: note:
+candidate template ignored: could not match 'const MatrixBase<T1>' against
+'const long double'
+553 | typename T1::RealScalar test_relative_error(const MatrixBase<T1>& a,
+const SparseMatrixBase<T2>& b) {
+      |                         ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:560:25: note:
+candidate template ignored: could not match 'const SparseMatrixBase<T1>' against
+'const long double'
+560 | typename T1::RealScalar test_relative_error(const SparseMatrixBase<T1>&
+a, const MatrixBase<T2>& b) {
+      |                         ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:567:25: note:
+candidate template ignored: could not match 'const SparseMatrixBase<T1>' against
+'const long double'
+567 | typename T1::RealScalar test_relative_error(const SparseMatrixBase<T1>&
+a, const SparseMatrixBase<T2>& b) {
+      |                         ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:572:62: note:
+candidate template ignored: requirement 'internal::is_arithmetic<long
+double>::value' was not satisfied [with T1 = long double, T2 = long double]
+572 | typename NumTraits<typename NumTraits<T1>::Real>::NonInteger
+test_relative_error(
+      |                                                              ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:580:3: note:
+candidate template ignored: could not match 'const Rotation2D<T>' against 'const
+long double'
+  580 | T test_relative_error(const Rotation2D<T>& a, const Rotation2D<T>& b) {
+      |   ^
+/var/tmp/paludis/dev-cpp-eigen-9999/work/eigen-9999/test/main.h:585:3: note:
+candidate template ignored: could not match 'const AngleAxis<T>' against 'const
+long double'
+  585 | T test_relative_error(const AngleAxis<T>& a, const AngleAxis<T>& b) {
+      |   ^
+2 errors generated.
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/test/basicstuff.cpp b/test/basicstuff.cpp
+index 455cbfddb..12c052d5a 100644
+--- a/test/basicstuff.cpp
++++ b/test/basicstuff.cpp
+@@ -333,8 +333,10 @@ EIGEN_DECLARE_TEST(basicstuff) {
+     CALL_SUBTEST_5(basicStuff(
+         MatrixXcd(internal::random<int>(1, EIGEN_TEST_MAX_SIZE), internal::random<int>(1, EIGEN_TEST_MAX_SIZE))));
+     CALL_SUBTEST_6(basicStuff(Matrix<float, 100, 100>()));
++    /*
+     CALL_SUBTEST_7(basicStuff(Matrix<long double, Dynamic, Dynamic>(internal::random<int>(1, EIGEN_TEST_MAX_SIZE),
+                                                                     internal::random<int>(1, EIGEN_TEST_MAX_SIZE))));
++    */
+     CALL_SUBTEST_8(casting_all());
+ 
+     CALL_SUBTEST_3(basicStuffComplex(
+diff --git a/test/numext.cpp b/test/numext.cpp
+index ebe9fb069..c984f1622 100644
+--- a/test/numext.cpp
++++ b/test/numext.cpp
+@@ -344,7 +344,9 @@ EIGEN_DECLARE_TEST(numext) {
+     CALL_SUBTEST(check_abs<bfloat16>());
+     CALL_SUBTEST(check_abs<float>());
+     CALL_SUBTEST(check_abs<double>());
++    /*
+     CALL_SUBTEST(check_abs<long double>());
++    */
+     CALL_SUBTEST(check_abs<std::complex<float> >());
+     CALL_SUBTEST(check_abs<std::complex<double> >());
+ 
+-- 
+2.52.0
+

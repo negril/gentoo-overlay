@@ -1,0 +1,23 @@
+From 095d1edd1fe82007fa59b397696ae81c9f606d99 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 25 Dec 2025 12:31:13 +0100
+Subject: fix TriangularSolverMatrix
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/Eigen/src/Core/products/TriangularSolverMatrix.h b/Eigen/src/Core/products/TriangularSolverMatrix.h
+index c09fec4f6..903fdf2b9 100644
+--- a/Eigen/src/Core/products/TriangularSolverMatrix.h
++++ b/Eigen/src/Core/products/TriangularSolverMatrix.h
+@@ -57,7 +57,7 @@ EIGEN_STRONG_INLINE void trsmKernelL<Scalar, Index, Mode, Conjugate, TriStorageO
+     Index rs = size - k - 1;  // remaining size
+     Index s = TriStorageOrder == RowMajor ? (IsLower ? 0 : i + 1) : IsLower ? i + 1 : i - rs;
+ 
+-    Scalar a = (Mode & UnitDiag) ? Scalar(1) : Scalar(Scalar(1) / conj(tri(i, i)));
++    Scalar a = (Mode & UnitDiag) ? Scalar(1) : Scalar(Scalar(1) / Scalar(conj(tri(i, i))));
+     for (Index j = 0; j < otherSize; ++j) {
+       if (TriStorageOrder == RowMajor) {
+         Scalar b(0);
+-- 
+2.52.0
+
