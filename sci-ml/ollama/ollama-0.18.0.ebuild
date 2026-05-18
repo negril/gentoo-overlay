@@ -15,12 +15,9 @@ inherit flag-o-matic
 DESCRIPTION="Get up and running with Llama 3, Mistral, Gemma, and other language models"
 HOMEPAGE="https://ollama.com"
 
-MY_PN="${PN}"
-
 if [[ "${PV}" == *9999* ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/ollama/ollama.git"
-	# GOMODCACHE="${DISTDIR}/go/pkg/mod"
 else
 	MY_PV="${PV/_rc/-rc}"
 	MY_P="${PN}-${MY_PV}"
@@ -45,7 +42,7 @@ IUSE="cpudetection cuda openmp rocm vulkan"
 # IUSE+=" opencl"
 # wwma USE explained here: https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md#hip
 IUSE+=" wmma"
-IUSE+=" system-ggml"
+IUSE+=" +system-ggml"
 
 # USE=examples requires (GGML_BUILD_EXAMPLES AND NOT GGML_BACKEND_DL)
 GGML_REQUIRED_USE="
@@ -181,8 +178,7 @@ unset COMMON_DEPEND GGML_RDEPEND GGML_DEPEND GGML_BDEPEND
 
 PATCHES=(
 	"${FILESDIR}/${PN}-9999-use-GNUInstallDirs.patch"
-	"${FILESDIR}/${PN}-9999-make-installing-runtime-deps-optional.patch"
-	"${FILESDIR}/${PN}-0.18.0-cmake-un-hardcode-options.patch"
+	"${FILESDIR}/${PN}-0.18.0-make-installing-runtime-deps-optional.patch"
 )
 
 pkg_pretend() {
@@ -285,12 +281,8 @@ src_configure() {
 	local mycmakeargs=()
 
 	mycmakeargs+=(
-		-DCMAKE_POLICY_DEFAULT_CMP0177="NEW"
 		# backends end up in /usr/bin otherwise
-		-DGGML_BACKEND_DL="yes" # $(usex cpudetection)"
-
-		# TODO causes duplicate install warning but breaks detection otherwise ollama/issues/13614
-		-DGGML_BACKEND_DIR="${EPREFIX}/usr/$(get_libdir)/${PN}"
+		-DGGML_BACKEND_DL="$(usex cpudetection)"
 
 		-DGGML_CPU_ALL_VARIANTS="$(usex cpudetection)"
 
@@ -360,13 +352,12 @@ src_configure() {
 
 	if use cpudetection; then
 		mycmakeargs+=(
-			# # TODO causes duplicate install warning but breaks detection otherwise ollama/issues/13614
-			# -DGGML_BACKEND_DIR="${EPREFIX}/usr/$(get_libdir)/${PN}"
+			# TODO causes duplicate install warning but breaks detection otherwise ollama/issues/13614
+			-DGGML_BACKEND_DIR="${EPREFIX}/usr/$(get_libdir)/${PN}"
 
-			# TODO why?
-			# -DCMAKE_BUILD_RPATH="\$ORIGIN"
-			# -DCMAKE_INSTALL_RPATH="\$ORIGIN:${EPREFIX}/usr/$(get_libdir)/${PN}"
-			# -DCMAKE_INSTALL_RPATH="\$ORIGIN"
+			-DCMAKE_BUILD_RPATH="\$ORIGIN"
+			# -DCMAKE_INSTALL_RPATH="${EPREFIX}/usr/$(get_libdir)/${PN}"
+			-DCMAKE_INSTALL_RPATH="\$ORIGIN"
 		)
 	fi
 
@@ -382,15 +373,6 @@ src_configure() {
 
 		mycmakeargs+=(
 			-DCMAKE_CUDA_ARCHITECTURES="${CUDAARCHS}"
-
-			# new
-			-DGGML_CUDA_FA_ALL_QUANTS="yes"
-			-DGGML_CUDA_FORCE_MMQ="yes"
-			-DGGML_CUDA_FORCE_CUBLAS="yes"
-			# TODO not in ollama
-			# -DGGML_CUDA_ENABLE_UNIFIED_MEMORY="yes"
-			# -DGGML_CUDA_KQUANTS_ITER="2"
-			# -DGGML_CUDA_MMV_Y="2"
 		)
 
 		cuda_add_sandbox -w
@@ -426,13 +408,9 @@ src_configure() {
 		# -DCMAKE_INSTALL_INCLUDEDIR="${EPREFIX}/usr/$(get_libdir)/${MY_PN}/include"
 		# -DCMAKE_INSTALL_LIBDIR="${EPREFIX}/usr/$(get_libdir)/${MY_PN}/$(get_libdir)"
 
-		# -DCMAKE_INSTALL_INCLUDEDIR="${EPREFIX}/usr/libexec/${MY_PN}/include"
-		# -DCMAKE_INSTALL_LIBDIR="${EPREFIX}/usr/libexec/${MY_PN}/$(get_libdir)"
-		# -DCMAKE_INSTALL_RPATH="${EPREFIX}/usr/libexec/${MY_PN}/$(get_libdir)"
-
-		# -DCMAKE_INSTALL_INCLUDEDIR="${EPREFIX}/usr/$(get_libdir)/${MY_PN}/include"
-		# -DCMAKE_INSTALL_LIBDIR="${EPREFIX}/usr/$(get_libdir)/${MY_PN}"
-		# -DCMAKE_INSTALL_RPATH="${EPREFIX}/usr/$(get_libdir)/${MY_PN}"
+		-DCMAKE_INSTALL_INCLUDEDIR="${EPREFIX}/usr/libexec/${MY_PN}/include"
+		-DCMAKE_INSTALL_LIBDIR="${EPREFIX}/usr/libexec/${MY_PN}/$(get_libdir)"
+		-DCMAKE_INSTALL_RPATH="${EPREFIX}/usr/libexec/${MY_PN}/$(get_libdir)"
 
 		-DOLLAMA_INSTALL_RUNTIME_DEPS="no"
 	)
@@ -475,10 +453,6 @@ src_install() {
 	newconfd "${FILESDIR}/ollama.confd" "${PN}"
 
 	systemd_dounit "${FILESDIR}/ollama.service"
-
-	if [[ -n $(find "${ED}/usr/bin" -name '*libggml-*.so') ]]; then
-		die "found ggml files in /usr/bin"
-	fi
 }
 
 pkg_preinst() {
