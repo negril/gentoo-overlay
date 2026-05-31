@@ -18,3 +18,7 @@ SLOT="0"
 KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ppc ~ppc64 ~riscv ~sparc ~x86"
 
 RDEPEND="dev-python/sphinx[${PYTHON_USEDEP}]"
+
+PATCHES=(
+	"${FILESDIR}/sphinx_press_theme-sphinx-7.2.patch"
+)
