@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -18,7 +18,7 @@ HOMEPAGE="
 
 if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
-	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/OpenColorIO.git"
+	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/OpenImageIO.git"
 else
 	TEST_OIIO_IMAGE_COMMIT="75099275c73a6937d40c69f9e14a006aa49fa201"
 	TEST_OEXR_IMAGE_COMMIT="e38ffb0790f62f05a6f083a6fa4cac150b3b7452"
