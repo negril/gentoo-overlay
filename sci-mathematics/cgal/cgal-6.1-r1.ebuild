@@ -22,7 +22,7 @@ LICENSE="LGPL-3 GPL-3 Boost-1.0"
 SLOT="0/14"
 KEYWORDS="~amd64 ~arm64 ~ppc64 ~x86"
 
-IUSE="demo doc examples test"
+IUSE="demos doc examples test"
 RESTRICT="!test? ( test )"
 
 # This seems wrong.
@@ -39,7 +39,7 @@ RDEPEND="
 DEPEND="${RDEPEND}
 	test? (
 		net-libs/libssh[server]
-		demo? (
+		demos? (
 			dev-qt/qtbase:6[gui,opengl,widgets]
 		)
 		examples? (
@@ -123,13 +123,13 @@ src_configure() {
 		-DCGAL_TEST_DRAW_FUNCTIONS="yes"
 		-DCGAL_WITH_GMPXX="yes"
 		# -DCGAL_WITH_benchmark="$(usex test "$(usex benchmark)")" # wired up but not present
-		-DCGAL_WITH_demos="$(usex test "$(usex demo)")"
+		-DCGAL_WITH_demos="$(usex test "$(usex demos)")"
 		-DCGAL_WITH_examples="$(usex test "$(usex examples)")"
 	)
 
 	# Optionally depends on sci-lib/vtk, which looks up a cuda compiler iff build with USE=cuda.
 	# We therefore need to set the correct CUDAHOSTCXX and setup the sandbox.
-	if use test && { use demo || use examples; }; then
+	if use test && { use demos || use examples; }; then
 		if has_version "sci-libs/vtk[cuda]" ; then
 			cuda_add_sandbox -w
 			addpredict "/dev/char/"
@@ -162,8 +162,8 @@ src_install() {
 
 	cmake_src_install
 
-	if use demo; then
-		dodoc -r demo
+	if use demos; then
+		dodoc -r demos
 	fi
 
 	if use examples; then
