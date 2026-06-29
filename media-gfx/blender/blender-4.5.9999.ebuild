@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 # shellcheck disable=SC2207
@@ -18,7 +18,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 # NOTE must match media-libs/osl
 LLVM_COMPAT=( {18..20} )
 LLVM_OPTIONAL=1
@@ -68,7 +68,7 @@ SLOT="${BLENDER_BRANCH}"
 # potentially mirror cpu_flags_x86 + REQUIRED_USE
 IUSE="
 	alembic +bullet collada +color-management cuda +cycles +cycles-bin-kernels
-	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
+	debug doc +draco +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
 	jemalloc jpeg2k man +manifold +nanovdb ndof nls +oidn openal +openexr +opengl +openpgl
 	+opensubdiv +openvdb optix osl pipewire +pdf +potrace +pugixml pulseaudio
 	renderdoc sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
@@ -140,7 +140,7 @@ RDEPEND="${PYTHON_DEPS}
 	gmp? ( dev-libs/gmp:=[cxx] )
 	gnome? ( gui-libs/libdecor )
 	hip? (
-		>=dev-util/hip-5.7:=
+		>=dev-util/hip-6.0:=
 		hiprt? (
 			dev-libs/hiprt:2.5=
 		)
@@ -848,7 +848,7 @@ src_test() {
 
 	# Environment OPENIMAGEIO_CUDA=0 trumps everything else, turns off
 	# Cuda functionality. We don't even initialize in this case.
-	local -x OPENIMAGEIO_CUDA=0
+	# local -x OPENIMAGEIO_CUDA=0
 
 	# Needed if openimageio wasn't build with -DNDEBUG
 	local -x OPENIMAGEIO_DEBUG=0
