@@ -1,18 +1,18 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 # NOTE must match media-libs/osl
-LLVM_COMPAT=( {17..18} )
+LLVM_COMPAT=( {18..18} )
 LLVM_OPTIONAL=1
 
 ROCM_SKIP_GLOBALS=1
 CMAKE_QA_COMPAT_SKIP=1
 
 inherit cuda rocm llvm-r2
-inherit eapi9-pipestatus check-reqs flag-o-matic pax-utils python-single-r1 toolchain-funcs virtualx
+inherit eapi9-pipestatus edo check-reqs flag-o-matic pax-utils python-single-r1 toolchain-funcs virtualx
 inherit cmake xdg-utils
 
 DESCRIPTION="3D Creation/Animation/Publishing System"
@@ -109,27 +109,22 @@ RDEPEND="${PYTHON_DEPS}
 	media-libs/libpng:=
 	media-libs/libsamplerate
 	<media-libs/openimageio-3:=
-	virtual/zlib:=
 	virtual/glu
 	virtual/libintl
 	virtual/opengl[X?]
+	virtual/zlib:=
 	alembic? ( >=media-gfx/alembic-1.8.3-r2[boost(+),hdf(+)] )
 	bullet? ( sci-physics/bullet:=[double-precision] )
 	collada? ( >=media-libs/opencollada-1.6.68 )
 	color-management? ( media-libs/opencolorio:= )
-	cuda? ( dev-util/nvidia-cuda-toolkit:= )
+	cuda? ( <dev-util/nvidia-cuda-toolkit-13:= )
 	embree? ( media-libs/embree:=[raymask] )
-	ffmpeg? ( media-video/ffmpeg:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
+	ffmpeg? ( <media-video/ffmpeg-8:=[encode(+),lame(-),jpeg2k?,opus,theora,vorbis,vpx,x264,xvid] )
 	fftw? ( sci-libs/fftw:3.0=[threads] )
 	gmp? ( dev-libs/gmp:=[cxx] )
 	gnome? ( gui-libs/libdecor )
 	hip? (
-		llvm_slot_17? (
-			dev-util/hip:0/5.7
-		)
-		llvm_slot_18? (
-			>=dev-util/hip-6.1:=[llvm_slot_18(-)]
-		)
+		>=dev-util/hip-5.7:=
 	)
 	jack? ( virtual/jack )
 	jemalloc? ( dev-libs/jemalloc:= )
@@ -378,6 +373,7 @@ src_prepare() {
 	rm -rf extern/gflags || die
 
 	if use vulkan; then
+		# TODO why?
 		sed -e "s/extern_vulkan_memory_allocator/extern_vulkan_memory_allocator\nSPIRV-Tools-opt\nSPIRV-Tools\nSPIRV-Tools-link\nglslang\nSPIRV\nSPVRemapper/" -i source/blender/gpu/CMakeLists.txt || die
 	fi
 }
@@ -718,21 +714,21 @@ src_install() {
 
 		einfo "Generating Blender C/C++ API docs ..."
 		cd "${CMAKE_USE_DIR}/doc/doxygen" || die
-		doxygen -u Doxyfile || die
-		doxygen || die "doxygen failed to build API docs."
+		edob doxygen -u Doxyfile
+		edob doxygen
 
-		cd "${CMAKE_USE_DIR}" || die
+		docinto "html/API/blender"
+		dodoc -r "${CMAKE_USE_DIR}/doc/doxygen/html/"
+
 		einfo "Generating (BPY) Blender Python API docs ..."
-		"${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio || die "sphinx failed."
+		cd "${CMAKE_USE_DIR}" || die
+		edob "${BUILD_DIR}"/bin/blender --background --python "doc/python_api/sphinx_doc_gen.py" -noaudio
 
 		cd "${CMAKE_USE_DIR}/doc/python_api" || die
 		sphinx-build sphinx-in BPY_API || die "sphinx failed."
 
 		docinto "html/API/python"
 		dodoc -r "${CMAKE_USE_DIR}/doc/python_api/BPY_API/"
-
-		docinto "html/API/blender"
-		dodoc -r "${CMAKE_USE_DIR}/doc/doxygen/html/"
 	fi
 
 	# Fix doc installdir
