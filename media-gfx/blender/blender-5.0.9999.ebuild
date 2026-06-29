@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 # shellcheck disable=SC2207
@@ -15,10 +15,10 @@
 # 	https://github.com/google/draco
 # - Package Audaspace
 # 	https://github.com/neXyon/audaspace
-
+# - ceres-solver
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 # NOTE must match media-libs/osl
 LLVM_COMPAT=( {20..22} )
 LLVM_OPTIONAL=1
@@ -68,7 +68,7 @@ SLOT="${BLENDER_BRANCH}"
 # potentially mirror cpu_flags_x86 + REQUIRED_USE
 IUSE="
 	alembic +bullet +color-management cuda +cycles +cycles-bin-kernels
-	debug doc +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
+	debug doc +draco +embree +ffmpeg +fftw +fluid +gmp gnome hip hiprt jack
 	jemalloc jpeg2k man +manifold +nanovdb ndof nls +oidn openal +openexr +opengl +openpgl
 	+opensubdiv +openvdb optix osl pipewire +pdf +potrace +pugixml pulseaudio
 	renderdoc +rubberband sdl +sndfile +tbb test +tiff +truetype valgrind vulkan wayland +webp X
@@ -167,7 +167,7 @@ RDEPEND="${PYTHON_DEPS}
 		>=media-libs/openexr-3.3.5:0=
 	)
 	openpgl? ( media-libs/openpgl:= )
-	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,tbb?] )
+	opensubdiv? ( >=media-libs/opensubdiv-3.6.0-r2:=[opengl,cuda?,tbb?] )
 	openvdb? (
 		>=media-gfx/openvdb-11.0.0:=[nanovdb?]
 		dev-libs/c-blosc:=
@@ -232,7 +232,7 @@ DEPEND="${RDEPEND}
 	)
 "
 
-if [[ "${PV}" == 9999* ]]; then
+if [[ "${PV}" == *9999* ]]; then
 DEPEND+="
 	test? (
 		experimental? (
@@ -271,11 +271,11 @@ BDEPEND="
 "
 
 PATCHES=(
-	"${FILESDIR}/${PN}-4.0.2-FindClang.patch"
+	"${FILESDIR}/${PN}-5.0.0-FindClang.patch"
 	"${FILESDIR}/${PN}-4.1.1-FindLLVM.patch"
 	"${FILESDIR}/${PN}-4.1.1-numpy.patch"
 	"${FILESDIR}/${PN}-4.3.2-system-glog.patch"
-# 	"${FILESDIR}/${PN}-4.4.0-optix-compile-flags.patch"
+	"${FILESDIR}/${PN}-5.0.0-osd-omp-link.patch"
 )
 
 blender_check_requirements() {
@@ -855,12 +855,12 @@ src_test() {
 
 	# Environment OPENIMAGEIO_CUDA=0 trumps everything else, turns off
 	# Cuda functionality. We don't even initialize in this case.
-	local -x OPENIMAGEIO_CUDA=0
+	# local -x OPENIMAGEIO_CUDA=0
 
 	# Needed if openimageio wasn't build with -DNDEBUG
 	local -x OPENIMAGEIO_DEBUG=0
 
-	local CTEST_JOBS="1"
+	# local CTEST_JOBS="1"
 	# local -x CYCLESTEST_ARGS="-t 1 --gpu-vsync off --gpu-backend opengl --gpu-compilation-subprocesses 16 --offline-mode"
 	# local -x CYCLESTEST_ARGS="-t 16" #${CTEST_LOADAVG:-$(get_makeopts_loadavg)}"
 

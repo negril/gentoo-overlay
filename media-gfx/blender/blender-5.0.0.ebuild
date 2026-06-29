@@ -18,7 +18,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{11..14} )
 # NOTE must match media-libs/osl
 LLVM_COMPAT=( {20..20} )
 LLVM_OPTIONAL=1
@@ -842,7 +842,7 @@ src_test() {
 
 	# Environment OPENIMAGEIO_CUDA=0 trumps everything else, turns off
 	# Cuda functionality. We don't even initialize in this case.
-	local -x OPENIMAGEIO_CUDA=0
+	# local -x OPENIMAGEIO_CUDA=0
 
 	# Needed if openimageio wasn't build with -DNDEBUG
 	local -x OPENIMAGEIO_DEBUG=0
