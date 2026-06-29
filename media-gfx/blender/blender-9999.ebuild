@@ -355,19 +355,19 @@ src_prepare() {
 
 	blender_get_version
 
-	# Prepare icons and .desktop files for slotting.
-	sed \
-		-e "s|blender.svg|blender-${BV}.svg|" \
-		-e "s|blender-symbolic.svg|blender-${BV}-symbolic.svg|" \
-		-e "s|blender.desktop|blender-${BV}.desktop|" \
-		-e "s|org.blender.Blender.metainfo.xml|blender-${BV}.metainfo.xml|" \
-		-i source/creator/CMakeLists.txt || die
+	# # Prepare icons and .desktop files for slotting.
+	# sed \
+	# 	-e "s|blender.svg|blender-${BV}.svg|" \
+	# 	-e "s|blender-symbolic.svg|blender-${BV}-symbolic.svg|" \
+	# 	-e "s|blender.desktop|blender-${BV}.desktop|" \
+	# 	-e "s|org.blender.Blender.metainfo.xml|blender-${BV}.metainfo.xml|" \
+	# 	-i source/creator/CMakeLists.txt || die
 
-	sed \
-		-e "s|Name=Blender|Name=Blender ${BV}|" \
-		-e "s|Exec=blender|Exec=blender-${BV}|" \
-		-e "s|Icon=blender|Icon=blender-${BV}|" \
-		-i release/freedesktop/blender.desktop || die
+	# sed \
+	# 	-e "s|Name=Blender|Name=Blender ${BV}|" \
+	# 	-e "s|Exec=blender|Exec=blender-${BV}|" \
+	# 	-e "s|Icon=blender|Icon=blender-${BV}|" \
+	# 	-i release/freedesktop/blender.desktop || die
 
 	sed \
 		-e "/CMAKE_INSTALL_PREFIX_WITH_CONFIG/{s|\${CMAKE_INSTALL_PREFIX}|${T%/}\${CMAKE_INSTALL_PREFIX}|g}" \
@@ -377,23 +377,23 @@ src_prepare() {
 	# WITH_SYSTEM_GLOG=yes
 	cmake_run_in extern cmake_comment_add_subdirectory glog
 
-	mv \
-		"release/freedesktop/icons/scalable/apps/blender.svg" \
-		"release/freedesktop/icons/scalable/apps/blender-${BV}.svg" \
-		|| die
-	mv \
-		"release/freedesktop/icons/symbolic/apps/blender-symbolic.svg" \
-		"release/freedesktop/icons/symbolic/apps/blender-${BV}-symbolic.svg" \
-		|| die
-	mv \
-		"release/freedesktop/blender.desktop" \
-		"release/freedesktop/blender-${BV}.desktop" \
-		|| die
+	# mv \
+	# 	"release/freedesktop/icons/scalable/apps/blender.svg" \
+	# 	"release/freedesktop/icons/scalable/apps/blender-${BV}.svg" \
+	# 	|| die
+	# mv \
+	# 	"release/freedesktop/icons/symbolic/apps/blender-symbolic.svg" \
+	# 	"release/freedesktop/icons/symbolic/apps/blender-${BV}-symbolic.svg" \
+	# 	|| die
+	# mv \
+	# 	"release/freedesktop/blender.desktop" \
+	# 	"release/freedesktop/blender-${BV}.desktop" \
+	# 	|| die
 
-	mv \
-		"release/freedesktop/org.blender.Blender.metainfo.xml" \
-		"release/freedesktop/blender-${BV}.metainfo.xml" \
-		|| die
+	# mv \
+	# 	"release/freedesktop/org.blender.Blender.metainfo.xml" \
+	# 	"release/freedesktop/blender-${BV}.metainfo.xml" \
+	# 	|| die
 
 	sed \
 		-e "s#\(set(cycles_kernel_runtime_lib_target_path \)\${cycles_kernel_runtime_lib_target_path}\(/lib)\)#\1\${CYCLES_INSTALL_PATH}\2#" \
@@ -426,10 +426,10 @@ src_prepare() {
 
 	rm -rf extern/gflags || die
 
-	# Use slotted libhiprt64
-	sed \
-		-e "s|\"libhiprt64.so\"|\"${ESYSROOT}/usr/lib/hiprt/2.5/$(get_libdir)/libhiprt64.so\"|" \
-		-i extern/hipew/src/hiprtew.cc || die
+	# # Use slotted libhiprt64
+	# sed \
+	# 	-e "s|\"libhiprt64.so\"|\"${ESYSROOT}/usr/lib/hiprt/2.5/$(get_libdir)/libhiprt64.so\"|" \
+	# 	-i extern/hipew/src/hiprtew.cc || die
 }
 
 src_configure() {
@@ -468,6 +468,7 @@ src_configure() {
 		-DWITH_INTERNATIONAL="$(usex nls)"
 		-DWITH_MANIFOLD="$(usex manifold)"
 		-DWITH_MATERIALX="$(usex materialx)"
+		-DWITH_MESHOPTIMIZER="yes" # TODO https://github.com/zeux/meshoptimizer
 		-DWITH_NANOVDB="$(usex nanovdb)"
 		-DWITH_OPENCOLORIO="$(usex color-management)"
 		-DWITH_OPENGL_BACKEND="$(usex opengl)"
