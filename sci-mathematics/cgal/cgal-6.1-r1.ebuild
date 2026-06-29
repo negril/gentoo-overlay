@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -9,7 +9,6 @@ inherit cmake cuda flag-o-matic multiprocessing
 
 DESCRIPTION="C++ library for geometric algorithms and data structures"
 HOMEPAGE="https://www.cgal.org/"
-LICENSE="LGPL-3 GPL-3 Boost-1.0"
 
 SRC_URI="
 	https://github.com/CGAL/cgal/releases/download/v${PV}/${P^^}.tar.xz
@@ -18,9 +17,11 @@ SRC_URI="
 	)
 "
 S="${WORKDIR}/${P^^}"
+
+LICENSE="LGPL-3 GPL-3 Boost-1.0"
+SLOT="0/14"
 KEYWORDS="~amd64 ~arm64 ~ppc64 ~x86"
 
-SLOT="0/14"
 IUSE="demo doc examples test"
 RESTRICT="!test? ( test )"
 
@@ -140,19 +141,16 @@ src_configure() {
 
 src_test() {
 	# tests have split compilation & execution stages that do not depend on each other, but break when run out of order
-# 	local -x CTEST_JOBS="1"
-# 	einfo "using CTEST_JOBS=${CTEST_JOBS}"
-#
-# 	# We pass CMAKE_BUILD_PARALLEL_LEVEL to run compilation tests in parallel
-# 	local -x CMAKE_BUILD_PARALLEL_LEVEL="17" # $(get_makeopts_jobs 999)"
-# 	einfo "using CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL}"
-#
-# 	# We pass CTEST_PARALLEL_LEVEL to run execution tests in parallel
-# 	local -x CTEST_PARALLEL_LEVEL="17" # $(get_makeopts_jobs 999)"
-# 	einfo "using CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL}"
+	# We pass CMAKE_BUILD_PARALLEL_LEVEL to run compilation tests in parallel
+	local -x CMAKE_BUILD_PARALLEL_LEVEL="$(get_makeopts_jobs)"
+	einfo "using CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL}"
+
+	# We pass CTEST_PARALLEL_LEVEL to run execution tests in parallel
+	local -x CTEST_PARALLEL_LEVEL="$(get_makeopts_jobs)"
+	einfo "using CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL}"
 
 	local -x QT_QPA_PLATFORM="offscreen"
-	cmake_src_test
+	cmake_src_test -j1
 }
 
 src_install() {
