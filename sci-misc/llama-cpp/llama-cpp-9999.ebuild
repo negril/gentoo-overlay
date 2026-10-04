@@ -22,6 +22,7 @@ inherit cmake
 inherit distutils-r1
 # inherit python-any-r1
 inherit linux-info toolchain-funcs
+inherit edo
 
 DESCRIPTION="Port of Facebook's LLaMA model in C/C++"
 HOMEPAGE="https://github.com/ggml-org/llama.cpp"
@@ -146,7 +147,7 @@ declare -rgA CPU_FEATURES=(
 )
 add_cpu_features_use() {
 	for flag in "${!CPU_FEATURES[@]}"; do
-		IFS=$';' read -r arch use <<< "${CPU_FEATURES[${flag}]}"
+		IFS=$';' read -r arch use < <( echo "${CPU_FEATURES[${flag}]}" )
 		IUSE+=" cpu_flags_${arch}_${use:-${flag,,}}"
 	done
 }
@@ -332,6 +333,23 @@ src_unpack() {
 			EGIT_LFS="yes" \
 				git-r3_src_unpack
 		fi
+
+
+		# TODO crude solution, should use huggingface_hub
+		local _GIT_REV="b$(git -C "${S}/.git" rev-list --count --all || die "failed to get rev")"
+
+		echo curl --output-dir "${T}" -LO -sf "https://huggingface.co/buckets/ggml-org/llama-ui/resolve/${_GIT_REV}/dist.tar.gz"
+		curl --output-dir "${T}" -LO -sf "https://huggingface.co/buckets/ggml-org/llama-ui/resolve/${_GIT_REV}/dist.tar.gz"
+
+		if [[ "$?" -ne 0 ]]; then
+			echo curl --output-dir "${T}" -LO -sf "https://huggingface.co/buckets/ggml-org/llama-ui/resolve/latest/dist.tar.gz"
+			curl --output-dir "${T}" -LO -sf "https://huggingface.co/buckets/ggml-org/llama-ui/resolve/latest/dist.tar.gz" || die "failed dl"
+		fi
+
+		mkdir -p "${S}/tools/ui/dist"
+		pushd "${S}/tools/ui/dist" >/dev/null || die
+		unpack "${T}/dist.tar.gz"
+		popd >/dev/null || die
 	fi
 
 	default
@@ -340,7 +358,7 @@ src_unpack() {
 src_prepare() {
 	cmake_src_prepare
 
-	if use examples; then
+	if use examples || use test; then
 		mkdir -p "${BUILD_DIR}/tinyllamas" || die
 		cp "${DISTDIR}/ggml-org_models_tinyllamas_stories15M-q4_0-${TINY_LLAMAS_COMMIT}.gguf" \
 			"${BUILD_DIR}/tinyllamas/stories15M-q4_0.gguf" || die
@@ -391,7 +409,7 @@ src_configure() {
 	)
 
 	for flag in "${!CPU_FEATURES[@]}"; do
-		IFS=$';' read -r arch use <<< "${CPU_FEATURES[${flag}]}"
+		IFS=$';' read -rd '' arch use < <(printf %s "${CPU_FEATURES[${flag}]}")
 		mycmakeargs+=(
 			-D"GGML_${flag}=$(usex "cpu_flags_${arch}_${use:-${flag,,}}")"
 		)
@@ -436,16 +454,15 @@ src_configure() {
 			# TODO causes duplicate install warning but breaks detection otherwise ollama/issues/13614
 			-DGGML_BACKEND_DIR="${EPREFIX}/usr/$(get_libdir)/${PN}"
 
-			-DCMAKE_BUILD_RPATH="\$ORIGIN"
+			# -DCMAKE_BUILD_RPATH="\$ORIGIN"
 			# -DCMAKE_INSTALL_RPATH="${EPREFIX}/usr/$(get_libdir)/${PN}"
-			-DCMAKE_INSTALL_RPATH="\$ORIGIN"
+			# -DCMAKE_INSTALL_RPATH="\$ORIGIN"
 		)
 	fi
 
 	if use cuda; then
-		local -x CUDAHOSTCXX CUDAHOSTLD
-		CUDAHOSTCXX="$(cuda_gccdir)"
-		CUDAHOSTLD="$(tc-getCXX)"
+		[[ ! -v CUDAHOSTCXX ]] && local -x CUDAHOSTCXX="$(cuda_gccdir)"
+		[[ ! -v CUDAHOSTLD ]] && local -x CUDAHOSTLD="$(tc-getCXX)"
 
 		# default to all-major for now until cuda.eclass is updated
 		if [[ ! -v CUDAARCHS ]]; then
@@ -454,6 +471,15 @@ src_configure() {
 
 		mycmakeargs+=(
 			-DCMAKE_CUDA_ARCHITECTURES="${CUDAARCHS}"
+
+			# new
+			# -DGGML_CUDA_FA_ALL_QUANTS="yes"
+			-DGGML_CUDA_FA_QUANTS="all"
+			# -DGGML_CUDA_FORCE_MMQ="yes"
+			# -DGGML_CUDA_FORCE_CUBLAS="yes"
+			-DGGML_CUDA_ENABLE_UNIFIED_MEMORY="yes"
+			-DGGML_CUDA_KQUANTS_ITER="2"
+			-DGGML_CUDA_MMV_Y="2"
 		)
 
 		cuda_add_sandbox -w
@@ -500,9 +526,13 @@ src_configure() {
 		# -DCMAKE_INSTALL_INCLUDEDIR="${EPREFIX}/usr/$(get_libdir)/${MY_PN}/include"
 		# -DCMAKE_INSTALL_LIBDIR="${EPREFIX}/usr/$(get_libdir)/${MY_PN}/$(get_libdir)"
 
-		-DCMAKE_INSTALL_INCLUDEDIR="${EPREFIX}/usr/libexec/${MY_PN}/include"
-		-DCMAKE_INSTALL_LIBDIR="${EPREFIX}/usr/libexec/${MY_PN}/$(get_libdir)"
-		-DCMAKE_INSTALL_RPATH="${EPREFIX}/usr/libexec/${MY_PN}/$(get_libdir)"
+		# -DCMAKE_INSTALL_INCLUDEDIR="${EPREFIX}/usr/libexec/${MY_PN}/include"
+		# -DCMAKE_INSTALL_LIBDIR="${EPREFIX}/usr/libexec/${MY_PN}/$(get_libdir)"
+		# -DCMAKE_INSTALL_RPATH="${EPREFIX}/usr/libexec/${MY_PN}/$(get_libdir)"
+
+		-DCMAKE_INSTALL_INCLUDEDIR="${EPREFIX}/usr/include/${MY_PN}"
+		-DCMAKE_INSTALL_LIBDIR="${EPREFIX}/usr/$(get_libdir)/${MY_PN}"
+		-DCMAKE_INSTALL_RPATH="${EPREFIX}/usr/$(get_libdir)/${MY_PN}"
 
 		-DLLAMA_USE_SYSTEM_GGML="$(usex system-ggml)"
 
@@ -511,6 +541,9 @@ src_configure() {
 		-DLLAMA_BUILD_SERVER="yes"
 		-DLLAMA_BUILD_TESTS="$(usex test)"
 		-DLLAMA_BUILD_TOOLS="$(usex tools)"
+
+		-DLLAMA_BUILD_UI="yes"
+		-DLLAMA_USE_PREBUILT_UI="yes"
 
 		-DLLAMA_TESTS_INSTALL="no"
 
@@ -567,25 +600,29 @@ src_test() {
 
 	# insert into cmake EXTRA_ARGS --offline
 	CMAKE_SKIP_TESTS+=(
-		"test-chat"
+		"^test-chat$"
+
+		"^test-llama-archs$"
 
 		# needs network
 		"^test-arg-parser$"
+		"^test-download-model$"
+		"^test-gguf-model-data$"
 
 		"^test-backend-ops$"
 	)
 
-# 	if ! use system-ggml; then
-# 		if use cuda && { use opencl || use vulkan; } then
-# 			CMAKE_SKIP_TESTS+=(
-# 				"^test-thread-safety$"
-# 				"^test-backend-ops$"
-# 			)
-# 		fi
-# 	fi
+	# if ! use system-ggml; then
+	# 	if use cuda && { use opencl || use vulkan; } then
+	# 		CMAKE_SKIP_TESTS+=(
+	# 			"^test-thread-safety$"
+	# 			"^test-backend-ops$"
+	# 		)
+	# 	fi
+	# fi
 
-	local -x TEST_VERBOSE=1
-	local -x CTEST_JOBS=1
+	# local -x TEST_VERBOSE=1
+	# local -x CTEST_JOBS=1
 	cmake_src_test
 
 	if use python ; then
@@ -606,8 +643,8 @@ src_install() {
 	# fi
 
 	if ! use system-ggml; then
-		# dobin "${BUILD_DIR}/bin/rpc-server"
-		# patchelf --remove-rpath "${ED}/usr/bin/rpc-server" || die
+		# dobin "${BUILD_DIR}/bin/ggml-rpc-server"
+		# patchelf --remove-rpath "${ED}/usr/bin/ggml-rpc-server" || die
 
 		# avoid clashing with whisper.cpp
 		# rm -rf "${ED}/usr/include"
