@@ -58,7 +58,7 @@ DOCS=(
 )
 
 PATCHES=(
-	"${FILESDIR}/${PN}-3.2.2-float-comp-is-hard.patch"
+	"${FILESDIR}/${PN}-3.2.2-fix-float-comp.patch" #981863
 )
 
 pkg_setup() {
