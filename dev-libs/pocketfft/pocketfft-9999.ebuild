@@ -8,7 +8,7 @@ inherit meson toolchain-funcs
 DESCRIPTION="PocketFFT for C++"
 HOMEPAGE="https://github.com/mreineck/pocketfft https://gitlab.mpcdf.mpg.de/mtr/pocketfft"
 
-if [[ ${PV} = *9999* ]] ; then
+if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/mreineck/pocketfft.git"
 else
