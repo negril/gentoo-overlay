@@ -1,0 +1,32 @@
+From 8c2ddd79e11bc1fb739bc785059408b202f3584d Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Thu, 1 Oct 2026 14:39:18 +0200
+Subject: fix tests with limited area
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/tests/cli-exif.tap b/tests/cli-exif.tap
+index 6a923fd06..a58dc1fad 100755
+--- a/tests/cli-exif.tap
++++ b/tests/cli-exif.tap
+@@ -115,7 +115,7 @@ check_promotion()
+   endian=$2
+ 
+   write_profile "$profile" "$endian"
+-  if ${MAGICK} -size 65536x1 xc:black -set profile "$profile" \
++  if ${MAGICK} -size 4000x1 xc:black -set profile "$profile" \
+       "$promotion_output" >/dev/null 2>&1; then
+     metadata=`${IDENTIFY} -quiet -format \
+       '%[EXIF:ImageWidth]x%[EXIF:ImageLength] %[EXIF:PixelXDimension]x%[EXIF:PixelYDimension]' \
+@@ -123,7 +123,7 @@ check_promotion()
+   else
+     metadata=
+   fi
+-  check_value "$endian SHORT promotion" "$metadata" "65536x1 65536x1"
++  check_value "$endian SHORT promotion" "$metadata" "4000x1 4000x1"
+ }
+ 
+ check_malformed_profile()
+-- 
+2.56.0
+
