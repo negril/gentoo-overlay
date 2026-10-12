@@ -20,6 +20,7 @@ else
 
 	MY_PV="$(ver_rs 3 '-')"
 	MY_P="ImageMagick-${MY_PV}"
+	# TODO FIX MIRROR BUG
 	SRC_URI="
 		mirror://imagemagick/${MY_P}.tar.xz
 		verify-sig? ( mirror://imagemagick/${MY_P}.tar.xz.asc )
@@ -35,10 +36,12 @@ LICENSE="imagemagick"
 # Please check this on bumps, SONAME is often not updated! Use abidiff on old/new.
 # If ABI is broken, change the bit after the '-'.
 SLOT="0/$(ver_cut 1-3)-18"
-IUSE="bzip2 corefonts +cxx djvu fftw fontconfig fpx graphviz hardened hdri heif"
-IUSE+=" jbig jpeg jpeg2k jpegxl lcms lqr lzma opencl openexr openmp pango perl ${GENTOO_PERL_USESTRING}"
-IUSE+=" +png postscript q32 q8 raw static-libs svg test tiff truetype webp wmf"
-IUSE+=" X xml zip zlib"
+IUSE="
+	bzip2 corefonts +cxx djvu fftw fontconfig fpx graphviz hardened hdri heif
+	jbig jpeg jpeg2k jpegxl lcms lqr lzma opencl openexr openmp pango perl ${GENTOO_PERL_USESTRING}
+	+png postscript q32 q8 raw static-libs svg test tiff truetype +uhdr webp wmf
+	X xml zip zlib
+"
 
 REQUIRED_USE="
 	corefonts? ( truetype )
@@ -58,7 +61,21 @@ RDEPEND="
 	fontconfig? ( media-libs/fontconfig )
 	fpx? ( >=media-libs/libfpx-1.3.0-r1 )
 	graphviz? ( media-gfx/graphviz )
-	heif? ( media-libs/libheif:=[x265] )
+	heif? (
+		media-libs/libheif:=
+		|| (
+			media-libs/libheif[x265]
+			media-libs/libheif[kvazaar]
+		)
+		|| (
+			media-libs/libheif[ffmpeg]
+			media-libs/libheif[de265]
+		)
+		|| (
+			media-libs/libheif[aom]
+			media-libs/libheif[dav1d]
+		)
+	)
 	jbig? ( >=media-libs/jbigkit-2:= )
 	jpeg? ( media-libs/libjpeg-turbo:= )
 	jpeg2k? ( >=media-libs/openjpeg-2.1.0:2 )
@@ -84,6 +101,7 @@ RDEPEND="
 		media-fonts/urw-fonts
 		>=media-libs/freetype-2
 	)
+	uhdr? ( media-libs/libultrahdr:= )
 	webp? ( media-libs/libwebp:= )
 	wmf? ( media-libs/libwmf )
 	X? (
@@ -105,6 +123,7 @@ BDEPEND+=" virtual/pkgconfig"
 
 PATCHES=(
 	"${FILESDIR}/${PN}-9999-nocputuning.patch"
+	"${FILESDIR}/${PN}-7.1.2.32-fix-tests-with-limited-area.patch"
 )
 
 pkg_pretend() {
@@ -156,7 +175,7 @@ src_configure() {
 		$(use_with zip)
 		$(use_with zlib)
 		--without-autotrace
-		--with-uhdr
+		$(use_with uhdr)
 		$(use_with postscript dps)
 		$(use_with djvu)
 		--with-dejavu-font-dir="${EPREFIX}"/usr/share/fonts/dejavu
@@ -191,7 +210,7 @@ src_configure() {
 		#
 		# We might change it to 'secure' and 'limited' at some point.
 		# See also bug #716674.
-		--with-security-policy=$(usex hardened limited open)
+		--with-security-policy=$(usex hardened websafe open)
 	)
 
 	CONFIG_SHELL="${BROOT}"/bin/bash econf "${myeconfargs[@]}"
