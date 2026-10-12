@@ -10,7 +10,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{12..14} )
 
-inherit cmake python-single-r1
+inherit cmake python-single-r1 flag-o-matic
 
 MY_PN=${PN^}
 
@@ -42,8 +42,9 @@ RDEPEND="
 	python? (
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
-			dev-python/pybind11[${PYTHON_USEDEP}]
+			dev-libs/boost:=[python,${PYTHON_USEDEP}]
 			dev-python/numpy[${PYTHON_USEDEP}]
+			dev-python/pybind11[${PYTHON_USEDEP}]
 		')
 	)
 "
@@ -73,7 +74,9 @@ PATCHES=(
 )
 
 pkg_setup() {
-	use python && python-single-r1_pkg_setup
+	if use python; then
+		python-single-r1_pkg_setup
+	fi
 }
 
 src_configure() {
@@ -89,18 +92,22 @@ src_configure() {
 	)
 	if use python; then
 		mycmakeargs+=(
-			-DPYTHON="no" # uses boost[python]
+			-DPYTHON="yes" # uses boost[python]
 			-DPYBIND11="yes"  # uses pybind
-			# -DPython3_EXECUTABLE="${EPYTHON}"
-			# -DPython3_PREFIX="${ED}"
-			# -DPython3_SITEARCH="${D}$(python_get_sitedir)"
-			# -DPython3_INCLUDE_DIR="$(python_get_includedir)"
-			# -DPython3_LIBRARY="$(python_get_library_path)"
 			-DPYTHON_INSTALL_DIR="$(python_get_sitedir)"
 		)
 	fi
 
 	cmake_src_configure
+}
+
+src_test() {
+	local CMAKE_SKIP_TESTS=(
+		# Throws exception, use of boost[python] is being replaced upstream
+		"^PyImath.PyImathTestC$"
+	)
+
+	cmake_src_test
 }
 
 src_install() {
