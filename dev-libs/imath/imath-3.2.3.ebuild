@@ -10,7 +10,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{12..14} )
 
-inherit cmake python-single-r1 flag-o-matic
+inherit cmake python-single-r1
 
 MY_PN=${PN^}
 
@@ -89,11 +89,12 @@ src_configure() {
 		-DIMATH_USE_CLANG_TIDY=OFF
 		-DIMATH_USE_DEFAULT_VISIBILITY=OFF
 		-DIMATH_USE_NOEXCEPT=ON
+
+		-DPYTHON="$(usex python)" # uses boost[python]
+		-DPYBIND11="$(usex python)" # uses pybind
 	)
 	if use python; then
 		mycmakeargs+=(
-			-DPYTHON="yes" # uses boost[python]
-			-DPYBIND11="yes"  # uses pybind
 			-DPYTHON_INSTALL_DIR="$(python_get_sitedir)"
 		)
 	fi
