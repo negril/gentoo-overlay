@@ -1,0 +1,40 @@
+From 0301ce89869c6691c2b1fe4db4d545401da27536 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 30 Jan 2026 14:54:34 +0100
+Subject: nanovdb: make building CCCL optional
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/nanovdb/nanovdb/CMakeLists.txt b/nanovdb/nanovdb/CMakeLists.txt
+index 22c6320e..c4ef005e 100644
+--- a/nanovdb/nanovdb/CMakeLists.txt
++++ b/nanovdb/nanovdb/CMakeLists.txt
+@@ -30,6 +30,7 @@ option(NANOVDB_BUILD_PYTHON_MODULE "Build the nanovdb Python module" OFF)
+ 
+ option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
+ option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
++option(NANOVDB_BUILD_CCCL "Build CCCL" OFF)
+ option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
+ 
+ option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
+@@ -117,6 +118,7 @@ if(NANOVDB_USE_CUDA)
+   find_package(CUDAToolkit)
+ 
+ 
++  if(NANOVDB_BUILD_CCCL)
+   include(../../cmake/CPM.cmake)
+ 
+   # This will automatically clone CCCL from GitHub and make the exported cmake targets available
+@@ -127,6 +129,9 @@ if(NANOVDB_USE_CUDA)
+   )
+ 
+   find_package(NCCL)
++  else()
++    find_package(CCCL)
++  endif()
+ endif()
+ 
+ if(NANOVDB_USE_OPENVDB)
+-- 
+2.53.0
+

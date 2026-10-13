@@ -1,0 +1,43 @@
+From 5d341960bfa03398c40d343fdf2b2a8ffdde4e76 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 19 Mar 2026 00:37:24 +0100
+Subject: nanovdb: fix variable names
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/nanovdb/nanovdb/tools/VoxelBlockManager.h b/nanovdb/nanovdb/tools/VoxelBlockManager.h
+index 5d05f06f..7fba10f6 100644
+--- a/nanovdb/nanovdb/tools/VoxelBlockManager.h
++++ b/nanovdb/nanovdb/tools/VoxelBlockManager.h
+@@ -56,20 +56,20 @@ public:
+     VoxelBlockManagerHandle& operator=(VoxelBlockManagerHandle&& other) noexcept {
+         mFirstLeafID = std::move(other.mFirstLeafID);
+         mJumpMap = std::move(other.mJumpMap);
+-        mBlockCount = other.mblockCount;
+-        mFirstOffset = other.mfirstOffset;
+-        mLastOffset = other.mlastOffset;
+-        mLowerCount = other.mlowerCount;
++        mBlockCount = other.mBlockCount;
++        mFirstOffset = other.mFirstOffset;
++        mLastOffset = other.mLastOffset;
++        mLowerCount = other.mLowerCount;
+         return *this;
+     }
+ 
+     VoxelBlockManagerHandle(VoxelBlockManagerHandle&& other) noexcept {
+         mFirstLeafID = std::move(other.mFirstLeafID);
+         mJumpMap = std::move(other.mJumpMap);
+-        mBlockCount = other.mblockCount;
+-        mFirstOffset = other.mfirstOffset;
+-        mLastOffset = other.mlastOffset;
+-        mLowerCount = other.mlowerCount;
++        mBlockCount = other.mBlockCount;
++        mFirstOffset = other.mFirstOffset;
++        mLastOffset = other.mLastOffset;
++        mLowerCount = other.mLowerCount;
+     }
+ 
+     ~VoxelBlockManagerHandle() { this->reset(); }
+-- 
+2.53.0
+
