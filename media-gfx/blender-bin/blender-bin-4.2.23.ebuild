@@ -41,7 +41,6 @@ RDEPEND="
 	sys-libs/ncurses
 	virtual/libcrypt
 	virtual/zlib:0/1
-	x11-base/xorg-server
 	x11-libs/libICE
 	x11-libs/libSM
 	x11-libs/libX11
