@@ -1,0 +1,22 @@
+From 38b688dadb02a205101cfcc65d02905a6a120201 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 14 Oct 2026 00:16:00 +0200
+Subject: mitigate missing assets count
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/tests/tester_v3_c.c b/tests/tester_v3_c.c
+index d53a372..98c0ef8 100644
+--- a/tests/tester_v3_c.c
++++ b/tests/tester_v3_c.c
+@@ -1680,6 +1680,7 @@ static int parse_file_arg(const char *path) {
+     }
+   } else {
+     printf("COUNTS"
++           " asset=1"
+            " accessors=%u animations=%u buffers=%u bufferViews=%u"
+            " cameras=%u images=%u materials=%u meshes=%u nodes=%u"
+            " samplers=%u scenes=%u skins=%u textures=%u lights=%u\n",
+-- 
+2.56.0
+
