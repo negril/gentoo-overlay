@@ -1,0 +1,38 @@
+From a5a8cb0233b4ebecce5f7537723e20a22aab152b Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Sun, 19 Apr 2026 15:16:47 +0200
+Subject: buildstring
+
+
+diff --git a/cmake/EigenTesting.cmake b/cmake/EigenTesting.cmake
+index ae5944b9a..0acd17502 100644
+--- a/cmake/EigenTesting.cmake
++++ b/cmake/EigenTesting.cmake
+@@ -707,14 +707,22 @@ macro(ei_get_cxxflags VAR)
+     set(${VAR} VSX)
+   elseif(EIGEN_TEST_ALTIVEC)
+     set(${VAR} ALVEC)
+-  elseif(EIGEN_TEST_FMA)
+-    set(${VAR} FMA)
++  elseif(EIGEN_TEST_AVX512DQ)
++    set(${VAR} AVX512DQ)
++  elseif(EIGEN_TEST_AVX512)
++    set(${VAR} AVX512)
++  elseif(EIGEN_TEST_AVX2)
++    set(${VAR} AVX2)
++  elseif(EIGEN_TEST_F16C)
++    set(${VAR} F16C)
+   elseif(EIGEN_TEST_AVX)
+     set(${VAR} AVX)
+   elseif(EIGEN_TEST_SSE4_2)
+     set(${VAR} SSE42)
+   elseif(EIGEN_TEST_SSE4_1)
+     set(${VAR} SSE41)
++  elseif(EIGEN_TEST_FMA)
++    set(${VAR} FMA)
+   elseif(EIGEN_TEST_SSSE3)
+     set(${VAR} SSSE3)
+   elseif(EIGEN_TEST_SSE3)
+-- 
+2.55.0
+

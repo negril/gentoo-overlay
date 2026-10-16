@@ -231,8 +231,8 @@ PATCHES=(
 	"${FILESDIR}/${PN}-3.4.0-doc-nocompress.patch" # bug 830064
 	"${FILESDIR}/${PN}-3.4.0-buildstring.patch"
 
-	"${FILESDIR}/${PN}-5.0.1-cmake-GNUInstallDirs.patch"
-	"${FILESDIR}/${PN}-5.0.1-make-static-libs-optional.patch"
+	"${FILESDIR}/${PN}-9999-0005-cmake-GNUInstallDirs.patch"
+	"${FILESDIR}/${PN}-9999-0006-make-static-libs-optional.patch"
 
 	"${FILESDIR}/${PN}-9999-Do-not-show-deprecated-CUDA-device-properties-for-CU.patch"
 	"${FILESDIR}/${PN}-9999-product_threaded_dont_parallelize.patch"

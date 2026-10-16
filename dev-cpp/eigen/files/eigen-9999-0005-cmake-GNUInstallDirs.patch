@@ -1,0 +1,71 @@
+From c3dfa526c6da1c4adba53bebd3c2c6262b1443ba Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Sat, 27 Dec 2025 15:39:40 +0100
+Subject: cmake GNUInstallDirs
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/blas/CMakeLists.txt b/blas/CMakeLists.txt
+index 4053b03e3..bdb79263f 100644
+--- a/blas/CMakeLists.txt
++++ b/blas/CMakeLists.txt
+@@ -25,6 +25,7 @@ if (EIGEN_BUILD_SHARED_LIBS)
+   list(APPEND EIGEN_BLAS_TARGETS eigen_blas)
+ endif()
+ 
++include(GNUInstallDirs)
+ foreach(target IN LISTS EIGEN_BLAS_TARGETS)
+   if(EIGEN_STANDARD_LIBRARIES_TO_LINK_TO)
+       target_link_libraries(${target} ${EIGEN_STANDARD_LIBRARIES_TO_LINK_TO})
+@@ -32,10 +33,7 @@ foreach(target IN LISTS EIGEN_BLAS_TARGETS)
+ 
+   add_dependencies(blas ${target})
+   if(EIGEN_INSTALL)
+-    install(TARGETS ${target}
+-            RUNTIME DESTINATION bin
+-            LIBRARY DESTINATION lib
+-            ARCHIVE DESTINATION lib)
++    install(TARGETS ${target})
+   endif()
+ endforeach()
+ 
+diff --git a/doc/CMakeLists.txt b/doc/CMakeLists.txt
+index 18efcde2d..a71967cbf 100644
+--- a/doc/CMakeLists.txt
++++ b/doc/CMakeLists.txt
+@@ -7,6 +7,8 @@ set_directory_properties(PROPERTIES EXCLUDE_FROM_ALL TRUE)
+ 
+ project(EigenDoc)
+ 
++include(GNUInstallDirs)
++
+ if(CMAKE_COMPILER_IS_GNUCXX)
+   if(CMAKE_SYSTEM_NAME MATCHES Linux)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -g1")
+diff --git a/lapack/CMakeLists.txt b/lapack/CMakeLists.txt
+index c6a952c2d..c168c2b12 100644
+--- a/lapack/CMakeLists.txt
++++ b/lapack/CMakeLists.txt
+@@ -119,6 +119,7 @@ if (EIGEN_BUILD_SHARED_LIBS)
+   list(APPEND EIGEN_LAPACK_TARGETS eigen_lapack)
+ endif()
+ 
++include(GNUInstallDirs)
+ foreach(target IN LISTS EIGEN_LAPACK_TARGETS)
+   if(EIGEN_STANDARD_LIBRARIES_TO_LINK_TO)
+     target_link_libraries(${target} ${EIGEN_STANDARD_LIBRARIES_TO_LINK_TO})
+@@ -126,10 +127,7 @@ foreach(target IN LISTS EIGEN_LAPACK_TARGETS)
+   target_link_libraries(${target} Eigen3::Eigen)
+   add_dependencies(lapack ${target})
+   if(EIGEN_INSTALL)
+-    install(TARGETS ${target}
+-            RUNTIME DESTINATION bin
+-            LIBRARY DESTINATION lib
+-            ARCHIVE DESTINATION lib)
++    install(TARGETS ${target})
+   endif()
+ endforeach()
+ 
+-- 
+2.55.0
+
