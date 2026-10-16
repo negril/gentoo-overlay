@@ -41,7 +41,8 @@ src_test() {
 	# sed -e "s/-O3/$(get-flag '-O*')/" -i tests/Makefile || die
 	sed -e "s/-O3 //" -i tests/Makefile || die
 
-	local -x OMPI_CXX="ccache $(tc-getCXX)"
+	local -x OMPI_CXX="$(tc-getCXX)"
+	# local -x OMPI_CXX="ccache $(tc-getCXX)"
 	local -x OMPI_CXXFLAGS="${CXXFLAGS}"
 
 	local myemakeargs=(
