@@ -24,7 +24,7 @@ REQUIRED_USE="test-full? ( test )"
 RESTRICT="!test? ( test )"
 
 BDEPEND="
-	doc? ( app-text/doxygen )
+	doc? ( app-text/doxygen[dot] )
 "
 DEPEND="
 	media-libs/libpng:=[${MULTILIB_USEDEP}]
@@ -62,6 +62,7 @@ MULTILIB_WRAPPED_HEADERS=(
 
 PATCHES=(
 	"${FILESDIR}"/libheif-1.21.2-svt-av1-4.patch
+	"${FILESDIR}"/libheif-1.21.2-svt-av1-4.1.patch
 )
 
 pkg_pretend() {
@@ -72,7 +73,7 @@ pkg_pretend() {
 
 multilib_src_configure() {
 	local mycmakeargs=(
-		$(cmake_use_find_package doc Doxygen)
+		-DBUILD_DOCUMENTATION=$(usex doc)
 		-DBUILD_TESTING=$(usex test)
 		-DENABLE_PLUGIN_LOADING=true
 		-DWITH_LIBDE265=$(usex de265)
@@ -115,6 +116,14 @@ multilib_src_configure() {
 	fi
 
 	cmake_src_configure
+}
+
+multilib_src_install() {
+	if multilib_native_use doc; then
+		local HTML_DOCS=( "${BUILD_DIR}"/apidoc/html/. )
+	fi
+
+	cmake_src_install
 }
 
 pkg_postinst() {
