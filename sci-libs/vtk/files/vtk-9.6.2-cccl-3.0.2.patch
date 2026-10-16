@@ -1,0 +1,28 @@
+From 27ad9cedd2f9199a43ffd626fc62fca27b34f750 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Tue, 2 Jun 2026 15:01:04 +0200
+Subject: cccl 3.0.2
+
+
+diff --git a/ThirdParty/viskores/vtkviskores/viskores/viskores/exec/cuda/internal/WrappedOperators.h b/ThirdParty/viskores/vtkviskores/viskores/viskores/exec/cuda/internal/WrappedOperators.h
+index 8e465e8..6e44665 100644
+--- a/ThirdParty/viskores/vtkviskores/viskores/viskores/exec/cuda/internal/WrappedOperators.h
++++ b/ThirdParty/viskores/vtkviskores/viskores/viskores/exec/cuda/internal/WrappedOperators.h
+@@ -199,6 +199,7 @@ struct WrappedBinaryPredicate
+ }
+ } //namespace viskores::exec::cuda::internal
+ 
++#if THRUST_VERSION < 300200
+ VISKORES_THRUST_NAMESPACE_BEGIN
+ namespace detail
+ {
+@@ -223,5 +224,6 @@ struct is_commutative<viskores::exec::cuda::internal::WrappedBinaryOperator<T, F
+ #endif
+ }
+ VISKORES_THRUST_NAMESPACE_END //namespace thrust::detail
++#endif
+ 
+ #endif //viskores_exec_cuda_internal_WrappedOperators_h
+-- 
+2.54.0
+
