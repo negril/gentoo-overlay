@@ -8,7 +8,6 @@ inherit cmake flag-o-matic
 DESCRIPTION="A library for storing voxel data"
 HOMEPAGE="http://opensource.imageworks.com/?p=field3d"
 
-
 SRC_COMMIT="b0ff0cd67893a4cbfa322676eb3eef10100d904d"
 SRC_URI="https://github.com/imageworks/Field3D/archive/${SRC_COMMIT}.tar.gz -> ${P}.tar.gz"
 S="${WORKDIR}/${PN}-${SRC_COMMIT}"
