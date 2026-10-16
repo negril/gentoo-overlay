@@ -19,16 +19,25 @@ HOMEPAGE="https://partio.us/"
 
 LICENSE="BSD"
 SLOT="0"
-IUSE="doc test"
+IUSE="doc python test tools"
 RESTRICT="!test? ( test )"
 
-REQUIRED_USE="${PYTHON_REQUIRED_USE}"
+REQUIRED_USE="
+	python? (
+		${PYTHON_REQUIRED_USE}
+	)
+"
 
-RDEPEND="${PYTHON_DEPS}
-	media-libs/freeglut
-	media-libs/glu
+RDEPEND="
+	python? (
+		${PYTHON_DEPS}
+	)
+	tools? (
+		media-libs/freeglut
+		media-libs/glu
+		virtual/opengl
+	)
 	virtual/zlib:=
-	virtual/opengl
 "
 
 DEPEND="${RDEPEND}
@@ -38,7 +47,9 @@ DEPEND="${RDEPEND}
 "
 
 BDEPEND="
-	dev-lang/swig
+	python? (
+		dev-lang/swig
+	)
 	doc? (
 		app-text/doxygen
 		dev-texlive/texlive-bibtexextra
@@ -50,32 +61,27 @@ BDEPEND="
 "
 
 PATCHES=(
-	"${FILESDIR}/${PN}-1.19.0-fix-python-install-dir.patch"
+	"${FILESDIR}/${PN}-1.20.0-fix-python-install-dir.patch"
 )
-
-src_prepare() {
-	cmake_src_prepare
-
-	sed \
-		-e 's/assertEquals/assertEqual/g' \
-		-i src/tests/testpartjson.py \
-		|| die
-}
 
 src_configure() {
 	local mycmakeargs=(
-		"$(cmake_use_find_package doc Doxygen)"
-
-		-DPARTIO_GTEST_ENABLED="$(usex test)" # "Enable GTest for tests"
+		-DPARTIO_ENABLE_TESTING="$(usex test)" # "Enable testing"
 		-DPARTIO_ORIGIN_RPATH="OFF" # "Enable ORIGIN rpath in the installed libraries"
 
 		-DPARTIO_USE_GLVND="ON" # "Use GLVND for OpenGL"
 		-DPARTIO_BUILD_SHARED_LIBS="ON" # "Enabled shared libraries"
 
-		-DWDAS_CXX_STANDARD=17
-
-		-DPYTHON_DEST="$(python_get_sitedir)" #922965
+		-DPARTIO_BUILD_DOCS="$(usex doc)"
+		-DPARTIO_BUILD_PYTHON="$(usex python)"
+		-DPARTIO_BUILD_TOOLS="$(usex tools)"
 	)
+	if use python; then
+		mycmakeargs+=(
+			-DPython_EXECUTABLE="${PYTHON}"
+			-DPYTHON_DEST="$(python_get_sitedir)" #922965
+		)
+	fi
 
 	cmake_src_configure
 }
@@ -84,13 +90,19 @@ src_test() {
 	#889567
 	# for libpartio.so.1
 	local -x LD_LIBRARY_PATH="${BUILD_DIR}/src/lib"
-	# for import partjson, partio
-	local -x PYTHONPATH="${BUILD_DIR}/src/py:${CMAKE_USE_DIR}/src/tools"
 
-	CMAKE_SKIP_TESTS=(
-		# TypeError: Wrong number or type of arguments for overloaded function 'clone'.
-		"^testpartio$"
+	local CMAKE_SKIP_TESTS=(
 	)
+
+	if use python; then
+		# for import partjson, partio
+		local -x PYTHONPATH="${BUILD_DIR}/src/py:${CMAKE_USE_DIR}/src/tools"
+	else
+		CMAKE_SKIP_TESTS+=(
+			"^testpartio$"
+			"^testpartjson$"
+		)
+	fi
 
 	cmake_src_test
 }

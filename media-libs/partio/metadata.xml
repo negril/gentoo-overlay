@@ -12,4 +12,7 @@
 	<upstream>
 		<remote-id type="github">wdas/partio</remote-id>
 	</upstream>
+	<use>
+		<flag name="tools">Enable CLI tools</flag>
+	</use>
 </pkgmetadata>
