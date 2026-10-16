@@ -61,15 +61,32 @@ src_configure() {
 	local mycmakeargs=(
 		-DMANIFOLD_CROSS_SECTION="yes"
 		-DMANIFOLD_CROSS_SECTION_BACKEND="clipper2" # boolean2
+
+		-DMANIFOLD_ASSERT="$(usex debug)"
 		-DMANIFOLD_DEBUG="$(usex debug)"
-		-DMANIFOLD_DOWNLOADS="no"
+		-DMANIFOLD_FUZZ="no"
+		# -DMANIFOLD_FUZZ="$(usex debug $(usex test))"
+		-DMANIFOLD_OPTIMIZED="$(usex debug $(usex test))"
+		-DMANIFOLD_STRICT="$(usex !debug)" # adds -Werror
+		-DMANIFOLD_TIMING="$(usex debug)"
+
+		#-DMANIFOLD_DOWNLOADS="no"
 		-DASSIMP_ENABLE="$(usex assimp)"
 		-DMANIFOLD_JSBIND="no"
-		-DMANIFOLD_PAR="$(usex tbb ON OFF)"
-		-DMANIFOLD_STRICT="no" # adds -Werror
+		-DMANIFOLD_PAR="$(usex tbb)"
+		# -DMANIFOLD_STRICT="no" # adds -Werror
 		-DMANIFOLD_PYBIND="$(usex python)"
 		-DMANIFOLD_TEST="$(usex test)"
+		# TODO breaks otherwise. why?
+		-DMANIFOLD_NO_IOSTREAM="$(usex test)"
+
+		# -DMANIFOLD_DEBUG="no"
+		# -DMANIFOLD_TIMING="no"
 	)
+	# if use debug && use test && ! tc-is-clang ; then
+	# 	export CC=${CHOST}-clang
+	# 	export CXX=${CHOST}-clang++
+	# fi
 
 	cmake_src_configure
 }
@@ -79,5 +96,5 @@ src_test() {
 		local -x GTEST_FILTER="-Properties.ToleranceSphere:Boolean.AlmostCoplanar:Smooth.RefineQuads:Smooth.ToLength:Smooth.Torus"
 	fi
 
-	cmake_src_test
+	cmake_src_test --extra-verbose
 }
