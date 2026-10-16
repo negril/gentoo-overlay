@@ -10,10 +10,10 @@ HOMEPAGE="https://pybullet.org/wordpress/"
 
 SRC_URI="https://github.com/bulletphysics/${PN}3/archive/${PV}.tar.gz -> ${P}.tar.gz"
 S="${WORKDIR}/${PN}3-${PV}"
-KEYWORDS="~amd64 ~arm ~arm64 ~ppc ~ppc64 ~riscv ~x86"
 
 LICENSE="ZLIB"
 SLOT="0/${PV}"
+KEYWORDS="~amd64 ~arm ~arm64 ~loong ~ppc ~ppc64 ~riscv ~x86"
 IUSE="doc double-precision examples extras openmp tbb test +threads"
 
 REQUIRED_USE="
@@ -68,7 +68,7 @@ src_configure() {
 		-DINSTALL_LIBS=ON
 		-DBUILD_BULLET3=ON
 		# BUG unused
-		-DBUILD_BULLET_ROBOTICS_GUI_EXTRA=OFF	# This module depends on example libraries
+		# -DBUILD_BULLET_ROBOTICS_GUI_EXTRA=OFF	# This module depends on example libraries
 		-DBUILD_EXTRAS=$(usex extras)
 		-DUSE_DOUBLE_PRECISION=$(usex double-precision)
 		-DBUILD_UNIT_TESTS=$(usex test)
