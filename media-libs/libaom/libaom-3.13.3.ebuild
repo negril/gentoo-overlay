@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..14} )
+PYTHON_COMPAT=( python3_{12..14} )
 inherit cmake-multilib flag-o-matic multiprocessing python-any-r1
 
 DESCRIPTION="Alliance for Open Media AV1 Codec SDK"
@@ -68,7 +68,7 @@ PATCHES=(
 src_prepare() {
 	# fix hardcoded path
 	# libvmaf ERROR could not read model from path: "/usr/local/share/model/vmaf_v0.6.1.json"
-	sed -e "s#/usr/local/share/model/#${EPREFIX}/usr/share/vmaf/model/#g" -i README.md  av1/av1_cx_iface.c || die
+	sed -e "s#/usr/local/share/model/#${EPREFIX}/usr/share/vmaf/model/#g" -i README.md av1/av1_cx_iface.c || die
 
 	sed \
 		-e 's/AOM_INSTALL_LIBS aom aom_static/AOM_INSTALL_LIBS aom/g' \
@@ -167,4 +167,8 @@ multilib_src_install() {
 	fi
 
 	cmake_src_install
+}
+
+multilib_src_install_all() {
+	find "${ED}" -type f \( -name "*.a" -o -name "*.la" \) -delete || die
 }

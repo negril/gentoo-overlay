@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..14} )
+PYTHON_COMPAT=( python3_{12..14} )
 inherit cmake-multilib flag-o-matic multiprocessing python-any-r1
 
 DESCRIPTION="Alliance for Open Media AV1 Codec SDK"
@@ -25,7 +25,7 @@ else
 fi
 
 LICENSE="BSD-2"
-SLOT="0/3"
+SLOT="0/$(ver_cut 1)"
 
 IUSE="big-endian debug doc +examples test
 	cpu_flags_x86_mmx
@@ -72,7 +72,7 @@ src_prepare() {
 
 	sed \
 		-e 's/AOM_INSTALL_LIBS aom aom_static/AOM_INSTALL_LIBS aom/g' \
-		-i cmake/aom_install.cmake || die
+		-i build/cmake/aom_install.cmake || die
 
 	cmake_src_prepare
 }
@@ -167,4 +167,8 @@ multilib_src_install() {
 	fi
 
 	cmake_src_install
+}
+
+multilib_src_install_all() {
+	find "${ED}" -type f \( -name "*.a" -o -name "*.la" \) -delete || die
 }
