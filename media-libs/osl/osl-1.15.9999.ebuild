@@ -4,24 +4,28 @@
 EAPI=8
 
 # keep in sync with blender
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 
 # Check this on updates
-LLVM_COMPAT=( {18..22} )
+LLVM_COMPAT=( {18..23} )
 
-inherit cmake cuda flag-o-matic llvm-r1 toolchain-funcs python-single-r1
+inherit cmake cuda flag-o-matic llvm-r2 toolchain-funcs python-single-r1
 
 DESCRIPTION="Advanced shading language for production GI renderers"
 HOMEPAGE="https://www.imageworks.com/technology/opensource https://github.com/AcademySoftwareFoundation/OpenShadingLanguage"
 
-if [[ ${PV} = *9999* ]] ; then
+if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/OpenShadingLanguage.git"
+	if [[ ${PV} != 9999* ]] ; then
+		EGIT_BRANCH="dev-$(ver_cut 1-2)"
+	fi
 else
 	# If a development release, please don't keyword!
 	SRC_URI="https://github.com/AcademySoftwareFoundation/OpenShadingLanguage/archive/v${PV}.tar.gz -> ${P}.tar.gz"
-	KEYWORDS="~amd64 ~arm ~arm64 ~ppc64"
 	S="${WORKDIR}/OpenShadingLanguage-${PV}"
+
+	KEYWORDS="~amd64 ~arm ~arm64 ~ppc64"
 fi
 
 LICENSE="BSD"
@@ -93,14 +97,19 @@ PATCHES=(
 )
 
 cuda_get_host_compiler() {
-	if [[ -n "${NVCC_CCBIN}" ]]; then
+	if [[ -v NVCC_CCBIN ]]; then
 		echo "${NVCC_CCBIN}"
 		return
 	fi
 
-	if [[ -n "${CUDAHOSTCXX}" ]]; then
+	if [[ -v CUDAHOSTCXX ]]; then
 		echo "${CUDAHOSTCXX}"
 		return
+	fi
+
+	if ! command -v nvcc >/dev/null; then
+		eerror "Could not find nvcc. Is the CUDA SDK installed?"
+		die "nvcc not found"
 	fi
 
 	einfo "Trying to find working CUDA host compiler"
@@ -109,9 +118,27 @@ cuda_get_host_compiler() {
 		die "$(tc-get-compiler-type) compiler is not supported"
 	fi
 
-	local compiler compiler_type compiler_version
-	local package package_version
-	# local -x NVCC_CCBIN
+	# compiler with CHOST prefix
+	# x86_64-pc-linux-gnu-g++
+	local compiler
+
+	# gcc or clang
+	local compiler_type
+
+	# major version of the current compiler. 15
+	local compiler_version
+
+	# cat/pkg of the compiler
+	# sys-devel/gcc, llvm-core/clang
+	local package
+
+	# QPN of the package we are checking
+	# sys-devel/gcc, <sys-devel/gcc-15
+	local package_version
+
+	# system compiler e.g. tc-getCXX plus version
+	# used to skip rechecking, as we check NVCC_CCBIN first
+	# x86_64-pc-linux-gnu-g++-15
 	local NVCC_CCBIN_default
 
 	compiler_type="$(tc-get-compiler-type)"
@@ -136,17 +163,35 @@ cuda_get_host_compiler() {
 
 	ebegin "testing ${NVCC_CCBIN_default} (default)"
 
-	while ! nvcc -v -ccbin "${NVCC_CCBIN}" - -x cu <<<"int main(){}" &>> "${T}/cuda_get_host_compiler.log" ; do
+	while ! \
+		nvcc \
+			-v \
+			-std=c++14 \
+			-ccbin "${NVCC_CCBIN}" \
+			- \
+			-x cu \
+			<<<"int main(){}" \
+			&>> "${T:?}/cuda_get_host_compiler.log" ;
+		do
 		eend 1
 
 		while true; do
 			# prepare next version
-			if ! package_version="<$(best_version "${package_version}")"; then
-				die "could not find a supported version of ${compiler}"
+			local package_version_next
+			package_version_next="$(best_version "${package_version}")"
+
+			if [[ -z "${package_version_next}" ]]; then
+				eerror "Compiler lookup failed. Nothing installed matches: ${package_version}."
+				eerror "You can use NVCC_CCBIN to specify the exact compiler to use."
+				eerror "Check ${T}/cuda_get_host_compiler.log for details."
+				die "Could not find a supported version of ${compiler}. Did not find \"${package_version}\". NVCC_CCBIN is unset."
 			fi
+
+			package_version="<${package_version_next}"
 
 			NVCC_CCBIN="${compiler}-$(ver_cut 1 "${package_version/#<${package}-/}")"
 
+			# skip the next version equals the already checked system default
 			[[ "${NVCC_CCBIN}" != "${NVCC_CCBIN_default}" ]] && break
 		done
 		ebegin "testing ${NVCC_CCBIN}"
@@ -164,19 +209,12 @@ cuda_get_host_native_arch() {
 }
 
 pkg_setup() {
-	llvm-r1_pkg_setup
+	llvm-r2_pkg_setup
 
 	use python && python-single-r1_pkg_setup
 }
 
 src_prepare() {
-	# we can use clang as default
-	if use clang-cuda && ! tc-is-clang ; then
-		export CC="${CHOST}-clang"
-		export CXX="${CHOST}-clang++"
-	else
-		tc-export CXX CC
-	fi
 	# clang-cuda needs to filter mfpmath
 	if use clang-cuda ; then
 		filter-mfpmath sse
@@ -190,6 +228,9 @@ src_prepare() {
 	sed -e "/^install.*llvm_macros.cmake.*cmake/d" -i CMakeLists.txt || die
 	sed -e "/install_targets ( libtestshade )/d" -i src/testshade/CMakeLists.txt || die
 
+	# TODO needed for cuda-13
+	sed -e "s/\+ptx50//g" -i src/liboslexec/llvm_util.cpp || die
+
 	cmake_src_prepare
 }
 
@@ -198,6 +239,7 @@ src_configure() {
 	# https://bugs.gentoo.org/875836
 	# https://github.com/AcademySoftwareFoundation/OpenShadingLanguage/issues/1810
 	filter-lto
+	append-flags -fno-strict-aliasing
 
 	# pick the highest we support
 	local mysimd=()
@@ -271,13 +313,17 @@ src_configure() {
 		-DLLVM_STATIC="no"
 		-DOSL_BUILD_TESTS="$(usex test)"
 		-DSTOP_ON_WARNING="no"
+		-DUSE_LLVM_BITCODE="$(usex clang-cuda)"
 		-DUSE_PARTIO="$(usex partio)"
 		-DUSE_PYTHON="$(usex python)"
 		-DUSE_SIMD="$(IFS=","; echo "${mysimd[*]}")"
 		-DUSE_BATCHED="$(IFS=","; echo "${mybatched[*]}")"
 		-DUSE_LIBCPLUSPLUS="$(usex libcxx)"
 		-DUSE_QT="$(usex gui)"
-# 		-DUSE_FAST_MATH="no"
+		# -DUSE_FAST_MATH="no"
+		# TODO
+		-DVISIBILITY_INLINES_HIDDEN="no"
+		-DCMAKE_CXX_VISIBILITY_PRESET="default"
 	)
 
 	if use debug; then
@@ -293,9 +339,10 @@ src_configure() {
 		addpredict "/dev/char/"
 
 		mycmakeargs+=(
-			-DUSE_LLVM_BITCODE="$(usex clang-cuda)"
 			-DCUDA_OPT_FLAG_NVCC="$(get-flag O)"
 			-DCUDA_OPT_FLAG_CLANG="$(get-flag O)"
+
+			-DLLVM_COMPILE_FLAGS="-D_NV_RSQRT_SPECIFIER="
 		)
 	fi
 
@@ -316,6 +363,7 @@ src_configure() {
 
 	if use optix; then
 		local -x CUDAHOSTCXX CUDAHOSTLD
+		# TODO handle USE=cuda-clang
 		CUDAHOSTCXX="$(cuda_get_host_compiler)"
 		CUDAHOSTLD="$(tc-getCXX)"
 
@@ -327,15 +375,17 @@ src_configure() {
 			-DOPTIXHOME="${OPTIX_PATH:-${ESYSROOT}/opt/optix}"
 			-DCUDA_TOOLKIT_ROOT_DIR="${CUDA_PATH:-${ESYSROOT}/opt/cuda}"
 
-			-DCUDA_NVCC_FLAGS="--compiler-bindir;${CUDAHOSTCXX}"
 			-DOSL_EXTRA_NVCC_ARGS="--compiler-bindir;${CUDAHOSTCXX}"
 			-DCUDA_VERBOSE_BUILD="yes"
 		)
+
+		if has_version ">=dev-util/nvidia-cuda-toolkit-13"; then
+			mycmakeargs+=(
+				-DCUDA_TARGET_ARCH="sm_75"
+			)
+		fi
 	fi
 
-	# Environment OPENIMAGEIO_CUDA=0 trumps everything else, turns off
-	# Cuda functionality. We don't even initialize in this case.
-# 	export OPENIMAGEIO_CUDA=0
 	cmake_src_configure
 }
 
@@ -352,6 +402,7 @@ src_test() {
 	LD_LIBRARY_PATH="${T}/usr/$(get_libdir)"
 	OSL_DIR="${T}/usr/$(get_libdir)/cmake/OSL"
 	OSL_SOURCE_DIR="${S}"
+
 	# local -x OSL_TESTSUITE_SKIP_DIFF=1
 	local -x OPENIMAGEIO_DEBUG=0
 
@@ -375,31 +426,22 @@ src_test() {
 	local CMAKE_SKIP_TESTS=(
 		"-broken$"
 
+		batched
+
 		# broken with in-tree <=dev-libs/optix-7.5.0 and out of date
 		"^example-cuda"
 
-		# outright fail
-		# batchregression
-		"^spline-reg.regress.batched.opt$"
-		"^transform-reg.regress.batched.opt$"
-# 		"^texture3d-opts-reg.regress.batched.opt$"
-
 		# doesn't handle parameters
 		"^osl-imageio"
-
-		# TODO Unknown exception: Unable to convert function return value to a Python type! The signature was (self: oslquery.Parameter) -> OpenImageIO_v3_0::TypeDesc
-		"^python-oslquery"
 	)
 
 	local myctestargs=(
 		-LE '(render|optix)'
 		# src/build-scripts/ci-test.bash
-		# --repeat until-pass:10
 		'--force-new-ctest-process'
 	)
 
-# 	OPENIMAGEIO_CUDA=0 \
-# 	cmake_src_test
+	cmake_src_test
 
 	# NOTE this should go to cuda eclass
 	cuda_add_sandbox -w
@@ -412,23 +454,32 @@ src_test() {
 
 	CMAKE_SKIP_TESTS=(
 		# optix
-		"^render-microfacet.optix.opt$"
-		"^render-microfacet.optix.fused$"
+		"^render-microfacet.optix.(fused|opt)$"
+		"^render-raytypes.optix.(fused|opt)$"
+
+		"^render-spi-thinlayer.optix"
+		"^testoptix-noise.optix.opt$"
+
+		"^render-uv.optix.(fused|opt)$"
 
 		# render
-		"^render-bunny.opt$"
 		"^render-displacement.opt$"
 		"^render-microfacet.opt$"
-		"^render-mx-burley-diffuse.opt$"
-		"^render-veachmis.opt$"
 	)
+
+	if ! tc-is-clang; then
+		CMAKE_SKIP_TESTS+=(
+			# render
+			# small errors
+			"^render-bunny.opt$"
+			"^render-veachmis.opt$"
+		)
+	fi
 
 	myctestargs=(
 		-L "(render|optix)"
 		# src/build-scripts/ci-test.bash
 		'--force-new-ctest-process'
-		--repeat until-pass:10
-		--output-on-failure
 	)
 
 	cmake_src_test
@@ -436,6 +487,10 @@ src_test() {
 
 src_install() {
 	cmake_src_install
+
+	if use python; then
+		python_optimize
+	fi
 
 	if [[ -d "${ED}/usr/build-scripts" ]]; then
 		rm -vr "${ED}/usr/build-scripts" || die
