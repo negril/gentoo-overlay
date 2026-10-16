@@ -1,0 +1,119 @@
+From ac8bdda72d57ff69ea0297471bce42a3e2b14df1 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Mon, 1 Jun 2026 15:55:58 +0200
+Subject: cccl 3.0
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/cpp/flann/algorithms/kdtree_cuda_builder.h b/src/cpp/flann/algorithms/kdtree_cuda_builder.h
+index d8294ca..b9bf22d 100644
+--- a/src/cpp/flann/algorithms/kdtree_cuda_builder.h
++++ b/src/cpp/flann/algorithms/kdtree_cuda_builder.h
+@@ -234,9 +234,9 @@ struct IsEven
+ struct SecondElementIsEven
+ {
+     __host__ __device__
+-    bool operator()( const thrust::tuple<int,int>& i )
++    bool operator()( const ::cuda::std::tuple<int,int>& i )
+     {
+-        return (thrust::get<1>(i)& 1)==0;
++        return (::cuda::std::get<1>(i)& 1)==0;
+     }
+ };
+ 
+@@ -275,13 +275,13 @@ struct MovePointsToChildNodes
+     // (used later in the scan op to separate the points of the children into continuous ranges)
+     int* lrx_, * lry_, * lrz_;
+     __device__
+-    void operator()( const thrust::tuple<int, int, int, int>& data )
++    void operator()( const ::cuda::std::tuple<int, int, int, int>& data )
+     {
+-        int index = thrust::get<0>(data);
++        int index = ::cuda::std::get<0>(data);
+         int owner = ox_[index]; // before a split, all points at the same position in the index array have the same owner
+-        int point_ind1=thrust::get<1>(data);
+-        int point_ind2=thrust::get<2>(data);
+-        int point_ind3=thrust::get<3>(data);
++        int point_ind1=::cuda::std::get<1>(data);
++        int point_ind2=::cuda::std::get<2>(data);
++        int point_ind3=::cuda::std::get<3>(data);
+         int leftChild=child1_[owner];
+         int split_dim;
+         float dim_val1, dim_val2, dim_val3;
+@@ -325,7 +325,7 @@ struct MovePointsToChildNodes
+         lrx_[index] = (dim_val1 > split.split_val);
+         lry_[index] = (dim_val2 > split.split_val);
+         lrz_[index] = (dim_val3 > split.split_val);
+-        //                      return thrust::make_tuple( r1, r2, leftChild+(dim_val > split.split_val) );
++        //                      return ::cuda::std::make_tuple( r1, r2, leftChild+(dim_val > split.split_val) );
+     }
+ };
+ 
+@@ -382,14 +382,14 @@ struct SplitNodes
+     SplitInfo* splits;
+ 
+     __device__
+-    void operator()( thrust::tuple<int&, int&,SplitInfo&,float4&,float4&, int> node ) // float4: aabbMin, aabbMax
++    void operator()( ::cuda::std::tuple<int&, int&,SplitInfo&,float4&,float4&, int> node ) // float4: aabbMin, aabbMax
+     {
+-        int& parent=thrust::get<0>(node);
+-        int& child1=thrust::get<1>(node);
+-        SplitInfo& s=thrust::get<2>(node);
+-        const float4& aabbMin=thrust::get<3>(node);
+-        const float4& aabbMax=thrust::get<4>(node);
+-        int my_index = thrust::get<5>(node);
++        int& parent=::cuda::std::get<0>(node);
++        int& child1=::cuda::std::get<1>(node);
++        SplitInfo& s=::cuda::std::get<2>(node);
++        const float4& aabbMin=::cuda::std::get<3>(node);
++        const float4& aabbMax=::cuda::std::get<4>(node);
++        int my_index = ::cuda::std::get<5>(node);
+         bool split_node=false;
+         // first, each thread block counts the number of nodes that it needs to allocate...
+         __shared__ int block_nodes_to_allocate;
+@@ -486,9 +486,9 @@ struct set_addr3
+ struct pointxyz_to_px_py_pz
+ {
+     __device__
+-    thrust::tuple<float,float,float> operator()( const float4& val )
++    ::cuda::std::tuple<float,float,float> operator()( const float4& val )
+     {
+-        return thrust::make_tuple(val.x, val.y, val.z);
++        return ::cuda::std::make_tuple(val.x, val.y, val.z);
+     }
+ };
+ } // namespace kd_tree_builder_detail
+@@ -593,7 +593,7 @@ public:
+         //              std::cout<<"buildTree()"<<std::endl;
+         //              sleep(1);
+         //              Util::Timer stepTimer;
+-        thrust::transform(thrust::cuda::par.on(gpu_stream), points_->begin(), points_->end(), thrust::make_zip_iterator(thrust::make_tuple(points_x_->begin(), points_y_->begin(),points_z_->begin()) ), cuda::kd_tree_builder_detail::pointxyz_to_px_py_pz() );
++        thrust::transform(thrust::cuda::par.on(gpu_stream), points_->begin(), points_->end(), thrust::make_zip_iterator(::cuda::std::make_tuple(points_x_->begin(), points_y_->begin(),points_z_->begin()) ), cuda::kd_tree_builder_detail::pointxyz_to_px_py_pz() );
+ 
+         thrust::counting_iterator<int> it(0);
+         thrust::copy(thrust::cuda::par.on(gpu_stream), it, it+points_->size(), index_x_->begin() );
+@@ -654,8 +654,8 @@ public:
+             sn.splits=thrust::raw_pointer_cast(&(*splits_)[0]);
+ 
+             thrust::counting_iterator<int> cit(0);
+-            thrust::for_each(thrust::cuda::par.on(gpu_stream), thrust::make_zip_iterator(thrust::make_tuple( parent_->begin(), child1_->begin(),  splits_->begin(), aabb_min_->begin(), aabb_max_->begin(), cit  )),
+-                              thrust::make_zip_iterator(thrust::make_tuple( parent_->begin()+last_node_count, child1_->begin()+last_node_count,splits_->begin()+last_node_count, aabb_min_->begin()+last_node_count, aabb_max_->begin()+last_node_count,cit+last_node_count  )),
++            thrust::for_each(thrust::cuda::par.on(gpu_stream), thrust::make_zip_iterator(::cuda::std::make_tuple( parent_->begin(), child1_->begin(),  splits_->begin(), aabb_min_->begin(), aabb_max_->begin(), cit  )),
++                              thrust::make_zip_iterator(::cuda::std::make_tuple( parent_->begin()+last_node_count, child1_->begin()+last_node_count,splits_->begin()+last_node_count, aabb_min_->begin()+last_node_count, aabb_max_->begin()+last_node_count,cit+last_node_count  )),
+                               sn   );
+             // copy allocation info to host
+             thrust::host_vector<int> alloc_info(allocation_info_.size());
+@@ -694,8 +694,8 @@ public:
+                                                                       thrust::raw_pointer_cast(&(*leftright_z_)[0])
+                                                                       );
+             thrust::counting_iterator<int> ci0(0);
+-            thrust::for_each(thrust::cuda::par.on(gpu_stream), thrust::make_zip_iterator( thrust::make_tuple( ci0, index_x_->begin(), index_y_->begin(), index_z_->begin()) ),
+-                              thrust::make_zip_iterator( thrust::make_tuple( ci0+points_->size(), index_x_->end(), index_y_->end(), index_z_->end()) ),sno  );
++            thrust::for_each(thrust::cuda::par.on(gpu_stream), thrust::make_zip_iterator( ::cuda::std::make_tuple( ci0, index_x_->begin(), index_y_->begin(), index_z_->begin()) ),
++                              thrust::make_zip_iterator( ::cuda::std::make_tuple( ci0+points_->size(), index_x_->end(), index_y_->end(), index_z_->end()) ),sno  );
+ 
+             #ifdef PRINT_DEBUG_TIMING
+             cudaDeviceSynchronize();
+-- 
+2.54.0
+

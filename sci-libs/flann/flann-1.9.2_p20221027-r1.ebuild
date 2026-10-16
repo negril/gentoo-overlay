@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -11,9 +11,8 @@ COMMIT="f9caaf609d8b8cb2b7104a85cf59eb92c275a25d"
 SRC_URI="
 	https://github.com/flann-lib/${PN}/archive/${COMMIT}.tar.gz
 		-> ${P}.tar.gz
-	https://xn--jtunheimr-07a.org/distfiles/${CATEGORY}/${PN}/${P}-patches-r1.tar.xz
+	https://github.com/negril/gentoo-overlay-vendored/raw/refs/heads/blobs/${P}-patches-r1.tar.xz
 "
-	# https://dev.gentoo.org/~sam/distfiles/${CATEGORY}/${PN}/${P}-patches-r1.tar.xz
 S="${WORKDIR}/${PN}-${COMMIT}"
 
 LICENSE="BSD"
@@ -54,8 +53,10 @@ DEPEND="${RDEPEND}
 PATCHES=(
 	"${FILESDIR}"/${PN}-1.9.1-build-oct-rather-than-mex-files-for-octave.patch # bug 830424
 	"${FILESDIR}"/${PN}-1.9.2-asio-boost187.patch
-	"${FILESDIR}"/${PN}-1.9.2-boost-config.patch
+	"${FILESDIR}"/${PN}-1.9.2-boost-config-1.89.patch
 	"${FILESDIR}"/${PN}-1.9.2-system-gtest.patch
+	"${FILESDIR}"/${PN}-1.9.2-gettimeofday.patch
+	"${FILESDIR}/${PN}-1.9.2-cccl-3.0.patch"
 
 	# "${FILESDIR}/${PN}-1.9.2-lz4-dependency-fix.patch" # https://github.com/flann-lib/flann/pull/523
 	# "${FILESDIR}/${PN}-1.9.2-fix-build.patch"
@@ -100,6 +101,7 @@ src_configure() {
 
 	if use cuda; then
 		cuda_add_sandbox -w
+		addpredict "/dev/char/"
 
 		export CUDAHOSTCXX="$(cuda_gccdir)"
 		export CUDAHOSTLD="$(tc-getCXX)"
