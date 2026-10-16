@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{12..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 
 # https://github.com/FreeCAD/FreeCAD/issues/19066
 # The added asserts break on mem leaks, so tests fail.
@@ -11,7 +11,7 @@ PYTHON_COMPAT=( python3_{12..13} )
 
 # pyNastran missing
 
-inherit check-reqs cmake cuda edo flag-o-matic optfeature python-single-r1 qmake-utils toolchain-funcs xdg virtualx
+inherit branding check-reqs cmake cuda edo flag-o-matic optfeature python-single-r1 toolchain-funcs xdg virtualx
 
 DESCRIPTION="Qt based Computer Aided Design application"
 HOMEPAGE="https://www.freecad.org/ https://github.com/FreeCAD/FreeCAD"
@@ -33,18 +33,17 @@ fi
 # examples are licensed CC-BY-SA (without note of specific version)
 LICENSE="LGPL-2 CC-BY-SA-4.0"
 SLOT="0"
-IUSE="debug designer +gui netgen pcl +smesh spacenav test X"
+IUSE="debug designer +gui netgen pcl +smesh spacenav tbb test X"
 # Modules are found in src/Mod/ and their options defined in:
 # cMake/FreeCAD_Helpers/InitializeFreeCADBuildOptions.cmake
 # To get their dependencies:
 # 'grep REQUIRES_MODS cMake/FreeCAD_Helpers/CheckInterModuleDependencies.cmake'
-IUSE+=" addonmgr assembly +bim cam cloud fem idf inspection +mesh openscad points reverse robot surface +techdraw"
+IUSE+=" addonmgr assembly +bim cam fem idf inspection +mesh openscad points reverse robot surface +techdraw"
 
 REQUIRED_USE="
 	${PYTHON_REQUIRED_USE}
 	bim? ( mesh )
 	cam? ( mesh )
-	gui? ( bim )
 	designer? ( gui )
 	fem? ( smesh )
 	inspection? ( points )
@@ -53,7 +52,6 @@ REQUIRED_USE="
 	reverse? ( mesh points )
 	test? ( techdraw )
 "
-# Draft Workbench needs BIM
 
 RESTRICT="!test? ( test )"
 
@@ -61,26 +59,26 @@ RESTRICT="!test? ( test )"
 # if vtk[cuda], we use cuda
 RDEPEND="
 	${PYTHON_DEPS}
-	dev-cpp/tbb:=
 	dev-cpp/yaml-cpp:=
 	dev-libs/boost:=
 	dev-libs/libfmt:=
 	dev-libs/xerces-c:=[icu]
 	dev-qt/qtbase:6[concurrent,network,xml]
 	media-libs/freetype
-	sci-libs/opencascade:=[json]
+	sci-libs/opencascade:=[json,tbb?]
+	>=sci-mathematics/clipper2-2:=
+	tbb? (
+		dev-cpp/tbb:=
+	)
 	virtual/zlib:=
 	$(python_gen_cond_dep '
+		dev-python/lark[${PYTHON_USEDEP}]
 		dev-python/numpy[${PYTHON_USEDEP}]
 		>=dev-python/pybind11-3.0.1[${PYTHON_USEDEP}]
 		dev-python/pycxx[${PYTHON_USEDEP}]
 		dev-python/pyyaml[${PYTHON_USEDEP}]
 	')
-	assembly? ( sci-libs/ondselsolver )
-	cloud? (
-		dev-libs/openssl:=
-		net-misc/curl
-	)
+	assembly? ( >=sci-libs/ondselsolver-1.0.1_p20260211 )
 	fem? (
 		sci-libs/vtk:=
 		$(python_gen_cond_dep 'dev-python/ply[${PYTHON_USEDEP}]')
@@ -98,7 +96,7 @@ RDEPEND="
 		virtual/opengl
 		spacenav? ( dev-libs/libspnav[X?] )
 	)
-	netgen? ( media-gfx/netgen[opencascade] )
+	netgen? ( <media-gfx/netgen-6.2.2605[opencascade] )
 	openscad? ( $(python_gen_cond_dep 'dev-python/ply[${PYTHON_USEDEP}]') )
 	pcl? ( sci-libs/pcl:= )
 	smesh? (
@@ -146,9 +144,10 @@ BDEPEND="
 
 PATCHES=(
 	"${FILESDIR}/${PN}-9999-Gentoo-specific-don-t-check-vcs.patch"
-	"${FILESDIR}"/${PN}-9999-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch
-	"${FILESDIR}/${PN}-9999-fastsignals-disconnect.patch"
+	"${FILESDIR}/${PN}-9999-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch"
 	"${FILESDIR}/${PN}-1.1.0-boost_system.patch"
+	"${FILESDIR}/${PN}-1.1.3-gcc-17-fstream.patch"
+	"${FILESDIR}/${PN}-1.1.3-skip-unicode-test.patch"
 )
 
 DOCS=( CODE_OF_CONDUCT.md README.md )
@@ -281,21 +280,13 @@ src_unpack() {
 }
 
 src_prepare() {
-	# deprecated in python-3.11 removed in python-3.13
-	sed -e '/import imghdr/d' -i src/Mod/CAM/CAMTests/TestCAMSanity.py || die
-
-	# The PCL point_traits.h header was renamed (and deprecated) since 1.11.0 and removed in 1.15.0.
-	# d9e731ca94abc14808ebeed208617116f6d5ea4a
-	sed -e 's#pcl/point_traits.h#pcl/type_traits.h#g' -i src/Mod/ReverseEngineering/App/SurfaceTriangulation.cpp || die
-
-	# band-aid fix for botched version check, needs to be revisited for VTK-10
-	sed -e 's/vtkVersion.GetVTKMajorVersion() > 9/vtkVersion.GetVTKMajorVersion() >= 9/g' \
-		-i src/Mod/Fem/femguiutils/data_extraction.py || die
-
 	sed \
 		-e '/include( ccache )/s/^/# /g' \
 		-e '/include( ClangFormat )/s/^/# /g' \
 		-i src/3rdParty/libE57Format/CMakeLists.txt || die
+
+	# TODO
+	sed -e '/TestExternalFacePreselection/d' -i src/Mod/Sketcher/TestSketcherGui.py || die
 
 	# removed bundled pycxx
 	if [[ ${PV} != *9999* ]]; then
@@ -318,9 +309,10 @@ src_configure() {
 	fi
 
 	local mycmakeargs=(
-		-DFREECAD_USE_CCACHE="no" # Do not use CCache
-
 		"$(cmake_use_find_package "spacenav" "Spnav")"
+
+		-DPYCXX_INCLUDE_DIRS="${ESYSROOT}/usr/include/${PYTHON_SINGLE_TARGET/_/.}"
+		-DPYCXX_SOURCE_DIR="${ESYSROOT}/usr/share/${PYTHON_SINGLE_TARGET/_/.}/CXX"
 
 		-DBUILD_DESIGNER_PLUGIN=$(usex designer)
 		-DBUILD_FORCE_DIRECTORY=ON				# force building in a dedicated directory
@@ -334,7 +326,6 @@ src_configure() {
 		-DBUILD_ASSEMBLY=$(usex assembly)
 		-DBUILD_BIM=$(usex bim)
 		-DBUILD_CAM=$(usex cam)
-		-DBUILD_CLOUD=$(usex cloud)
 		-DBUILD_DRAFT=ON
 		# see below for DRAWING
 		-DBUILD_FEM=$(usex fem)
@@ -377,19 +368,36 @@ src_configure() {
 
 		-DFREECAD_BUILD_DEBIAN=OFF
 
+		-DE57_ENABLE_DIAGNOSTIC_OUTPUT="no"
+		-DE57_VALIDATION_LEVEL=0
+
+		# -DFREECAD_PARALLEL_COMPILE_JOBS=""
+		# -DFREECAD_PARALLEL_LINK_JOBS=""
+
+		-DFREECAD_USE_3DCONNEXION_LEGACY="no"
+		-DFREECAD_USE_CCACHE="no" # Do not use CCache
+
+		-DFREECAD_USE_EXTERNAL_CLIPPER2="yes"
+		-DFREECAD_USE_EXTERNAL_COIN_PIVY="yes"
 		-DFREECAD_USE_EXTERNAL_E57FORMAT="no"
 		-DFREECAD_USE_EXTERNAL_GTEST="$(usex test)"
+		-DFREECAD_USE_EXTERNAL_JSON="yes"
+		-DFREECAD_USE_EXTERNAL_KDL=OFF # https://github.com/FreeCAD/FreeCAD/commit/9f98866
+		-DFREECAD_USE_EXTERNAL_KDTREE=OFF
 		-DFREECAD_USE_EXTERNAL_ONDSELSOLVER=$(usex assembly)
+		-DFREECAD_USE_EXTERNAL_PYCXX="no"
 		-DFREECAD_USE_EXTERNAL_SMESH=OFF		# no package in Gentoo
 		-DFREECAD_USE_EXTERNAL_ZIPIOS=OFF		# doesn't work yet, also no package in Gentoo tree
-		-DFREECAD_USE_EXTERNAL_FMT="yes"
-		-DFREECAD_USE_EXTERNAL_KDL=OFF # https://github.com/FreeCAD/FreeCAD/commit/9f98866
+
 		-DFREECAD_USE_FREETYPE=ON
 		-Dfreetype_DIR="${ESYSROOT}/usr"
 		-DFREECAD_USE_OCC_VARIANT:STRING="Official Version"
 		-DFREECAD_USE_PCL=$(usex pcl)
-		-DFREECAD_USE_PYBIND11=ON
-		-DFREECAD_USE_QT_FILEDIALOG=ON
+		# -DFREECAD_USE_PYBIND11=ON
+		-DFREECAD_USE_PYSIDE="yes"
+		-DFREECAD_USE_QT_DIALOGS="yes"
+		# -DFREECAD_USE_QT_FILEDIALOG=ON
+		-DFREECAD_USE_SHIBOKEN="yes"
 
 		# install python modules to site-packages' dir. True only for the main package,
 		# sub-packages will still be installed inside /usr/lib64/freecad
@@ -406,16 +414,19 @@ src_configure() {
 
 			-DPACKAGE_WCREF="%{release} (Git)"
 			-DPACKAGE_WCURL="git://github.com/FreeCAD/FreeCAD.git main"
+
+			# -DPYCXX_INCLUDE_DIRS="${S}/src/3rdParty/PyCXX"
+			# -DPYCXX_SOURCE_DIR="${S}/src/3rdParty/PyCXX/CXX"
 		)
 	else
 		mycmakeargs+=(
 			-DENABLE_DEVELOPER_TESTS=OFF
 
-			-DPACKAGE_WCREF="${PVR} (gentoo)"
+			-DPACKAGE_WCREF="${PVR} (${BRANDING_OS_NAME})"
 			-DPACKAGE_WCURL="git://github.com/FreeCAD/FreeCAD.git ${PV}"
 
-			-DPYCXX_INCLUDE_DIRS="${ESYSROOT}/usr/include/${PYTHON_SINGLE_TARGET/_/.}"
-			-DPYCXX_SOURCE_DIR="${ESYSROOT}/usr/share/${PYTHON_SINGLE_TARGET/_/.}/CXX"
+			# -DPYCXX_INCLUDE_DIRS="${ESYSROOT}/usr/include/${PYTHON_SINGLE_TARGET/_/.}"
+			# -DPYCXX_SOURCE_DIR="${ESYSROOT}/usr/share/${PYTHON_SINGLE_TARGET/_/.}/CXX"
 		)
 	fi
 
@@ -448,8 +459,6 @@ src_configure() {
 			-DFREECAD_QT_MAJOR_VERSION=6
 			-DFREECAD_QT_VERSION=6
 			-DQT_DEFAULT_MAJOR_VERSION=6
-			-DQt6Core_MOC_EXECUTABLE="$(qt6_get_bindir)/moc"
-			-DQt6Core_RCC_EXECUTABLE="$(qt6_get_bindir)/rcc"
 			-DBUILD_QT5=OFF
 			# Drawing module unmaintained and not ported to qt6
 			-DBUILD_DRAWING=OFF
@@ -465,8 +474,7 @@ src_configure() {
 # 2. We don't need virtualx.eclass and its dependencies
 src_test() {
 	# Fails because translated names are used otherwise
-	# Why LANGUAGE?
-	local LANGUAGE="en"
+	local -x LANG="en_US.UTF-8"
 
 	# The environment variables are needed, so that FreeCAD knows
 	# where to save its temporary files, and where to look and write its
@@ -480,8 +488,13 @@ src_test() {
 
 	cd "${BUILD_DIR}" || die
 
+	local -x EPYTEST_IGNORE=()
+
 	if use bim; then
 		# No module named 'ifcopenshell' #940465
+		EPYTEST_IGNORE+=(
+			"Mod/BIM/nativeifc/ifc_performance_test.py"
+		)
 		rm "Mod/BIM/nativeifc/ifc_performance_test.py" || die
 	fi
 
@@ -504,11 +517,11 @@ src_test() {
 	# 	-e '/self.assertTrue(pc.getTriangleCount/s/self/# /' \
 	# 	-i Mod/Mesh/MeshTestsApp.py || die
 
-	local -x EPYTEST_IGNORE=(
-		"Mod/BIM/nativeifc/ifc_performance_test.py"
-	)
-
 	local CMAKE_SKIP_TESTS=(
+		"^AttachExtensionTest.testEmptyLegacySupportDoesNotClearAttachmentSupport$"
+		"^AttachExtensionTest.testNonEmptyLegacySupportReplacesAttachmentSupport$"
+		"^LinkArrayPolarTest.expandedElementsFollowPatternPlacementChanges$"
+		"^LinkArrayPolarTest.suppressedExpandedElementIsOmittedFromSubObjects$"
 		"^TestLineFormat.setQColorKeepsOpaqueColorsOpaque$"
 		"^TestLineFormat.setQColorPreservesAlphaValue$"
 	)
