@@ -6,7 +6,7 @@ EAPI=8
 LLVM_COMPAT=( {21..23} )
 LLVM_OPTIONAL="cuda-clang"
 
-PYTHON_COMPAT=( python3_{12..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 
 FORTRAN_NEEDED="no"
 
@@ -19,17 +19,22 @@ HOMEPAGE="https://eigen.tuxfamily.org/index.php?title=Main_Page"
 
 if [[ ${PV} = *9999* ]] ; then
 	inherit git-r3
-	EGIT_REPO_URI="https://gitlab.com/lib${PN}/${PN}.git"
+	EGIT_REPO_URI="https://gitlab.com/libeigen/eigen.git"
 	if [[ ${PV} = *.9999* ]] ; then
 		EGIT_BRANCH="$(ver_cut 1-2)"
 	fi
 else
-	# we backport two patches from the 3.4 branch
-	SRC_URI="
-		https://gitlab.com/lib${PN}/${PN}/-/archive/${PV}/${P}.tar.bz2
-		https://gitlab.com/libeigen/eigen/-/commit/0295f81a835ef69e2bacd9e75ab5782eca398720.patch -> ${P}_p1.patch
-		https://gitlab.com/libeigen/eigen/-/commit/28ded8800c26864e537852658428ab44c8399e87.patch -> ${P}_p2.patch
-	"
+	if [[ ${PV} == *_p* ]] ; then
+		COMMIT="26f009dbbe1f8520439e6b1b6c564d897e80ace6"
+		SRC_URI="
+			https://gitlab.com/libeigen/eigen/-/archive/${COMMIT}/${COMMIT}.tar.bz2 -> ${P}.tar.bz2
+		"
+		S="${WORKDIR}/${PN}-${COMMIT}"
+	else
+		SRC_URI="
+			https://gitlab.com/libeigen/eigen/-/archive/${PV}/${P}.tar.bz2
+		"
+	fi
 	KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~loong ~mips ~ppc ~ppc64 ~riscv ~s390 ~sparc ~x86 ~arm64-macos ~x64-macos"
 fi
 
@@ -43,7 +48,7 @@ SRC_URI+="
 "
 
 LICENSE="MPL-2.0"
-SLOT="3/$(ver_cut 1-2)"
+SLOT="3/${PV}"
 
 # The following lines are shamelessly stolen from ffmpeg-9999.ebuild with modifications
 ARM_CPU_FEATURES=(
