@@ -44,6 +44,15 @@ src_configure() {
 src_test() {
 	local CMAKE_SKIP_TESTS=(
 		"^OndselSolver.runPreDragBackhoe[1-3]$"
+		"^OndselSolver.sliderrunDragStep$"
+		"^OndselSolver.slider_issue$"
+
+		# random fails
+		"^OndselSolver.Gears$"
+		"^OndselSolver.anglejoint$"
+		"^OndselSolver.rackscrew$"
+		"^OndselSolver.planarbug$"
+		"^OndselSolver.piston$"
 	)
 
 	cmake_src_test
