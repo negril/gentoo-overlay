@@ -1,0 +1,44 @@
+From 8f4ca6e6b53bfc3227ea90a3fb69f5b5c8c6fd48 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 14 Oct 2026 00:34:44 +0200
+Subject: support tinygltf v3
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/draco/io/tiny_gltf_utils.cc b/src/draco/io/tiny_gltf_utils.cc
+index d57e109..f7edc9f 100644
+--- a/src/draco/io/tiny_gltf_utils.cc
++++ b/src/draco/io/tiny_gltf_utils.cc
+@@ -19,7 +19,7 @@
+ #include "draco/animation/node_animation_data.h"
+ #include "draco/core/status.h"
+ #include "draco/core/vector_d.h"
+-#include "tiny_gltf.h"
++#include "tiny_gltf_v3.h"
+ 
+ namespace draco {
+ 
+@@ -225,6 +225,6 @@ void TinyGltfUtils::SetDataImpl(float value, int index,
+ #define TINYGLTF_ENABLE_DRACO
+ #define TINYGLTF_IMPLEMENTATION
+ 
+-#include "tiny_gltf.h"
++#include "tiny_gltf_v3.h"
+ 
+ #endif  // DRACO_TRANSCODER_SUPPORTED
+diff --git a/src/draco/io/tiny_gltf_utils.h b/src/draco/io/tiny_gltf_utils.h
+index c0a85ad..605f8b4 100644
+--- a/src/draco/io/tiny_gltf_utils.h
++++ b/src/draco/io/tiny_gltf_utils.h
+@@ -25,7 +25,7 @@
+ #include "draco/material/material.h"
+ 
+ #define TINYGLTF_ENCLOSING_NAMESPACE draco
+-#include "tiny_gltf.h"
++#include "tiny_gltf_v3.h"
+ 
+ namespace draco {
+ 
+-- 
+2.56.0
+

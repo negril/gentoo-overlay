@@ -1,0 +1,44 @@
+From 441a9557c8f99ed38b573dd5b2de1c34a8c126a0 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Wed, 14 Oct 2026 00:34:44 +0200
+Subject: support tinygltf v3
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/src/draco/io/tiny_gltf_utils.cc b/src/draco/io/tiny_gltf_utils.cc
+index d7c3820..aec15ee 100644
+--- a/src/draco/io/tiny_gltf_utils.cc
++++ b/src/draco/io/tiny_gltf_utils.cc
+@@ -26,7 +26,7 @@
+ #include "draco/core/status.h"
+ #include "draco/core/status_or.h"
+ #include "draco/core/vector_d.h"
+-#include "tiny_gltf.h"
++#include "tiny_gltf_v3.h"
+ 
+ namespace draco {
+ 
+@@ -302,6 +302,6 @@ void TinyGltfUtils::SetDataImpl(float value, int index,
+ 
+ #define TINYGLTF_IMPLEMENTATION
+ 
+-#include "tiny_gltf.h"
++#include "tiny_gltf_v3.h"
+ 
+ #endif  // DRACO_TRANSCODER_SUPPORTED
+diff --git a/src/draco/io/tiny_gltf_utils.h b/src/draco/io/tiny_gltf_utils.h
+index 3f80ee9..b2c22e3 100644
+--- a/src/draco/io/tiny_gltf_utils.h
++++ b/src/draco/io/tiny_gltf_utils.h
+@@ -23,7 +23,7 @@
+ #include "draco/core/status.h"
+ #include "draco/core/status_or.h"
+ #include "draco/material/material.h"
+-#include "tiny_gltf.h"
++#include "tiny_gltf_v3.h"
+ 
+ namespace draco {
+ 
+-- 
+2.56.0
+
