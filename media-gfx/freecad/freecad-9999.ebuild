@@ -147,7 +147,6 @@ BDEPEND="
 PATCHES=(
 	"${FILESDIR}/${PN}-9999-Gentoo-specific-don-t-check-vcs.patch"
 	"${FILESDIR}"/${PN}-9999-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch
-	"${FILESDIR}/${PN}-1.0.0-r4-error-cannot-convert-bool-to-App-DocumentInitFlags.patch"
 	"${FILESDIR}/${PN}-9999-fastsignals-disconnect.patch"
 	"${FILESDIR}/${PN}-1.1.0-boost_system.patch"
 )

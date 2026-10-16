@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{12..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 
 # https://github.com/FreeCAD/FreeCAD/issues/19066
 # The added asserts break on mem leaks, so tests fail.
@@ -11,7 +11,7 @@ PYTHON_COMPAT=( python3_{12..13} )
 
 # pyNastran missing
 
-inherit check-reqs cmake cuda edo flag-o-matic optfeature python-single-r1 qmake-utils toolchain-funcs xdg virtualx
+inherit branding check-reqs cmake cuda edo flag-o-matic optfeature python-single-r1 qmake-utils toolchain-funcs xdg virtualx
 
 DESCRIPTION="Qt based Computer Aided Design application"
 HOMEPAGE="https://www.freecad.org/ https://github.com/FreeCAD/FreeCAD"
@@ -38,7 +38,7 @@ IUSE="debug designer +gui netgen pcl +smesh spacenav test X"
 # cMake/FreeCAD_Helpers/InitializeFreeCADBuildOptions.cmake
 # To get their dependencies:
 # 'grep REQUIRES_MODS cMake/FreeCAD_Helpers/CheckInterModuleDependencies.cmake'
-IUSE+=" addonmgr assembly +bim cam cloud fem idf inspection +mesh openscad points reverse robot surface +techdraw"
+IUSE+=" addonmgr assembly +bim cam fem idf inspection +mesh openscad points reverse robot surface +techdraw"
 
 REQUIRED_USE="
 	${PYTHON_REQUIRED_USE}
@@ -77,10 +77,6 @@ RDEPEND="
 		dev-python/pyyaml[${PYTHON_USEDEP}]
 	')
 	assembly? ( sci-libs/ondselsolver )
-	cloud? (
-		dev-libs/openssl:=
-		net-misc/curl
-	)
 	fem? (
 		sci-libs/vtk:=
 		$(python_gen_cond_dep 'dev-python/ply[${PYTHON_USEDEP}]')
@@ -147,8 +143,9 @@ BDEPEND="
 PATCHES=(
 	"${FILESDIR}/${PN}-1.1.0-Gentoo-specific-don-t-check-vcs.patch"
 	"${FILESDIR}"/${PN}-9999-tests-src-Qt-only-build-test-for-BUILD_GUI-ON.patch
-	"${FILESDIR}/${PN}-1.0.0-r4-error-cannot-convert-bool-to-App-DocumentInitFlags.patch"
-	"${FILESDIR}/${PN}-9999-fastsignals-disconnect.patch"
+	"${FILESDIR}/${PN}-1.1.3-fastsignals-disconnect.patch"
+	"${FILESDIR}/${PN}-1.1.1-fix-sketcher-toolbars.patch"
+	"${FILESDIR}"/${PN}-1.1.1-qt-6.11.patch
 	"${FILESDIR}/${PN}-1.1.0-boost_system.patch"
 )
 
@@ -282,21 +279,13 @@ src_unpack() {
 }
 
 src_prepare() {
-	# deprecated in python-3.11 removed in python-3.13
-	sed -e '/import imghdr/d' -i src/Mod/CAM/CAMTests/TestCAMSanity.py || die
-
-	# The PCL point_traits.h header was renamed (and deprecated) since 1.11.0 and removed in 1.15.0.
-	# d9e731ca94abc14808ebeed208617116f6d5ea4a
-	sed -e 's#pcl/point_traits.h#pcl/type_traits.h#g' -i src/Mod/ReverseEngineering/App/SurfaceTriangulation.cpp || die
-
-	# band-aid fix for botched version check, needs to be revisited for VTK-10
-	sed -e 's/vtkVersion.GetVTKMajorVersion() > 9/vtkVersion.GetVTKMajorVersion() >= 9/g' \
-		-i src/Mod/Fem/femguiutils/data_extraction.py || die
-
 	sed \
 		-e '/include( ccache )/s/^/# /g' \
 		-e '/include( ClangFormat )/s/^/# /g' \
 		-i src/3rdParty/libE57Format/CMakeLists.txt || die
+
+	# # TODO
+	# sed -e '/TestExternalFacePreselection/d' -i src/Mod/Sketcher/TestSketcherGui.py || die
 
 	# removed bundled pycxx
 	if [[ ${PV} != *9999* ]]; then
@@ -319,8 +308,6 @@ src_configure() {
 	fi
 
 	local mycmakeargs=(
-		-DFREECAD_USE_CCACHE="no" # Do not use CCache
-
 		"$(cmake_use_find_package "spacenav" "Spnav")"
 
 		-DBUILD_DESIGNER_PLUGIN=$(usex designer)
@@ -335,7 +322,6 @@ src_configure() {
 		-DBUILD_ASSEMBLY=$(usex assembly)
 		-DBUILD_BIM=$(usex bim)
 		-DBUILD_CAM=$(usex cam)
-		-DBUILD_CLOUD=$(usex cloud)
 		-DBUILD_DRAFT=ON
 		# see below for DRAWING
 		-DBUILD_FEM=$(usex fem)
@@ -378,13 +364,17 @@ src_configure() {
 
 		-DFREECAD_BUILD_DEBIAN=OFF
 
+		-DFREECAD_USE_CCACHE="no" # Do not use CCache
+
 		-DFREECAD_USE_EXTERNAL_E57FORMAT="no"
+		-DFREECAD_USE_EXTERNAL_FMT="yes"
 		-DFREECAD_USE_EXTERNAL_GTEST="$(usex test)"
+		-DFREECAD_USE_EXTERNAL_KDL=OFF # https://github.com/FreeCAD/FreeCAD/commit/9f98866
+		-DFREECAD_USE_EXTERNAL_PYCXX="no"
 		-DFREECAD_USE_EXTERNAL_ONDSELSOLVER=$(usex assembly)
 		-DFREECAD_USE_EXTERNAL_SMESH=OFF		# no package in Gentoo
 		-DFREECAD_USE_EXTERNAL_ZIPIOS=OFF		# doesn't work yet, also no package in Gentoo tree
-		-DFREECAD_USE_EXTERNAL_FMT="yes"
-		-DFREECAD_USE_EXTERNAL_KDL=OFF # https://github.com/FreeCAD/FreeCAD/commit/9f98866
+
 		-DFREECAD_USE_FREETYPE=ON
 		-Dfreetype_DIR="${ESYSROOT}/usr"
 		-DFREECAD_USE_OCC_VARIANT:STRING="Official Version"
@@ -412,7 +402,7 @@ src_configure() {
 		mycmakeargs+=(
 			-DENABLE_DEVELOPER_TESTS=OFF
 
-			-DPACKAGE_WCREF="${PVR} (gentoo)"
+			-DPACKAGE_WCREF="${PVR} (${BRANDING_OS_NAME})"
 			-DPACKAGE_WCURL="git://github.com/FreeCAD/FreeCAD.git ${PV}"
 
 			-DPYCXX_INCLUDE_DIRS="${ESYSROOT}/usr/include/${PYTHON_SINGLE_TARGET/_/.}"
