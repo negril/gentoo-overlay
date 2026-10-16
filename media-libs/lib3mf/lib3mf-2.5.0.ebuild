@@ -34,7 +34,6 @@ BDEPEND="
 	test? (
 		dev-cpp/gtest
 		dev-libs/openssl
-		dev-debug/valgrind
 	)
 "
 
@@ -63,6 +62,8 @@ src_configure() {
 		-DUSE_INCLUDED_CPPBASE64=ON # TODO not packaged
 		-DSTRIP_BINARIES=OFF
 		-DLIB3MF_BUILD_WASM=OFF
+		# we don't want valgrind tests
+		-DVALGRIND=NOTFOUND
 	)
 
 	if use test; then
