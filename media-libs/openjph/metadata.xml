@@ -12,4 +12,7 @@
 	<upstream>
 		<remote-id type="github">aous72/OpenJPH</remote-id>
 	</upstream>
+	<use>
+		<flag name="tools">Build command line executables</flag>
+	</use>
 </pkgmetadata>
