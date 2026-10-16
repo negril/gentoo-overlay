@@ -15,5 +15,7 @@
 	</upstream>
 	<use>
 		<flag name="demos">Build and install demos</flag>
+		<flag name="pipewire">Build With PipeWire via <pkg>media-video/pipewire</pkg></flag>
+		<flag name="rubberband">Build With Rubber Band Library via <pkg>media-libs/rubberband</pkg></flag>
 	</use>
 </pkgmetadata>
