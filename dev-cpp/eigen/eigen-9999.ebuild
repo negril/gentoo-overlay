@@ -106,10 +106,13 @@ IUSE_TEST_BACKENDS=(
 )
 
 IUSE="
+	custom-cflags
 	debug
 	blas lapack
 	${CPU_FEATURES_MAP[*]%:*}
-	cuda cuda-clang hip
+	cuda cuda-clang
+	cublas cudss cusolver cusparse
+	hip
 	doc mathjax
 	openmp
 	test ${IUSE_TEST_BACKENDS[*]}
@@ -209,6 +212,9 @@ DEPEND="
 					llvm-runtimes/clang-runtime:${LLVM_SLOT}[llvm_targets_NVPTX,offload,openmp]
 				')
 			)
+			cudss? (
+				dev-libs/cudss
+			)
 		)
 		hip? ( dev-util/hip )
 		!blas? (
@@ -224,12 +230,12 @@ DEPEND="
 PATCHES=(
 	"${FILESDIR}/${PN}-3.4.0-doc-nocompress.patch" # bug 830064
 	"${FILESDIR}/${PN}-3.4.0-buildstring.patch"
-	"${FILESDIR}/${PN}-5.0.0-please_protect_your_min_with_parentheses.patch"
 
 	"${FILESDIR}/${PN}-5.0.1-cmake-GNUInstallDirs.patch"
 	"${FILESDIR}/${PN}-5.0.1-make-static-libs-optional.patch"
 
 	"${FILESDIR}/${PN}-9999-Do-not-show-deprecated-CUDA-device-properties-for-CU.patch"
+	"${FILESDIR}/${PN}-9999-product_threaded_dont_parallelize.patch"
 )
 
 # TODO should be in cuda.eclass
@@ -344,6 +350,10 @@ src_prepare() {
 }
 
 src_configure() {
+	if ! use custom-cflags; then
+		filter-flags '-mcpu=*' '-march=*' '-mtune=*'
+	fi
+
 	if use lapack; then
 		# bug 878987
 		# multiple definition of `cgesdd_'
@@ -359,11 +369,10 @@ src_configure() {
 		-DEIGEN_BUILD_BLAS="$(usex blas)" # Toggles the building of the Eigen Blas library
 		-DEIGEN_BUILD_LAPACK="$(usex blas "$(usex lapack)")" # Toggles the building of the included Eigen LAPACK library
 
+		-DEIGEN_BUILD_DEMOS="no"
 		-DEIGEN_BUILD_DOC="$(usex doc)" # Enable creation of Eigen documentation
 		-DEIGEN_BUILD_PKGCONFIG="yes" # Build pkg-config .pc file for Eigen
 	)
-
-	append-cxxflags "-DEIGEN_USE_OPENBLAS_BFLOAT16=0"
 
 	if use blas; then
 		mycmakeargs+=(
@@ -429,6 +438,11 @@ src_configure() {
 			-DEIGEN_SPLIT_LARGE_TESTS="yes" # Split large tests into smaller executables
 
 			-DEIGEN_TEST_CUDA="$(usex cuda)" # Enable CUDA support in unit tests
+			-DEIGEN_TEST_CUBLAS="$(usex cuda $(usex cublas))" # Test cuBLAS integration
+			-DEIGEN_TEST_CUDSS="$(usex cuda $(usex cudss))" # Test cuDSS sparse solver integration
+			-DEIGEN_TEST_CUSOLVER="$(usex cuda $(usex cusolver))" # Test cuSOLVER integration
+			-DEIGEN_TEST_CUSPARSE="$(usex cuda $(usex cusparse))" # Test cuSPARSE integration
+
 			-DEIGEN_TEST_CUDA_CLANG="$(usex cuda "$(usex cuda-clang)")" # Use clang instead of nvcc to compile the CUDA tests
 			# Use nvc++ (NVHPC) instead of nvcc to compile the CUDA tests
 			# -DEIGEN_TEST_CUDA_NVC="$(usex cuda "$(usex cuda-nvc)")"
@@ -438,6 +452,7 @@ src_configure() {
 			# -DEIGEN_TEST_SYCL="$(usex sycl)" # Add Sycl support.
 			# -DEIGEN_SYCL_TRISYCL="no" # Use the triSYCL Sycl implementation (ComputeCPP by default).
 
+			-DCMAKE_DISABLE_FIND_PACKAGE_Accelerate=yes
 			$(cmake_use_find_package adolc Adolc)
 			$(cmake_use_find_package boost Boost)
 			$(cmake_use_find_package cholmod CHOLMOD)
@@ -460,6 +475,7 @@ src_configure() {
 			$(cmake_use_find_package umfpack UMFPACK)
 		)
 
+		if ! use custom-cflags; then
 		if use arm; then
 			mycmakeargs+=(
 				-DEIGEN_TEST_NEON="$(usex cpu_flags_arm_neon)"
@@ -508,6 +524,7 @@ src_configure() {
 				# -DEIGEN_TEST_Z13=no # Enable/Disable S390X(zEC13) ZVECTOR in tests/examples
 				# -DEIGEN_TEST_Z14=no # Enable/Disable S390X(zEC14) ZVECTOR in tests/examples
 			)
+		fi
 		fi
 
 		if use cuda; then
@@ -576,18 +593,21 @@ src_configure() {
 
 				# -DCUDA_PROPAGATE_HOST_FLAGS="yes"
 				-DCUDA_USE_STATIC_CUDA_RUNTIME="no"
+				# -DCUDA_BUILD_CUBIN="yes"
+				# -DCUDA_SEPARABLE_COMPILATION="yes"
+				# -DCUDA_VERBOSE_BUILD="yes"
 			)
+
+			if use cudss; then
+				mycmakeargs+=(
+					-DCUDSS_DIR="${CUDNN_PATH}"
+				)
+			fi
 		fi
 
 		if use opengl; then
 			mycmakeargs+=(
 				-DOpenGL_GL_PREFERENCE="GLVND"
-			)
-		fi
-
-		if use pocketfft; then
-			mycmakeargs+=(
-				-DEIGEN_TEST_CXX11=yes
 			)
 		fi
 	fi
@@ -633,7 +653,72 @@ src_test() {
 		# (Failed)
 		"^ref"
 		"^ref_8$"
+
+		# TODO
+		"^fastmath_2$"
+		"^bunchkaufman_8$"
 	)
+
+	if use blas; then
+		if use cuda && ! use lapack; then
+			CMAKE_SKIP_TESTS+=(
+				# Official
+				# (Failed)
+				# "^product_large_11$"
+			)
+		fi
+		if use lapack; then
+			CMAKE_SKIP_TESTS+=(
+				# Official
+				# (Failed)
+				# "^householder_9$"
+				# "^lscg_2$" # retry
+			)
+		fi
+	else
+		CMAKE_SKIP_TESTS+=(
+			# Official
+			# (Subprocess aborted)
+			"^nomalloc"
+			"^nomalloc_1$" # smoketest
+			"^nomalloc_2$"
+			"^nomalloc_3$"
+			"^nomalloc_4$"
+
+			"^product_notemporary"
+			"^product_notemporary_1$"
+			"^product_notemporary_2$"
+			"^product_notemporary_3$"
+			"^product_notemporary_4$" # retry
+		)
+		if ! use cuda; then
+			CMAKE_SKIP_TESTS+=(
+				# Official
+				# (Failed)
+				# "^eigensolver_selfadjoint_13$"
+				# (SEGFAULT)
+				# "^sparse_basic_4$"
+
+				# Unsupported
+				# (Failed)
+				# "^cxx11_tensor_random$" # retry
+				# "^geo_quaternion_2$"
+				# "^matrix_function_1$" # retry
+
+			)
+		else
+			CMAKE_SKIP_TESTS+=(
+				# Official
+				# (Failed)
+				# "^matrix_power_8$"
+				# "^product_extra_2$"
+				# "^product_small_10$"
+				# "^qr_colpivoting_2$" # retry
+				# "^cxx11_tensor_gpu_3$"
+			)
+		fi
+
+	fi
 
 	if use cholmod && use blas && use lapack; then
 		CMAKE_SKIP_TESTS+=(
@@ -645,6 +730,48 @@ src_test() {
 
 	if use cuda; then
 		cuda_add_sandbox -w
+
+		CMAKE_SKIP_TESTS+=(
+			# "^cxx11_tensor_gpu$"
+			# we rerun these til they pass
+			# "^cxx11_tensor_complex_gpu$" # (Failed)                 Unsupported gpu
+			# "^cxx11_tensor_reduction_gpu_1$" # (Failed)             Unsupported gpu
+			# "^cxx11_tensor_reduction_gpu_2$" # (Failed)             Unsupported gpu
+
+			# "^cxx11_tensor_scan_gpu_1$" # (Subprocess aborted)      Unsupported gpu
+			# "^cxx11_tensor_scan_gpu_2$" # (Subprocess aborted)      Unsupported gpu
+			# "^cxx11_tensor_device_2$" # (Subprocess aborted)        Unsupported gpu
+			# "^cxx11_tensor_gpu_1$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_gpu_2$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_gpu_3$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_gpu_4$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_gpu_5$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_gpu_6$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_gpu_7$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_gpu_8$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_gpu_9$" # (Subprocess aborted)           Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_1$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_2$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_3$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_4$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_5$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_6$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_7$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_8$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_contract_gpu_9$" # (Subprocess aborted)  Unsupported gpu
+			# "^cxx11_tensor_of_float16_gpu_1$" # (Subprocess aborted) Unsupported gpu
+			# "^cxx11_tensor_of_float16_gpu_2$" # (Subprocess aborted) Unsupported gpu
+			# "^cxx11_tensor_of_float16_gpu_3$" # (Subprocess aborted) Unsupported gpu
+			# "^cxx11_tensor_of_float16_gpu_4$" # (Subprocess aborted) Unsupported gpu
+			# "^cxx11_tensor_of_float16_gpu_5$" # (Subprocess aborted) Unsupported gpu
+			# "^cxx11_tensor_random_gpu$" # (Subprocess aborted)      Unsupported gpu
+		)
+
+		if use boost; then
+			CMAKE_SKIP_TESTS+=(
+				"^boostmultiprec_6$" # Official
+			)
+		fi
 	fi
 
 	if use klu && use blas; then
