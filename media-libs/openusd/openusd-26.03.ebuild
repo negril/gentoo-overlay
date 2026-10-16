@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -12,10 +12,10 @@ HOMEPAGE="http://www.openusd.org"
 
 if [[ "${PV}" == *9999* ]]; then
 	inherit git-r3
-	EGIT_REPO_URI="https://github.com/PixarAnimationStudios/USD.git"
+	EGIT_REPO_URI="https://github.com/PixarAnimationStudios/OpenUSD.git"
 else
 	SRC_URI="
-		https://github.com/PixarAnimationStudios/USD/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
+		https://github.com/PixarAnimationStudios/OpenUSD/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
 	"
 	S="${WORKDIR}/OpenUSD-${PV}"
 	KEYWORDS="~amd64"

@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{12..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 OPENVDB_COMPAT=( {10..12} )
 inherit cmake desktop python-single-r1 flag-o-matic openvdb xdg-utils
 
@@ -12,10 +12,10 @@ HOMEPAGE="http://www.openusd.org"
 
 if [[ "${PV}" == *9999* ]]; then
 	inherit git-r3
-	EGIT_REPO_URI="https://github.com/PixarAnimationStudios/USD.git"
+	EGIT_REPO_URI="https://github.com/PixarAnimationStudios/OpenUSD.git"
 else
 	SRC_URI="
-		https://github.com/PixarAnimationStudios/USD/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
+		https://github.com/PixarAnimationStudios/OpenUSD/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
 	"
 	S="${WORKDIR}/OpenUSD-${PV}"
 	KEYWORDS="~amd64"
@@ -248,7 +248,7 @@ src_configure() {
 			-DDRACO_ATTRIBUTE_VALUES_DEDUPLICATION_SUPPORTED=ON \
 			-DTBB_SUPPRESS_DEPRECATED_MESSAGES=1
 	fi
-    # See https://github.com/PixarAnimationStudios/USD/blob/v24.05/cmake/defaults/Options.cmake
+	# See https://github.com/PixarAnimationStudios/OpenUSD/blob/v24.05/cmake/defaults/Options.cmake
 	local mycmakeargs+=(
 		$(usex jemalloc "-DPXR_MALLOC_LIBRARY=${ESYSROOT}/usr/$(get_libdir)/${PN}/$(get_libdir)/libjemalloc.so" "")
 		$(usex usdview "-DPYSIDEUICBINARY:PATH=${S}/pyside-uic" "")
