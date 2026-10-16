@@ -28,6 +28,7 @@ LICENSE="BSD-2"
 SLOT="0/$(ver_cut 1)"
 
 IUSE="big-endian debug doc +examples test
+	cpudetection jpegxl vmaf highway
 	cpu_flags_x86_mmx
 	cpu_flags_x86_sse
 	cpu_flags_x86_sse2
@@ -37,8 +38,15 @@ IUSE="big-endian debug doc +examples test
 	cpu_flags_x86_sse4_2
 	cpu_flags_x86_avx
 	cpu_flags_x86_avx2
+	cpu_flags_x86_avx512f
+	cpu_flags_arm_asimddp
 	cpu_flags_arm_crc32
+	cpu_flags_arm_i8mm
 	cpu_flags_arm_neon
+	cpu_flags_arm_sve
+	cpu_flags_arm_sve2
+	cpu_flags_mips_msa
+	cpu_flags_riscv_rvv
 	cpu_flags_ppc_vsx
 "
 RESTRICT="!test? ( test )"
@@ -47,6 +55,14 @@ REQUIRED_USE="
 	cpu_flags_x86_sse2? ( cpu_flags_x86_mmx )
 	cpu_flags_x86_ssse3? ( cpu_flags_x86_sse2 )
 "
+
+RDEPEND="
+	highway? ( dev-cpp/highway[${MULTILIB_USEDEP}] )
+	jpegxl? ( media-libs/libjxl:=[${MULTILIB_USEDEP}] )
+	vmaf? ( media-libs/libvmaf:=[${MULTILIB_USEDEP}] )
+"
+
+DEPEND="${RDEPEND}"
 
 BDEPEND="${PYTHON_DEPS}
 	dev-lang/perl
@@ -61,8 +77,8 @@ DOCS=( PATENTS )
 
 PATCHES=(
 	"${FILESDIR}/${PN}-3.4.0-posix-c-source-ftello.patch"
-	"${FILESDIR}/${PN}-3.7.0-allow-fortify-source.patch"
 	"${FILESDIR}/${PN}-3.8.1-tests-parallel.patch"
+	"${FILESDIR}/${PN}-3.14.0-allow-fortify-source.patch"
 )
 
 src_prepare() {
@@ -72,7 +88,7 @@ src_prepare() {
 
 	sed \
 		-e 's/AOM_INSTALL_LIBS aom aom_static/AOM_INSTALL_LIBS aom/g' \
-		-i build/cmake/aom_install.cmake || die
+		-i cmake/aom_install.cmake || die
 
 	cmake_src_prepare
 }
@@ -84,6 +100,7 @@ multilib_src_configure() {
 
 	local mycmakeargs=(
 		-DENABLE_CCACHE=OFF
+		-DENABLE_DISTCC=OFF
 		-DENABLE_DOCS="$(multilib_native_usex doc)"
 		-DENABLE_EXAMPLES="$(multilib_native_usex examples)"
 		-DENABLE_NASM=OFF
@@ -94,39 +111,59 @@ multilib_src_configure() {
 		# that big endian detection doesn't really work otherwise.
 		-DCONFIG_BIG_ENDIAN="$(usex big-endian 1 0)"
 
-		# Needs libjxl, currently unpackaged.
-		-DCONFIG_TUNE_BUTTERAUGLI=0
-
-		# arm
-		-DENABLE_NEON="$(usex cpu_flags_arm_neon)"
-		-DENABLE_ARM_CRC32="$(usex cpu_flags_arm_crc32)"
-		# bug #917277
-		-DENABLE_NEON_DOTPROD=OFF
-		# bug #917278
-		-DENABLE_NEON_I8MM=OFF
-		# bug #920474
-		-DENABLE_SVE=OFF
-
-		# mips
-		# ENABLE_DSPR2 / ENABLE_MSA for mips
-
-		# riscv
-		# ENABLE_RVV for riscv
-
-		# amd64
-		-DENABLE_MMX="$(usex cpu_flags_x86_mmx)"
-		-DENABLE_SSE="$(usex cpu_flags_x86_sse)"
-		-DENABLE_SSE2="$(usex cpu_flags_x86_sse2)"
-		-DENABLE_SSE3="$(usex cpu_flags_x86_sse3)"
-		-DENABLE_SSSE3="$(usex cpu_flags_x86_ssse3)"
-		-DENABLE_SSE4_1="$(usex cpu_flags_x86_sse4_1)"
-		-DENABLE_SSE4_2="$(usex cpu_flags_x86_sse4_2)"
-		-DENABLE_AVX="$(usex cpu_flags_x86_avx)"
-		-DENABLE_AVX2="$(usex cpu_flags_x86_avx2)"
-
-		# ppc
-		-DENABLE_VSX="$(usex cpu_flags_ppc_vsx)"
+		-DCONFIG_AV1_TEMPORAL_DENOISING=ON
+		-DCONFIG_HIGHWAY="$(usex highway)"
+		-DCONFIG_PIC=ON
+		-DCONFIG_RUNTIME_CPU_DETECT="$(usex cpudetection)"
+		-DCONFIG_TUNE_VMAF="$(usex vmaf)"
+		# dropped from libjxl
+		-DCONFIG_TUNE_BUTTERAUGLI="no"
 	)
+
+	if use arm || use arm64; then
+		mycmakeargs+=(
+			-DENABLE_NEON="$(usex cpu_flags_arm_neon)"
+			-DENABLE_ARM_CRC32="$(usex cpu_flags_arm_crc32)"
+			-DENABLE_NEON_DOTPROD="$(usex cpu_flags_arm_asimddp)"
+			-DENABLE_NEON_I8MM="$(usex cpu_flags_arm_i8mm)"
+			-DENABLE_SVE="$(usex cpu_flags_arm_sve)"
+			-DENABLE_SVE2="$(usex cpu_flags_arm_sve2)"
+		)
+	fi
+
+	if use mips; then
+		mycmakeargs+=(
+			# ENABLE_DSPR2 for mips
+			-DENABLE_MSA="$(usex cpu_flags_mips_msa)"
+		)
+	fi
+
+	if use riscv; then
+		mycmakeargs+=(
+			-DENABLE_RVV="$(usex cpu_flags_riscv_rvv)"
+		)
+	fi
+
+	if use amd64 || use x86; then
+		mycmakeargs+=(
+			-DENABLE_MMX="$(usex cpu_flags_x86_mmx)"
+			-DENABLE_SSE="$(usex cpu_flags_x86_sse)"
+			-DENABLE_SSE2="$(usex cpu_flags_x86_sse2)"
+			-DENABLE_SSE3="$(usex cpu_flags_x86_sse3)"
+			-DENABLE_SSSE3="$(usex cpu_flags_x86_ssse3)"
+			-DENABLE_SSE4_1="$(usex cpu_flags_x86_sse4_1)"
+			-DENABLE_SSE4_2="$(usex cpu_flags_x86_sse4_2)"
+			-DENABLE_AVX="$(usex cpu_flags_x86_avx)"
+			-DENABLE_AVX2="$(usex cpu_flags_x86_avx2)"
+			-DENABLE_AVX512="$(usex cpu_flags_x86_avx512f)"
+		)
+	fi
+
+	if use ppc; then
+		mycmakeargs+=(
+			-DENABLE_VSX="$(usex cpu_flags_ppc_vsx)"
+		)
+	fi
 
 	# For 32-bit multilib builds, force some intrinsics on to work around
 	# bug #816027. libaom seems to do runtime detection for some targets

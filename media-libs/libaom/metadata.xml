@@ -5,4 +5,9 @@
 		<email>codec@gentoo.org</email>
 		<name>Gentoo Codec Project</name>
 	</maintainer>
+	<use>
+	<flag name="cpudetection">Enables runtime CPU detection (useful for bindist, compatibility on other CPUs)</flag>
+	<flag name="highway">Enable SIMD optimizations using <pkg>dev-cpp/highway</pkg></flag>
+	<flag name="vmaf">Enable Netflix's perceptual video quality assessment filter support via <pkg>media-libs/libvmaf</pkg></flag>
+	</use>
 </pkgmetadata>
