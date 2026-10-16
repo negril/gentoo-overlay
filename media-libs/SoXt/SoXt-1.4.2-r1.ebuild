@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -22,11 +22,16 @@ LICENSE="GPL-2"
 SLOT="0"
 IUSE="debug doc test"
 
-RESTRICT="test"
+RESTRICT="!test? ( test )"
 
 RDEPEND="
 	media-libs/coin
-	x11-libs/motif:0
+	x11-libs/motif:0=
+	x11-libs/libX11
+	x11-libs/libXi
+	x11-libs/libXmu
+	x11-libs/libXpm
+	x11-libs/libXt
 	virtual/opengl[X]
 "
 DEPEND="${RDEPEND}"
@@ -45,6 +50,14 @@ DOCS=(
 	TODO
 	BUGS.txt
 )
+
+src_prepare() {
+	cmake_src_prepare
+
+	if has_version ">=x11-libs/motif-2.3.9"; then
+		eapply "${FILESDIR}/${PN}-1.4.2-motif-2.3.9-version.h.patch"
+	fi
+}
 
 src_configure() {
 	use debug && append-cppflags "-D${PN^^}_DEBUG=1"
