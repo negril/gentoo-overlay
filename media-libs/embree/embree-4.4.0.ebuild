@@ -18,7 +18,7 @@ IUSE="compact-polys ispc +raymask ssp +tbb test ${CPU_FLAGS[*]}"
 RESTRICT="!test? ( test )"
 REQUIRED_USE="
 	amd64? ( || ( ${X86_CPU_FLAGS[*]/#/cpu_flags_x86_} ) )
-	arm? ( cpu_flags_arm_neon )
+	arm64? ( cpu_flags_arm_neon )
 "
 
 BDEPEND="
