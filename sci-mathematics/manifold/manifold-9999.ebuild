@@ -21,7 +21,7 @@ else
 		SRC_URI="https://github.com/elalish/manifold/releases/download/v${PV}/${P}.tar.gz"
 	fi
 
-	KEYWORDS="~amd64"
+	KEYWORDS="~amd64 ~arm64 ~x86"
 fi
 
 LICENSE="Apache-2.0"
@@ -63,7 +63,7 @@ src_configure() {
 		-DMANIFOLD_CROSS_SECTION_BACKEND="clipper2" # boolean2
 		-DMANIFOLD_DEBUG="$(usex debug)"
 		-DMANIFOLD_DOWNLOADS="no"
-		-DMANIFOLD_EXPORT="$(usex assimp)"
+		-DASSIMP_ENABLE="$(usex assimp)"
 		-DMANIFOLD_JSBIND="no"
 		-DMANIFOLD_PAR="$(usex tbb ON OFF)"
 		-DMANIFOLD_STRICT="no" # adds -Werror
