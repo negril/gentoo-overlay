@@ -34,7 +34,7 @@ RDEPEND="
 		sys-cluster/medipack:=
 	)
 	sparse? (
-		>sci-libs/colpack-1.0.10[openmp?]
+		>=sci-libs/colpack-1.0.10_p20190621[openmp?]
 	)
 "
 DEPEND="${RDEPEND}
@@ -95,7 +95,7 @@ src_configure() {
 
 	if use sparse; then
 		mycmakeargs+=(
-			-DColPack_DIR="${ESYSROOT}"/usr
+			-DColPack_DIR="${ESYSROOT}/usr"
 		)
 	fi
 
