@@ -1,0 +1,34 @@
+From d91743ac7ef31a7c6f4ac44a2a1dd7d052b45826 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Thu, 16 Jul 2026 13:06:00 +0200
+Subject: jxl: fix build with libjxl-0.12.0
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/testsuite/jxl/ref/out.txt b/testsuite/jxl/ref/out.txt
+index 0ed56fe..cd483ba 100644
+--- a/testsuite/jxl/ref/out.txt
++++ b/testsuite/jxl/ref/out.txt
+@@ -24,7 +24,7 @@ tahoe-cicp-pq.jxl    :  128 x   96, 3 channel, uint8 jpegxl
+     SHA-1: 069F1A3E5567349C2D34E535B29913029EF1B09C
+     channel list: R, G, B
+     CICP: 9, 16, 0, 1
+-    ICCProfile: 0, 0, 16, 248, 106, 120, 108, 32, 4, 64, 0, 0, 109, 110, 116, 114, ... [4344 x uint8]
++    ICCProfile: 0, 0, 16, 228, 106, 120, 108, 32, 4, 64, 0, 0, 109, 110, 116, 114, ... [4324 x uint8]
+     ICCProfile:attributes: "Reflective, Glossy, Positive, Color"
+     ICCProfile:cmm_type: 1786276896
+     ICCProfile:color_space: "RGB"
+@@ -37,8 +37,8 @@ tahoe-cicp-pq.jxl    :  128 x   96, 3 channel, uint8 jpegxl
+     ICCProfile:model: "0"
+     ICCProfile:platform_signature: "Apple Computer, Inc."
+     ICCProfile:profile_connection_space: "CIELAB"
+-    ICCProfile:profile_description: "RGB_D65_202_Per_PeQ"
+-    ICCProfile:profile_size: 4344
++    ICCProfile:profile_description: "Rec2100PQ"
++    ICCProfile:profile_size: 4324
+     ICCProfile:profile_version: "4.4.0"
+     ICCProfile:rendering_intent: "Perceptual"
+     oiio:ColorSpace: "pq_rec2020_display"
+-- 
+2.55.0
+
