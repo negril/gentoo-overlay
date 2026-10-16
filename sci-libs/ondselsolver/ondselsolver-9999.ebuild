@@ -29,7 +29,6 @@ RESTRICT="!test? ( test )"
 DEPEND="test? ( dev-cpp/gtest )"
 
 PATCHES=(
-	"${FILESDIR}/${PN}-1.0.1_p20241024-system-gtest.patch"
 	"${FILESDIR}/${PN}-1.0.1-properly-demangle-typenames.patch"
 )
 
