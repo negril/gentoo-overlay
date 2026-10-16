@@ -53,7 +53,6 @@ RESTRICT="!test? ( test )"
 
 RDEPEND="
 	dev-lang/tcl:=
-	dev-libs/double-conversion
 	tk? ( dev-lang/tk:= )
 	gles2? (
 		media-libs/libglvnd
