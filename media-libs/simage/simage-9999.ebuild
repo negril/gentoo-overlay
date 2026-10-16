@@ -1,4 +1,4 @@
-# Copyright 1999-2024 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -6,19 +6,21 @@ EAPI=8
 inherit cmake
 
 DESCRIPTION="Image and video texturing library"
-HOMEPAGE="https://github.com/coin3d/simage/"
+HOMEPAGE="https://github.com/coin3d/simage https://github.com/coin3d/coin/wiki"
 
-if [[ ${PV} = *9999* ]]; then
+if [[ ${PV} == *9999* ]]; then
 	inherit git-r3
-	EGIT_REPO_URI="https://github.com/coin3d/simage.git"
+	EGIT_REPO_URI="https://github.com/coin3d/${PN,,}.git"
 else
-	SRC_URI="https://github.com/coin3d/simage/releases/download/v${PV}/${P}-src.tar.gz -> ${P}.tar.gz"
+	SRC_URI="https://github.com/coin3d/${PN,,}/releases/download/v${PV}/${P/${PN}/${PN,,}}-src.tar.gz"
+	S="${WORKDIR}/${PN,,}"
+
 	KEYWORDS="~amd64 ~arm ~arm64 ~hppa ~ppc ~ppc64 ~sparc ~x86"
-	S="${WORKDIR}/${PN}"
 fi
 
 LICENSE="BSD-1"
-SLOT="0"
+# SONAME
+SLOT="0/20"
 IUSE="gif jpeg png qt6 sndfile test tiff vorbis zlib"
 RESTRICT="!test? ( test )"
 
@@ -54,33 +56,33 @@ DOCS=( AUTHORS ChangeLog NEWS README )
 
 src_configure() {
 	local mycmakeargs=(
-		-DSIMAGE_BUILD_SHARED_LIBS=ON
-		-DSIMAGE_BUILD_EXAMPLES=OFF
-		-DSIMAGE_BUILD_TESTS=$(usex test)
-		-DSIMAGE_BUILD_DOCUMENTATION=OFF
-		-DSIMAGE_USE_AVIENC=OFF # Windows only
-		-DSIMAGE_USE_GDIPLUS=OFF # Windows
-		-DSIMAGE_USE_CGIMAGE=OFF # OS X only
-		-DSIMAGE_USE_QUICKTIME=OFF # OS X only
-		-DSIMAGE_USE_QIMAGE=$(usex qt6)
-		-DSIMAGE_USE_QT5=OFF
-		-DSIMAGE_USE_QT6=$(usex qt6)
-		-DSIMAGE_USE_CPACK=OFF
-		-DSIMAGE_USE_STATIC_LIBS=OFF
-		-DSIMAGE_LIBJASPER_SUPPORT=OFF
-		-DSIMAGE_LIBSNDFILE_SUPPORT=$(usex sndfile)
-		-DSIMAGE_OGGVORBIS_SUPPORT=$(usex vorbis)
-		-DSIMAGE_EPS_SUPPORT=ON
-		-DSIMAGE_MPEG2ENC_SUPPORT=ON
-		-DSIMAGE_PIC_SUPPORT=ON
-		-DSIMAGE_RGB_SUPPORT=ON
-		-DSIMAGE_TGA_SUPPORT=ON
-		-DSIMAGE_XWD_SUPPORT=ON
-		-DSIMAGE_ZLIB_SUPPORT=$(usex zlib)
-		-DSIMAGE_GIF_SUPPORT=$(usex gif)
-		-DSIMAGE_JPEG_SUPPORT=$(usex jpeg)
-		-DSIMAGE_PNG_SUPPORT=$(usex png)
-		-DSIMAGE_TIFF_SUPPORT=$(usex tiff)
+		-D${PN^^}_BUILD_SHARED_LIBS=ON
+		-D${PN^^}_BUILD_EXAMPLES=OFF
+		-D${PN^^}_BUILD_TESTS=$(usex test)
+		-D${PN^^}_BUILD_DOCUMENTATION=OFF
+		-D${PN^^}_USE_AVIENC=OFF # Windows only
+		-D${PN^^}_USE_GDIPLUS=OFF # Windows
+		-D${PN^^}_USE_CGIMAGE=OFF # OS X only
+		-D${PN^^}_USE_QUICKTIME=OFF # OS X only
+		-D${PN^^}_USE_QIMAGE=$(usex qt6)
+		-D${PN^^}_USE_QT5=OFF
+		-D${PN^^}_USE_QT6=$(usex qt6)
+		-D${PN^^}_USE_CPACK=OFF
+		-D${PN^^}_USE_STATIC_LIBS=OFF
+		-D${PN^^}_LIBJASPER_SUPPORT=OFF
+		-D${PN^^}_LIBSNDFILE_SUPPORT=$(usex sndfile)
+		-D${PN^^}_OGGVORBIS_SUPPORT=$(usex vorbis)
+		-D${PN^^}_EPS_SUPPORT=ON
+		-D${PN^^}_MPEG2ENC_SUPPORT=ON
+		-D${PN^^}_PIC_SUPPORT=ON
+		-D${PN^^}_RGB_SUPPORT=ON
+		-D${PN^^}_TGA_SUPPORT=ON
+		-D${PN^^}_XWD_SUPPORT=ON
+		-D${PN^^}_ZLIB_SUPPORT=$(usex zlib)
+		-D${PN^^}_GIF_SUPPORT=$(usex gif)
+		-D${PN^^}_JPEG_SUPPORT=$(usex jpeg)
+		-D${PN^^}_PNG_SUPPORT=$(usex png)
+		-D${PN^^}_TIFF_SUPPORT=$(usex tiff)
 	)
 	cmake_src_configure
 }
