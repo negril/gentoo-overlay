@@ -9,12 +9,16 @@
 		<email>proxy-maint@gentoo.org</email>
 		<name>Proxy Maintainers</name>
 	</maintainer>
+	<upstream>
+		<remote-id type="github">AcademySoftwareFoundation/MaterialX</remote-id>
+	</upstream>
 	<use>
-		<flag name="graph-editor">graph-editor</flag>
-		<flag name="openimageio">openimageio</flag>
-		<flag name="osl">osl</flag>
-		<flag name="renderer">renderer</flag>
-		<flag name="resources">resources</flag>
-		<flag name="viewer">viewer</flag>
+		<flag name="graph-editor">BUILD_GRAPH_EDITOR</flag>
+		<flag name="opencolorio">BUILD_OCIO</flag>
+		<flag name="openimageio">BUILD_OIIO</flag>
+		<flag name="osl">GEN_OSL</flag>
+		<flag name="renderer">BUILD_RENDER</flag>
+		<flag name="resources">INSTALL_RESOURCES</flag>
+		<flag name="viewer">BUILD_VIEWER</flag>
 	</use>
 </pkgmetadata>
