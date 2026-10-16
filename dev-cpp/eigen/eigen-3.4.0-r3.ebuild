@@ -412,7 +412,7 @@ src_compile() {
 		fi
 		# tests generate random data, which
 		# obviously fails for some seeds
-		export EIGEN_SEED=712808
+		# export EIGEN_SEED=712808
 	fi
 
 	if use doc || use test; then

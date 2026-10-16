@@ -612,7 +612,8 @@ src_compile() {
 			targets+=( buildtests_gpu )
 		fi
 
-		# tests generate random data, which obviously fails for some seeds
+		# tests generate random data, which fails for some seeds
+		# we solve this via test reruns now
 		# export EIGEN_SEED=712808
 	fi
 
