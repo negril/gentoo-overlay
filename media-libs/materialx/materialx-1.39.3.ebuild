@@ -6,7 +6,7 @@ EAPI=8
 MY_PN="MaterialX"
 MY_P="${MY_PN}-${PV}"
 
-PYTHON_COMPAT=( python3_{11..13} ) # CI does not list 3.10 for this package.
+PYTHON_COMPAT=( python3_{11..14} ) # CI does not list 3.10 for this package.
 inherit cmake python-single-r1 desktop flag-o-matic
 
 DESCRIPTION="MaterialX is an open standard for the exchange of rich material content."
@@ -63,7 +63,7 @@ LICENSE="
 	graph-editor? ( ZLIB MIT Boost-1.0 BSD )
 "
 
-SLOT="0/$(ver_cut 1-2)"
+SLOT="0/$(ver_cut 1)"
 
 IUSE="X doc debug examples graph-editor javascript lto openimageio +osl python +renderer resources test viewer"
 
@@ -273,7 +273,7 @@ src_install() {
 		cp documents/Images/MaterialXLogo_200x155.png "${ED}/usr/share/icons/hicolor/256x256/apps/materialx.png" || die
 	fi
 
-	if use docs ; then
+	if use doc ; then
 		local DOCS=(
 			"LICENSE"
 			"CHANGELOG.md"
