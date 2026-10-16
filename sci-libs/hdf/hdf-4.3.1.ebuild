@@ -11,19 +11,20 @@ DESCRIPTION="General purpose library and format for storing scientific data"
 HOMEPAGE="https://www.hdfgroup.org/hdf4.html"
 
 SRC_URI="
-	https://github.com/HDFGroup/hdf4/releases/download/hdf4.3.1/hdf4.3.1.tar.gz
+	https://github.com/HDFGroup/hdf4/releases/download/hdf${PV}/hdf${PV}.tar.gz
+		-> ${P}.tar.gz
 "
-KEYWORDS="~amd64 ~arm ~ppc ~riscv ~x86"
 
 LICENSE="NCSA-HDF"
 SLOT="0"
+KEYWORDS="~amd64 ~arm ~ppc ~riscv ~x86"
 IUSE="examples fortran +szip static-libs test"
 RESTRICT="!test? ( test )"
 REQUIRED_USE="test? ( szip )"
 
 RDEPEND="
 	net-libs/libtirpc:=
-	virtual/jpeg:0
+	media-libs/libjpeg-turbo:=
 	virtual/zlib:=
 	szip? (
 		virtual/szip:=

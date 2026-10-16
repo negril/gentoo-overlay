@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -22,7 +22,7 @@ REQUIRED_USE="test? ( szip )"
 
 RDEPEND="net-libs/libtirpc:=
 	virtual/zlib:=
-	virtual/jpeg:0
+	media-libs/libjpeg-turbo:=
 	szip? ( virtual/szip )"
 DEPEND="${RDEPEND}
 	test? ( virtual/szip )"
