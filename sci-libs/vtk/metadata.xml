@@ -22,6 +22,7 @@
     <flag name="imaging">Building Imaging modules</flag>
     <flag name="kokkos">Enable GPU support via <pkg>dev-cpp/kokkos</pkg></flag>
     <flag name="logging">Build the logging module</flag>
+    <flag name="onnx">Enable ONNX based filters</flag>
     <flag name="opencascade">Enable OpenCASCADE support</flag>
     <flag name="openvdb">Build support to handle VDB data files</flag>
     <flag name="pdal">Build support to handle point cloud data files</flag>
@@ -31,8 +32,10 @@
     <flag name="truetype">Build support for font rendering</flag>
     <flag name="video_cards_nvidia">Support running on NVIDIA GPUs using <pkg>x11-drivers/nvidia-drivers</pkg></flag>
     <flag name="video_cards_zink">Run tests using the MESA Zink OpenGL-over-Vulkan driver</flag>
+    <flag name="usd">Enable the VTK::IOUSD module</flag>
     <flag name="views">Building Views modules</flag>
-    <flag name="vtkm">Build the vtkm accelerations modules</flag>
+    <flag name="vtkm" restrict="&lt;sci-libs/vtk-9.5">Build the vtkm accelerations modules</flag>
+    <flag name="vtkm" restrict="&gt;=sci-libs/vtk-9.5">Build the viskores accelerations modules</flag>
     <flag name="web">Install web component</flag>
   </use>
   <upstream>
