@@ -15,11 +15,12 @@ if [[ ${PV} = *9999* ]] ; then
 	EGIT_REPO_URI="https://github.com/aous72/${PN}.git"
 	TEST_REPO_URI="https://github.com/aous72/jp2k_test_codestreams.git"
 else
-	TEST_COMMIT="eda0844b9f3be47d9b64194bcea5eb1ac2285e39"
+	TEST_COMMIT="1ccd349d12dced98eafabe641e5dac8c42a7c909"
 	SRC_URI="
 		https://github.com/aous72/${PN}/archive/${PV}.tar.gz -> ${P}.tar.gz
 		test? (
-			https://github.com/aous72/jp2k_test_codestreams/archive/${TEST_COMMIT}.tar.gz -> ${PN}-jp2k_test_codestreams-${TEST_COMMIT:0:8}.tar.gz
+			https://github.com/aous72/jp2k_test_codestreams/archive/${TEST_COMMIT}.tar.gz
+				-> ${PN}-jp2k_test_codestreams-${TEST_COMMIT:0:8}.tar.gz
 		)
 	"
 	S="${WORKDIR}/${MY_PN}-${PV}"
@@ -43,7 +44,7 @@ declare -A CPU_FEATURES=(
 
 add_cpu_features_use() {
 	for flag in "${!CPU_FEATURES[@]}"; do
-		IFS=$';' read -r arch use <<< "${CPU_FEATURES[${flag}]}"
+		IFS=$';' read -r arch use < <( echo "${CPU_FEATURES[${flag}]}" )
 		IUSE+=" cpu_flags_${arch}_${use:-${flag,,}}"
 	done
 }
@@ -74,7 +75,6 @@ DOCS=(
 PATCHES=(
 	"${FILESDIR}/${PN}-0.25.3-system-gtest.patch"
 	"${FILESDIR}/${PN}-0.25.3-use-prefetched-test-data.patch"
-	"${FILESDIR}/${PN}-0.25.3-fix-ub.patch"
 	"${FILESDIR}/${PN}-0.25.3-Warray-bounds.patch"
 )
 
@@ -100,9 +100,7 @@ src_unpack() {
 }
 
 multilib_src_configure() {
-	# https://github.com/aous72/OpenJPH/issues/186
-	# append-flags -fno-strict-aliasing
-	# append-cxxflags -fno-lifetime-dse
+	filter-lto
 
 	local mycmakeargs=(
 		# defaults to 11
