@@ -12,7 +12,9 @@ if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/wdas/ptex.git"
 else
-	SRC_URI="https://github.com/wdas/ptex/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz"
+	SRC_URI="
+		https://github.com/wdas/ptex/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
+	"
 	KEYWORDS="~amd64 ~arm ~arm64 ~riscv ~x86"
 fi
 
@@ -36,7 +38,6 @@ BDEPEND="
 "
 
 PATCHES=(
-	"${FILESDIR}/${PN}-2.5.1-cmake-4.patch"
 	"${FILESDIR}/${PN}-2.5.1-fix-pkgconfig.patch"
 )
 
@@ -51,7 +52,7 @@ src_prepare() {
 
 src_configure() {
 	# replace-flags -O3 -O2
-	# filter-lto
+	append-cxxflags -fno-tree-dce -fno-tree-dse
 
 	local mycmakeargs=(
 		-DCMAKE_INSTALL_DOCDIR="share/doc/${PF}/html"
@@ -77,11 +78,32 @@ src_configure() {
 	cmake_src_configure
 }
 
-# src_test() {
-# 	local CMAKE_SKIP_TESTS=(
-# 		# Program received signal SIGSEGV, Segmentation fault.
-# 		# 0x00007ffff7f4ab26 in Ptex::v2_5::PtexReader::getData(int, void*, int, Ptex::v2_5::Res) () from /var/tmp/paludis/media-libs-ptex-2.5.1/work/ptex-2.5.1_build/src/ptex/libPtex.so.2.5
-# 		"^rtest$"
-# 	)
-# 	cmake_src_test
-# }
+src_test() {
+	# local CMAKE_SKIP_TESTS=(
+	# 	# Program received signal SIGSEGV, Segmentation fault.
+	# 	# 0x00007ffff7f4ab26 in Ptex::v2_5::PtexReader::getData(int, void*, int, Ptex::v2_5::Res) ()
+	# 	from /var/tmp/paludis/media-libs-ptex-2.5.1/work/ptex-2.5.1_build/src/ptex/libPtex.so.2.5
+	# 	"^rtest$"
+	# )
+	cmake_src_test --extra-verbose
+
+	# cd "${BUILD_DIR}/src/tests" || die
+
+	# local test tests=(
+	# 	wtest
+	# 	halftest
+	# 	rtest
+	# 	ftest
+	# )
+
+	# for test in "${tests[@]}"; do
+	# 	sh &> "./${test}_valgrind.log" <<-_EOF_
+	# 		echo valgrind --leak-check=full --trace-children=yes --track-origins=yes "./${test}"
+	# 		valgrind --leak-check=full --trace-children=yes --track-origins=yes "./${test}"
+	# 	_EOF_
+	# done
+
+	# wgetpaste -s pgz ./*_valgrind.log
+
+	# die
+}
