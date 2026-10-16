@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -21,8 +21,9 @@ REQUIRED_USE="
 	amd64? ( || ( ${X86_CPU_FLAGS[*]/#/cpu_flags_x86_} ) )
 "
 
+# TODO bundle embree
+# 	media-libs/embree:=
 RDEPEND="
-	media-libs/embree:=
 	dev-cpp/tbb:=
 "
 DEPEND="${RDEPEND}"
