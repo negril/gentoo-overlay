@@ -1,0 +1,28 @@
+From 816ba2859255963f8adae57a7f6c7bb25d2e989e Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 19 Jun 2026 16:19:41 +0200
+Subject: ffmpeg 8.0
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/plugins/ffmpeg/FFMPEGReader.cpp b/plugins/ffmpeg/FFMPEGReader.cpp
+index 6415424..89a990c 100644
+--- a/plugins/ffmpeg/FFMPEGReader.cpp
++++ b/plugins/ffmpeg/FFMPEGReader.cpp
+@@ -202,9 +202,11 @@ FFMPEGReader::FFMPEGReader(std::shared_ptr<Buffer> buffer, int stream) :
+ 		m_membuffer(buffer),
+ 		m_membufferpos(0)
+ {
+-	m_membuf = reinterpret_cast<data_t*>(av_malloc(AV_INPUT_BUFFER_MIN_SIZE + AV_INPUT_BUFFER_PADDING_SIZE));
++	// Default buffer size (aligns with the x86 page size), taken from FFmpeg's "doc/examples/avio_read_callback.c" example
++	const size_t avio_ctx_buffer_size = 4096;
++	m_membuf = reinterpret_cast<data_t*>(av_malloc(avio_ctx_buffer_size + AV_INPUT_BUFFER_PADDING_SIZE));
+ 
+-	m_aviocontext = avio_alloc_context(m_membuf, AV_INPUT_BUFFER_MIN_SIZE, 0, this, read_packet, nullptr, seek_packet);
++	m_aviocontext = avio_alloc_context(m_membuf, avio_ctx_buffer_size, 0, this, read_packet, nullptr, seek_packet);
+ 
+ 	if(!m_aviocontext)
+ 	{
+-- 
+2.54.0
+

@@ -1,0 +1,22 @@
+From fb0273f319e1018f1ddb34859aa10339df43d996 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx+gentoo@gmail.com>
+Date: Fri, 19 Jun 2026 16:19:53 +0200
+Subject: gcc-17 include string
+
+Signed-off-by: Paul Zander <negril.nx+gentoo@gmail.com>
+
+diff --git a/plugins/pulseaudio/PulseAudioDevice.h b/plugins/pulseaudio/PulseAudioDevice.h
+index e985dfa..ee8101e 100644
+--- a/plugins/pulseaudio/PulseAudioDevice.h
++++ b/plugins/pulseaudio/PulseAudioDevice.h
+@@ -30,6 +30,7 @@
+ #include "util/RingBuffer.h"
+ 
+ #include <condition_variable>
++#include <string>
+ #include <thread>
+ 
+ #include <pulse/pulseaudio.h>
+-- 
+2.54.0
+
