@@ -6,6 +6,9 @@ EAPI=8
 # TODO:
 # - add USE flag for remote modules? Those modules can be downloaded properly before building.
 # - vtkm was renamed to viskores. Rename once usemove is implemented.
+# unused
+# VTK_MODULE_ENABLE_VTK_h5part
+# VTKm_ENABLE_MPI
 
 PYTHON_COMPAT=( python3_{12..14} )
 PYTHON_REQ_USE="tk?"
@@ -13,8 +16,8 @@ PYTHON_REQ_USE="tk?"
 WEBAPP_OPTIONAL=yes
 WEBAPP_MANUAL_SLOT=yes
 
-inherit check-reqs cmake cuda java-pkg-opt-2 multiprocessing python-single-r1 toolchain-funcs virtualx webapp xdg-utils
-inherit flag-o-matic
+inherit check-reqs cmake cuda java-pkg-opt-2 multiprocessing python-single-r1 toolchain-funcs virtualx webapp
+inherit flag-o-matic xdg-utils
 
 # Short package version
 MY_PV="$(ver_cut 1-2)"
@@ -47,7 +50,7 @@ else
 		)
 	"
 	S="${WORKDIR}/VTK-${PV}"
-	KEYWORDS="~amd64 ~arm ~arm64 ~x86"
+	KEYWORDS="~amd64 ~arm64 ~x86"
 fi
 
 LICENSE="BSD LGPL-2"
@@ -56,8 +59,8 @@ SLOT="0/${MY_PV}"
 # TODO: Like to simplify these. Mostly the flags related to Groups.
 IUSE="
 	all-modules boost +cgns cuda debug doc egl examples ffmpeg gdal gles2 imaging
-	java +logging minimal mpi mysql +netcdf odbc opencascade openmp openvdb pdal postgres
-	python qt6 +rendering tbb test +threads tk +truetype video_cards_nvidia +views vtkm web
+	java +logging minimal mpi mysql +netcdf odbc onnx opencascade openmp openvdb pdal postgres
+	python qt6 +rendering tbb test +threads tk +truetype usd video_cards_nvidia +views vtkm web
 	+video_cards_zink
 "
 
@@ -89,7 +92,6 @@ REQUIRED_USE="
 # eigen, nlohmann_json, pegtl and utfcpp are referenced in the cmake files
 # and need to be available when VTK consumers configure the dependencies.
 # opencascade does things with gles2/opengl detection so we need to align both
-# python uses in1d which is obsolete and removed in numpy-2.4, fixed in 9.6
 RDEPEND="
 	app-arch/lz4:=
 	app-arch/xz-utils
@@ -110,6 +112,17 @@ RDEPEND="
 	media-libs/tiff:=
 	sci-libs/hdf5:=[mpi=]
 	virtual/zlib:=
+	all-modules? (
+		app-arch/libarchive:=
+		dev-lang/tcl:=
+		media-gfx/alembic
+		onnx? (
+			sci-libs/onnxruntime[cuda=]
+		)
+		usd? (
+			media-libs/openusd
+		)
+	)
 	boost? ( dev-libs/boost:=[mpi?] )
 	cgns? (
 		>=sci-libs/cgnslib-4.1.1:=[hdf5,mpi=]
@@ -150,22 +163,25 @@ RDEPEND="
 	qt6? (
 		dev-qt/qtbase:6[gui,opengl,sql,widgets]
 		dev-qt/qtdeclarative:6[opengl]
-		dev-qt/qtshadertools:6
 		x11-libs/libxkbcommon
 		!gles2? (
 			dev-qt/qtbase:6[-gles2-only]
 		)
 	)
 	rendering? (
-		media-libs/libglvnd[X]
-		x11-libs/gl2ps
+		virtual/opengl[X]
 		x11-libs/libXcursor
 		x11-libs/libX11
+		!gles2? (
+			x11-libs/gl2ps
+		)
 	)
 	tbb? ( dev-cpp/tbb:= )
 	tk? ( dev-lang/tk:= )
 	truetype? ( media-libs/fontconfig )
-	video_cards_nvidia? ( x11-drivers/nvidia-drivers[tools,static-libs] )
+	cuda? (
+		video_cards_nvidia? ( x11-drivers/nvidia-drivers )
+	)
 	views? (
 		x11-libs/libX11
 	)
@@ -189,30 +205,24 @@ DEPEND="
 		rendering? ( media-libs/freeglut )
 	)
 "
-BDEPEND="virtual/pkgconfig"
+BDEPEND="
+	virtual/pkgconfig
+	qt6? (
+		dev-qt/qtshadertools:6
+	)
+"
 
 PATCHES=(
 	"${FILESDIR}/${PN}-9.2.5-pegtl-3.x.patch"
 	"${FILESDIR}/${PN}-9.3.0-java.patch"
-# 	"${FILESDIR}/${PN}-9.3.0-opencascade.patch"
-	# "${FILESDIR}/${PN}-9.3.0-ThrustPatches.patch"
-	# "${FILESDIR}/${PN}-9.3.0-core-octree_node.txx.patch"
-	# "${FILESDIR}/${PN}-9.3.0-ThirdParty-gcc15.patch"
-# 	"${FILESDIR}/${PN}-9.3.0-update-for-cuda-12.6.patch"
-	# "${FILESDIR}/${PN}-9.3.1-fix-fmt-11.patch"
 
 	"${FILESDIR}/${PN}-9.4.2-pegtl-3.x.patch"
-# 	"${FILESDIR}/${PN}-9.4.1-fix-fmt-11.patch"
-# 	"${FILESDIR}/${PN}-9.4.1-opencascade-components.patch"
-# 	"${FILESDIR}/${PN}-9.4.1-vtk-m-jobpool-2.patch"
-# 	"${FILESDIR}/${PN}-9.4.1-vtk-m-jobpool-10G.patch"
-# 	"${FILESDIR}/${PN}-9.4.1-vtk-m-jobpool-15G.patch"
-# 	"${FILESDIR}/${PN}-9.4.1-vtk-m-jobpool-20G.patch"
-# 	"${FILESDIR}/${PN}-9.4.1-ThirdParty-gcc15.patch"
-# 	"${FILESDIR}/${PN}-9.4.2-find-hdf5-in-global-scope.patch"
-	"${FILESDIR}/${PN}-9.4.2-ThirdParty-libfmt-12.patch"
-	"${FILESDIR}/${PN}-9.5.0-cuda-13-1.patch"
-	"${FILESDIR}/${PN}-9.5.0-cuda-13-2.patch"
+	"${FILESDIR}/${PN}-9.5.2-gcc17-include-string.patch"
+
+	# "${DISTDIR}/${PN}-9.6.2-viscores-PR290.patch"
+	# "${DISTDIR}/${PN}-9.6.2-viscores-PR314.patch"
+	# "${DISTDIR}/${PN}-9.6.2-viscores-PR336.patch"
+	# "${FILESDIR}/${PN}-9.6.2-cccl-3.0.patch"
 )
 
 DOCS=( CONTRIBUTING.md README.md )
@@ -405,6 +415,16 @@ pkg_setup() {
 		# so __nvcc_device_query does not fail later.
 
 		nvidia-smi -L || true
+
+		if has_version ">=dev-util/nvidia-cuda-toolkit-12.6.0"; then
+			# NOTE Without this ptxas will consume large amounts of memory.
+			# The user can override this using NVCC_APPEND_FLAGS.
+			# #973279
+			# TODO Should go into the eclass.
+			export NVCC_PREPREND_FLAGS="${NVCC_PREPREND_FLAGS:+"${NVCC_PREPREND_FLAGS} "} -Ofc min --threads $(makeopts_jobs)"
+			einfo "Using NVCC_PREPREND_FLAGS=\"${NVCC_PREPREND_FLAGS}\""
+			einfo "You can override this using NVCC_APPEND_FLAGS"
+		fi
 	fi
 
 	use java && java-pkg-opt-2_pkg_setup
@@ -430,12 +450,6 @@ src_prepare() {
 
 	cmake_src_prepare
 
-	# 14 GiB is the highest single process ram usage seen
-	# 932464
-	sed \
-		-e "/EXPR viskores_pool_size/s/3072/$(( 10 * 1024 ))/g" \
-		-i ThirdParty/viskores/vtkviskores/viskores/CMake/ViskoresWrappers.cmake || die
-
 	if use test; then
 		ebegin "Copying data files to ${BUILD_DIR}"
 		mkdir -p "${BUILD_DIR}/ExternalData" || die
@@ -452,6 +466,10 @@ src_prepare() {
 #	VTK_DISPATCH_{AOS,SOA,TYPED}_ARRAYS
 src_configure() {
 	filter-lto
+
+	if ! is-flagq "$(usex debug '-DDEBUG' '-DNDEBUG')"; then
+		append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
+	fi
 
 	local mycmakeargs=(
 		-DCMAKE_DISABLE_FIND_PACKAGE_Git="yes"
@@ -478,7 +496,6 @@ src_configure() {
 		-DVTK_BUILD_DOCUMENTATION=OFF
 		-DVTK_BUILD_EXAMPLES="$(usex examples)"
 
-		# no package in the tree: https://github.com/LLNL/conduit
 		-DVTK_ENABLE_CATALYST=OFF
 		-DVTK_ENABLE_KITS=OFF
 		-DVTK_ENABLE_LOGGING="$(usex logging)"
@@ -497,7 +514,8 @@ src_configure() {
 		-DVTK_GROUP_ENABLE_Web="$(usex web "YES" "NO")"
 
 		-DVTK_INSTALL_SDK=ON
-
+		# no package in the tree: https://github.com/LLNL/conduit
+		-DVTK_MODULE_ENABLE_VTK_IOCatalystConduit="NO"
 		-DVTK_MODULE_ENABLE_VTK_IOCGNSReader="$(usex cgns "YES" "NO")"
 		-DVTK_MODULE_ENABLE_VTK_IOExportPDF="$(usex minimal "NO" "YES")"
 		-DVTK_MODULE_ENABLE_VTK_IOLAS="NO" # las is dead
@@ -514,7 +532,6 @@ src_configure() {
 		-DVTK_MODULE_ENABLE_VTK_cgns="$(usex cgns "YES" "NO")"
 		# -DVTK_MODULE_ENABLE_VTK_cli11
 		# -DVTK_MODULE_ENABLE_VTK_dy2
-		-DVTK_MODULE_ENABLE_VTK_doubleconversion="YES"
 		-DVTK_MODULE_ENABLE_VTK_eigen="YES"
 		# -DVTK_MODULE_ENABLE_VTK_exodusII
 		-DVTK_MODULE_ENABLE_VTK_expat="YES"
@@ -545,7 +562,7 @@ src_configure() {
 		-DVTK_MODULE_ENABLE_VTK_pegtl="YES"
 		-DVTK_MODULE_ENABLE_VTK_png="YES"
 		-DVTK_MODULE_ENABLE_VTK_pugixml="YES"
-		-DVTK_MODULE_ENABLE_VTK_scn="$(usex test "YES" "NO")"
+		# -DVTK_MODULE_ENABLE_VTK_scn="$(usex test "YES" "NO")"
 		-DVTK_MODULE_ENABLE_VTK_sqlite="YES"
 		-DVTK_MODULE_ENABLE_VTK_theora="$(usex minimal "NO" "YES")"
 		-DVTK_MODULE_ENABLE_VTK_tiff="YES"
@@ -578,7 +595,7 @@ src_configure() {
 		-DVTK_USE_HIP="$(usex hip)"
 		# use system libraries where possible
 		-DVTK_USE_EXTERNAL=ON
-		# avoid finding package from either ::guru or ::sci
+		# avoid finding dev-libs/memkind from either ::guru or ::sci
 		-DVTK_USE_MEMKIND=OFF
 		-DVTK_USE_MPI="$(usex mpi)"
 		-DVTK_USE_TK="$(usex tk)"
@@ -600,13 +617,19 @@ src_configure() {
 			-DVTK_MODULE_ENABLE_VTK_DomainsMicroscopy="NO"
 			-DVTK_MODULE_ENABLE_VTK_fides="NO"
 			-DVTK_MODULE_ENABLE_VTK_FiltersOpenTURNS="NO"
+			-DVTK_MODULE_ENABLE_VTK_FiltersONNX="$(usex onnx "YES" "NO")"
+
 			-DVTK_MODULE_ENABLE_VTK_IOADIOS2="NO"
 			-DVTK_MODULE_ENABLE_VTK_IOFides="NO"
+			-DVTK_MODULE_ENABLE_VTK_IOUSD="$(usex usd "YES" "NO")"
 
 			-DVTK_MODULE_ENABLE_VTK_RenderingOpenVR="NO"
 			-DVTK_MODULE_ENABLE_VTK_RenderingOpenXR="NO"
 
 			-DVTK_MODULE_USE_EXTERNAL_VTK_cli11="YES"
+
+			-DVTK_MODULE_ENABLE_VTK_conduit="NO"
+			-DVTK_MODULE_ENABLE_VTK_IOIFC="NO"
 		)
 	fi
 
@@ -619,6 +642,7 @@ src_configure() {
 
 	if use cuda; then
 		cuda_add_sandbox -w
+		addpredict "/dev/char"
 
 		if ! test -w /dev/nvidiactl; then
 			# eqawarn "Can't access the GPU at /dev/nvidiactl."
@@ -648,10 +672,6 @@ src_configure() {
 				grep LIBRARY_PATH | cut -d '=' -f 2 | cut -d ':' -f 1
 			)
 		fi
-
-		mycmakeargs+=(
-			-DCMAKE_CUDA_FLAGS_RELWITHDEBINFO="-DNDEBUG"
-		)
 	fi
 
 	if use debug; then
@@ -710,7 +730,7 @@ src_configure() {
 			-DVTK_MODULE_ENABLE_VTK_ImagingStatistics="YES"
 			-DVTK_MODULE_ENABLE_VTK_ImagingStencil="YES"
 		)
-		use rendering && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_RenderingImage="WANT" )
+		use rendering && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_RenderingImage="YES" )
 	fi
 
 	if ! use java && ! use python; then
@@ -767,7 +787,7 @@ src_configure() {
 			-DVTK_MODULE_ENABLE_VTK_IOParallelNetCDF="$(usex netcdf "YES" "NO")"
 			-DVTK_MODULE_ENABLE_VTK_IOParallelXML="YES"
 			-DVTK_MODULE_ENABLE_VTK_ParallelMPI="YES"
-			-DVTK_MODULE_ENABLE_VTK_h5part="YES"
+			# -DVTK_MODULE_ENABLE_VTK_h5part="YES"
 			-DVTK_MODULE_USE_EXTERNAL_VTK_verdict=OFF
 		)
 		use imaging && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_IOMPIImage="YES" )
@@ -775,10 +795,15 @@ src_configure() {
 		if use rendering; then
 			mycmakeargs+=(
 				-DVTK_MODULE_ENABLE_VTK_RenderingParallel="YES"
-				-DVTK_MODULE_ENABLE_VTK_RenderingParallelLIC="YES"
+				-DVTK_MODULE_ENABLE_VTK_RenderingParallelLIC="$(usex !gles2 "YES" "NO")"
 			)
 		fi
-		use vtkm && mycmakeargs+=( -DVTKm_ENABLE_MPI=ON )
+	fi
+
+	if has_version ">=sci-libs/hdf5-2"; then
+		mycmakeargs+=(
+			-DHDF5_IS_PARALLEL="$(usex mpi)"
+		)
 	fi
 
 	use mysql && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_IOMySQL="YES" )
@@ -826,14 +851,12 @@ src_configure() {
 
 			-DVTK_ENABLE_OSPRAY=OFF
 
-			-DVTK_MODULE_ENABLE_VTK_IOExportGL2PS="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingAnari="NO"  # no package in ::gentoo
 			-DVTK_MODULE_ENABLE_VTK_RenderingAnnotation="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingContext2D="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingContextOpenGL2="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingCore="YES"
-			-DVTK_MODULE_ENABLE_VTK_RenderingExternal="YES"
-			-DVTK_MODULE_ENABLE_VTK_RenderingGL2PSOpenGL2="YES"
+			-DVTK_MODULE_ENABLE_VTK_RenderingExternal="$(usex !gles2 "YES" "NO")"
 			-DVTK_MODULE_ENABLE_VTK_RenderingHyperTreeGrid="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingLICOpenGL2="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingLOD="YES"
@@ -842,11 +865,19 @@ src_configure() {
 			-DVTK_MODULE_ENABLE_VTK_RenderingRayTracing="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingSceneGraph="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingUI="YES"
+			-DVTK_MODULE_ENABLE_VTK_RenderingVR="$(usex !gles2 "YES" "NO")"
 			-DVTK_MODULE_ENABLE_VTK_RenderingVolume="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingVolumeAMR="YES"
 			-DVTK_MODULE_ENABLE_VTK_RenderingVolumeOpenGL2="YES"
-			-DVTK_MODULE_ENABLE_VTK_gl2ps="YES"
 		)
+
+		if ! use gles2; then
+			mycmakeargs+=(
+				-DVTK_MODULE_ENABLE_VTK_IOExportGL2PS="YES"
+				-DVTK_MODULE_ENABLE_VTK_RenderingGL2PSOpenGL2="YES"
+				-DVTK_MODULE_ENABLE_VTK_gl2ps="YES"
+			)
+		fi
 
 		use python && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_RenderingMatplotlib="YES" )
 		use tk && mycmakeargs+=( -DVTK_MODULE_ENABLE_VTK_RenderingTk="YES" )
@@ -871,7 +902,11 @@ src_configure() {
 			-DVTK_MODULE_USE_EXTERNAL_VTK_scn=OFF
 		)
 	else
-		mycmakeargs+=( -DVTK_BUILD_TESTING=OFF )
+		mycmakeargs+=(
+			-DVTK_BUILD_TESTING=OFF
+			# not packaged in Gentoo
+			-DVTK_MODULE_USE_EXTERNAL_VTK_scn=OFF
+		)
 	fi
 
 	# FIXME: upstream provides 4 threading models, as of 9.1.0. These are
@@ -947,9 +982,6 @@ src_compile() {
 }
 
 src_test() {
-	local -x LIBGL_ALWAYS_SOFTWARE="true"
-	local -x __GLX_VENDOR_LIBRARY_NAME="mesa"
-
 	vtk_add_sandbox
 
 	# TODO why?
@@ -1287,6 +1319,27 @@ src_test() {
 			)
 		fi
 
+		if use rendering && use python && has_version '>=dev-python/matplotlib-3.11'; then
+			REALLY_BAD_TESTS+=(
+				"^VTK::RenderingMatplotlibCxx-TestContextMathTextImage$"
+				"^VTK::RenderingMatplotlibCxx-TestRenderString$"
+				"^VTK::RenderingMatplotlibCxx-TestStringToPath$"
+				"^VTK::RenderingMatplotlibCxx-TestScalarBarCombinatorics$"
+				"^VTK::RenderingMatplotlibPython-TestRenderString$"
+				"^VTK::RenderingMatplotlibPython-TestStringToPath$"
+			)
+
+			if use truetype; then
+				REALLY_BAD_TESTS+=(
+					"^VTK::RenderingFreeTypeCxx-TestMathTextFonts$"
+					"^VTK::RenderingFreeTypeCxx-TestMathTextFreeTypeTextRenderer$"
+					"^VTK::RenderingFreeTypeCxx-TestFreeTypeTextMapper$"
+					"^VTK::RenderingFreeTypeCxx-TestFreeTypeTextMapperWithColumns$"
+					"^VTK::RenderingFreeTypeCxx-TestFontDPIScaling$"
+				)
+			fi
+		fi
+
 		RANDOM_FAIL_TESTS=(
 			# (Failed)
 			"VTK::FiltersVerdictCxx-TestCellQuality$"
@@ -1319,10 +1372,8 @@ src_test() {
 	local -x CXX="$(tc-getCXX)"
 
 	myctestargs=(
-		-j1
-		# -N
-		# --test-load 16
-		# --test-timeout 300
+		--test-timeout 300
+		--repeat until-pass:15
 		--output-on-failure
 	)
 
