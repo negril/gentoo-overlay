@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -28,13 +28,16 @@ SRC_URI+="
 
 LICENSE="Apache-2.0"
 SLOT="0/$(ver_cut 1)"
-IUSE="benchmark debug egl tools test"
+IUSE="benchmark debug egl heif tools test"
 RESTRICT="!test? ( test )"
 
 RDEPEND="
 	media-libs/libjpeg-turbo:=
 	egl? (
 		media-libs/libglvnd
+	)
+	heif? (
+		media-libs/libheif:=
 	)
 "
 
@@ -78,9 +81,12 @@ src_configure() {
 		-DUHDR_BUILD_PACKAGING="no"
 		-DUHDR_BUILD_TESTS="$(usex test)"
 		-DUHDR_ENABLE_GLES="$(usex egl)"
+		-DUHDR_ENABLE_HEIF="$(usex heif)"
 		-DUHDR_ENABLE_INSTALL="yes"
 		-DUHDR_ENABLE_INTRINSICS="yes" # arm neon specific
 		-DUHDR_ENABLE_LOGS="$(usex debug)"
+		# https://github.com/webmproject/libsmpte2094-50.git
+		-DUHDR_ENABLE_SMPTE2094_50="no"
 		-DUHDR_ENABLE_WERROR="no"
 		-DUHDR_WRITE_ISO="yes"
 		-DUHDR_WRITE_XMP="yes"
