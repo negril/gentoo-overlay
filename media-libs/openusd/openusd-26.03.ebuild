@@ -3,9 +3,8 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{12..13} )
-OPENVDB_COMPAT=( {10..12} )
-inherit cmake desktop python-single-r1 flag-o-matic openvdb xdg-utils
+PYTHON_COMPAT=( python3_{12..14} )
+inherit cmake desktop python-single-r1 flag-o-matic toolchain-funcs xdg
 
 DESCRIPTION="Universal Scene Description"
 HOMEPAGE="http://www.openusd.org"
@@ -32,18 +31,19 @@ LICENSE="
 # custom - search "In consideration of your agreement"
 SLOT="0"
 # test USE flag is enabled upstream
-IUSE="alembic debug doc draco embree examples hdf5 +imaging +jemalloc man
-materialx monolithic color-management opengl openimageio openvdb openexr osl
-ptex +python +safety-over-speed -static-libs tutorials -test tools usdview vulkan"
+IUSE="
+	alembic debug doc draco embree examples hdf5 +imaging jemalloc man
+	materialx monolithic color-management opengl openimageio openvdb openexr osl
+	ptex +python +safety-over-speed static-libs tutorials test tools usdview vulkan
+"
 
-REQUIRED_USE+="
+REQUIRED_USE="
 	${PYTHON_REQUIRED_USE}
 	alembic? (
 		openexr
 	)
 	embree? (
 		imaging
-		opengl
 	)
 	hdf5? (
 		alembic
@@ -51,8 +51,8 @@ REQUIRED_USE+="
 	color-management? (
 		imaging
 	)
-	opengl? (
-		imaging
+	imaging? (
+		opengl
 	)
 	openimageio? (
 		imaging
@@ -61,7 +61,6 @@ REQUIRED_USE+="
 		${OPENVDB_REQUIRED_USE}
 		imaging
 		openexr
-		opengl
 	)
 	osl? (
 		openexr
@@ -78,11 +77,10 @@ REQUIRED_USE+="
 	)
 "
 
-RDEPEND+="
+RDEPEND="
 	!python? (
-		>=dev-libs/boost-1.76.0
+		>=dev-libs/boost-1.76.0:=
 	)
-	>=virtual/zlib-1.2.11:=
 	alembic? (
 		>=media-gfx/alembic-1.8.5:=[hdf5?]
 	)
@@ -97,33 +95,34 @@ RDEPEND+="
 		>=sci-libs/hdf5-1.10[cxx,hl]
 	)
 	imaging? (
-		>=media-libs/opensubdiv-3.6.0
+		>=media-libs/opensubdiv-3.6.0:=
 		x11-libs/libX11
 	)
 	jemalloc? (
 		dev-libs/jemalloc-usd
 	)
 	materialx? (
-		>=media-libs/materialx-1.38.8:=[renderer]
+		>=media-libs/materialx-1.38.8:=[X,renderer]
 	)
 	color-management? (
-		>=media-libs/opencolorio-2.1.3
+		>=media-libs/opencolorio-2.1.3:=
 	)
 	openexr? (
 		>=media-libs/openexr-3.1.5-r1:=
 	)
 	opengl? (
-		>=media-libs/glew-2.0.0
+		>=media-libs/glew-2.0.0:=
+		virtual/opengl[X]
 	)
 	openimageio? (
+		media-libs/libjpeg-turbo:=
 		>=media-libs/libpng-1.6.29
 		>=media-libs/openimageio-2.3.21.0:=
 		>=media-libs/tiff-4.0.7
-		virtual/jpeg
 	)
 	openvdb? (
-		>=dev-libs/c-blosc-1.17
-		>=media-gfx/openvdb-9.1.0:=[${OPENVDB_SINGLE_USEDEP}]
+		>=dev-libs/c-blosc-1.17:=
+		>=media-gfx/openvdb-9.1.0:=[blosc]
 	)
 	osl? (
 		>=media-libs/osl-1.10.9:=
@@ -135,6 +134,9 @@ RDEPEND+="
 		${PYTHON_DEPS}
 		$(python_gen_cond_dep '
 			>=dev-libs/boost-1.76.0:=[python,${PYTHON_USEDEP}]
+			opengl? (
+				dev-python/pyopengl[${PYTHON_USEDEP}]
+			)
 			usdview? (
 				(
 					>=dev-python/pyside-6.2.0[${PYTHON_USEDEP},quick(+),tools(+),opengl?]
@@ -143,7 +145,8 @@ RDEPEND+="
 		')
 	)
 	vulkan? (
-		>=dev-util/vulkan-headers-1.3.243.0
+		>=dev-util/vulkan-headers-1.3.296.0
+		>=media-libs/vulkan-layers-1.3.296.0
 		>=dev-libs/vulkan-memory-allocator-3.0.0
 		>=dev-libs/spirv-reflect-1.3.296.0
 		>=dev-util/spirv-headers-1.3.296.0
@@ -157,41 +160,25 @@ BDEPEND="
 	$(python_gen_cond_dep '
 		>=dev-python/jinja2-2[${PYTHON_USEDEP}]
 	')
-	>=dev-build/cmake-3.17.5
 	app-alternatives/yacc
 	app-alternatives/lex
 	dev-cpp/argparse
 	dev-util/patchelf
-	virtual/pkgconfig
 	man? ( sys-apps/help2man )
 	doc? ( >=app-text/doxygen-1.9.6[dot] )
-	|| (
-		(
-			<sys-devel/gcc-16
-			>=sys-devel/gcc-9.0.1
-		)
-		<llvm-core/clang-21
-	)
 "
 
-RESTRICT="
-	mirror
-	!test? ( test )
-"
+RESTRICT="!test? ( test )"
 
 PATCHES=(
 	"${FILESDIR}/algorithm.patch"
 	"${FILESDIR}/packageUtils.cpp.patch"
 	"${FILESDIR}/openusd-23.11-defaultfonts.patch"
-	"${FILESDIR}/openusd-21.11-gcc-11-numeric_limits.patch"
-	"${FILESDIR}/openusd-21.11-use-whole-archive-for-lld.patch"
-	"${FILESDIR}/openusd-24.08-fix-monolithic-build-2400.patch"
 	"${FILESDIR}/openusd-24.08-PVS-bugfix-base-trace-2313.patch"
 	"${FILESDIR}/openusd-24.08-PVS-bugfix-envvar-2157.patch"
 	"${FILESDIR}/openusd-24.08-PVS-bugfix-base-tf-2161.patch"
-	"${FILESDIR}/openusd-24.08-PVS-bugfix-usd-2165.patch"
 	"${FILESDIR}/openusd-25.05-cmake-FindBoost-fix.patch"
-	"${FILESDIR}/openusd-25.05-embree-4-plugin-2313.patch"
+	"${FILESDIR}/${PN}-26.03-pxr-workTBB-Ensure-TBB_INTERFACE_VERSION_MAJOR-is-de.patch"
 )
 
 DOCS=( "CHANGELOG.md" "README.md" )
@@ -205,70 +192,92 @@ pkg_setup() {
 			export VULKAN_SDK="${EPREFIX}/usr/include/vulkan"
 		fi
 	fi
-	use python && python-single-r1_pkg_setup
-	use openvdb && openvdb_pkg_setup
-}
 
-gen_pyside_uic_file() {
-	echo -e "#!"${EPREFIX}"/bin/bash\n/usr/"$(get_libdir)"/qt6/libexec/uic -g python \$@" > pyside-uic
+	if use python; then
+		python-single-r1_pkg_setup
+	fi
 }
 
 src_prepare() {
 	cmake_src_prepare
 
-	# Fix for #2351
-	sed -i 's|CMAKE_CXX_STANDARD 14|CMAKE_CXX_STANDARD 17|g' \
-		cmake/defaults/CXXDefaults.cmake || die
-
 	# Fix python dirs
 	if use python ; then
 		eapply "${FILESDIR}/${PN}-23.11-fix-python.patch"
-		sed -i 's|/python|/python'${EPYTHON/python}/site-packages'|g' cmake/macros/Private.cmake
-		sed -i 's|lib/python/pxr|'$(python_get_sitedir)'/pxr|' cmake/macros/{Private,Public}.cmake pxr/usdImaging/usdviewq/CMakeLists.txt
+		sed \
+			-e "s/\(set(INSTALL_PYTHON_PXR_ROOT \"\).*$/\1usr\/$(get_libdir)\/openusd\/lib\/python\/pxr\"\)/" \
+			-e "s/\(--pythonPath \)\${CMAKE_INSTALL_PREFIX}\/lib\/python/\1usr\/$(get_libdir)\/openusd\/lib\/python/" \
+			-i cmake/macros/Public.cmake || die
 	fi
 
-		rm -r docs/doxygen/doxygen-awesome-css || die
+	if ! use opengl ; then
+		# Disable X11
+		sed -e '/find_package(X11)/d' \
+			-e '/find_package(X11 REQUIRED)/d' \
+			-e '/add_definitions(-DPXR_X11_SUPPORT_ENABLED)/d' \
+			-i cmake/defaults/Packages.cmake || die
+	fi
 
-	# make dummy pyside-uid
-	if use usdview ; then
-		gen_pyside_uic_file
-		chmod +x pyside-uic
+	rm -r docs/doxygen/doxygen-awesome-css || die
+
+	if use elibc_musl; then
+		eapply "${FILESDIR}"/openusd-25.08-fix-musl-build.patch
 	fi
 }
 
 src_configure() {
-	CMAKE_BUILD_TYPE=$(usex debug 'Debug' 'Release')
+	CMAKE_BUILD_TYPE=$(usex debug 'RelWithDebInfo' 'Release')
+
+	filter-lto
+
 	append-cppflags $(usex debug '-DDEBUG' '-DNDEBUG')
 	append-cppflags -DTBB_ALLOCATOR_TRAITS_BROKEN
-	export USD_PATH="/usr/$(get_libdir)/${PN}"
-	use openvdb && openvdb_src_configure
+
+	if tc-is-clang; then
+		append-cppflags --no-system-header-prefix pxr
+	fi
+
+	local -x USD_PATH="/usr/$(get_libdir)/${PN}"
+
+	if use elibc_musl; then
+		append-flags -D_LARGEFILE64_SOURCE
+	fi
+
 	if use draco; then
 		append-cppflags \
 			-DDRACO_ATTRIBUTE_INDICES_DEDUPLICATION_SUPPORTED=ON \
 			-DDRACO_ATTRIBUTE_VALUES_DEDUPLICATION_SUPPORTED=ON \
 			-DTBB_SUPPRESS_DEPRECATED_MESSAGES=1
 	fi
-    # See https://github.com/PixarAnimationStudios/USD/blob/v24.05/cmake/defaults/Options.cmake
-	local mycmakeargs+=(
-		$(usex jemalloc "-DPXR_MALLOC_LIBRARY=${ESYSROOT}/usr/$(get_libdir)/${PN}/$(get_libdir)/libjemalloc.so" "")
-		$(usex usdview "-DPYSIDEUICBINARY:PATH=${S}/pyside-uic" "")
+
+	# See https://github.com/PixarAnimationStudios/OpenUSD/blob/v24.05/cmake/defaults/Options.cmake
+	local mycmakeargs=(
+		$(usex jemalloc "-DPXR_MALLOC_LIBRARY=${ESYSROOT}${USD_PATH}/$(get_libdir)/libjemalloc.so" "")
+		# $(usex usdview "-DPYSIDEUICBINARY:PATH=${S}/pyside-uic" "")
 		-DBUILD_SHARED_LIBS=ON
 		-DCMAKE_CXX_STANDARD=17
+
+		# -DCMAKE_POLICY_DEFAULT_CMP0072="OLD"
+		-DCMAKE_POLICY_DEFAULT_CMP0167="OLD"
+		-DCMAKE_POLICY_DEFAULT_CMP0177="OLD"
 		-DCMAKE_INSTALL_PREFIX="${EPREFIX}${USD_PATH}"
 		-DPXR_VALIDATE_GENERATED_CODE=OFF
+		-DPXR_STRICT_BUILD_MODE=OFF
 		-DPXR_BUILD_ALEMBIC_PLUGIN=$(usex alembic)
 		-DPXR_BUILD_DOCUMENTATION=$(usex doc)
-		-DPXR_BUILD_PYTHON_DOCUMENTATION=$(usex man $(usex python))
+		-DPXR_BUILD_PYTHON_DOCUMENTATION=$(usex doc $(usex python))
+		-DPXR_BUILD_HTML_DOCUMENTATION=$(usex doc)
 		-DPXR_BUILD_DRACO_PLUGIN=$(usex draco)
 		-DPXR_BUILD_EMBREE_PLUGIN=$(usex embree)
 		-DPXR_BUILD_EXAMPLES=$(usex examples)
 		-DPXR_BUILD_IMAGING=$(usex imaging)
+		# -DPXR_BUILD_METAL_PLUGIN=OFF
 		-DPXR_BUILD_MONOLITHIC=$(usex monolithic)
 		-DPXR_BUILD_OPENCOLORIO_PLUGIN=$(usex color-management)
 		-DPXR_BUILD_OPENIMAGEIO_PLUGIN=$(usex openimageio)
 		-DPXR_BUILD_PRMAN_PLUGIN=OFF
-		#-DPXR_BUILD_METAL_PLUGIN=OFF
 		-DPXR_BUILD_TESTS=$(usex test)
+		-DPXR_HEADLESS_TEST_MODE=ON
 		-DPXR_BUILD_TUTORIALS=$(usex tutorials)
 		-DPXR_BUILD_USD_IMAGING=$(usex imaging)
 		-DPXR_BUILD_USD_TOOLS=$(usex tools)
@@ -283,27 +292,40 @@ src_configure() {
 		-DPXR_ENABLE_PYTHON_SUPPORT=$(usex python)
 		-DPXR_ENABLE_VULKAN_SUPPORT=$(usex vulkan)
 		-DPXR_INSTALL_LOCATION="${EPREFIX}${USD_PATH}"
+
 		-DPXR_PREFER_SAFETY_OVER_SPEED=$(usex safety-over-speed)
 		-DPXR_PYTHON_SHEBANG="${PYTHON}"
-		-DPXR_SET_INTERNAL_NAMESPACE="usdBlender"
-		#-DCMAKE_FIND_DEBUG_MODE=yes
+		# -DPXR_USE_PYTHON_3=ON
+		-DPXR_SET_INTERNAL_NAMESPACE="pxrBlender_v0_$(ver_cut 2)_$(ver_cut 3)"
+		# -DCMAKE_FIND_DEBUG_MODE=yes
 	)
+
 	cmake_src_configure
 }
 
 src_install() {
 	cmake_src_install
-	use usdview && dosym "${USD_PATH}/bin/usdview" /usr/bin/usdview
+
+	local -x USD_PATH="/usr/$(get_libdir)/${PN}"
+
+	if use usdview; then
+		dosym "${USD_PATH}/bin/usdview" /usr/bin/usdview
+	fi
+
 	dosym "${USD_PATH}"/include/pxr /usr/include/pxr
 	echo "${USD_PATH}"/lib >> 99-${PN}.conf || die
+
 	insinto /etc/ld.so.conf.d/
 	doins 99-${PN}.conf
+
 	local f
 	for f in $(find "${ED}${USD_PATH}/lib" -name "*.so*") ; do
 		einfo "Removing rpath from ${f}"
 		patchelf --remove-rpath "${f}" || die # triggers warning
 	done
-	export STRIP="${BROOT}/bin/true" # strip breaks rpath
+
+	local -x STRIP="${BROOT}/bin/true" # strip breaks rpath
+
 	if use jemalloc ; then
 		for f in $(find "${ED}${USD_PATH}" -executable) ; do
 			if ldd "${f}" 2>/dev/null | grep -q -e "libjemalloc.so.2" ; then
@@ -312,12 +334,12 @@ src_install() {
 				if [[ -n "${old_rpath}" ]] ; then
 					old_rpath=":${old_rpath}"
 				fi
-				patchelf --set-rpath "${EPREFIX}/usr/$(get_libdir)/openusd/$(get_libdir)${old_rpath}" "${f}" || die
+				patchelf --set-rpath "${EPREFIX}${USD_PATH}/$(get_libdir)${old_rpath}" "${f}" || die
 			fi
 		done
 
-		if [[ -d "${ED}/usr/$(get_libdir)/${PN}/bin" ]] ; then
-			mv "${ED}/usr/$(get_libdir)/${PN}/"{bin,.bin} || die
+		if [[ -d "${ED}${USD_PATH}/bin" ]] ; then
+			mv "${ED}${USD_PATH}/"{bin,.bin} || die
 		fi
 
 		local UTILS_LIST=(
@@ -340,38 +362,46 @@ src_install() {
 		)
 
 		# Setting LD_PRELOAD for jemalloc is still required or you may get a segfault
-		exeinto /usr/lib64/openusd/bin
+		exeinto ${USD_PATH}/bin
 		local u
 		for u in "${UTILS_LIST[@]}" ; do
-			if [[ -e "${ED}/usr/$(get_libdir)/${PN}/.bin/${u}" ]] ; then
+			if [[ -e "${ED}${USD_PATH}/.bin/${u}" ]] ; then
+				# TODO newexe
 				einfo "Creating wrapper for ${u}"
-				echo -e "#!/bin/bash\nLD_PRELOAD=\"${EPREFIX}/usr/$(get_libdir)/openusd/$(get_libdir)/libjemalloc.so\"" "${EPREFIX}/usr/$(get_libdir)/openusd/.bin/${u}" "\$@" > "${T}/${u}"
-				doexe "${T}/${u}"
+				# echo -e "#!/bin/bash\nLD_PRELOAD=\"${EPREFIX}${USD_PATH}/$(get_libdir)/libjemalloc.so\"" "${EPREFIX}${USD_PATH}/.bin/${u}" "\$@" > "${T}/${u}"
+
+				newexe - "${u}" <<- _EOF_
+					#!${EPREFIX}/usr/bin/env bash
+					LD_PRELOAD="${EPREFIX}${USD_PATH}/$(get_libdir)/libjemalloc.so" \
+					"${EPREFIX}${USD_PATH}/.bin/${u}" "\${@}"
+				_EOF_
+
 				if use man; then
 					help2man --no-info --no-discard-stderr --version-string="${PV}" \
-						--output="${ED}/usr/share/man/man1/${u}.1" "${T}/${u}"
+						--output="${ED}/usr/share/man/man1/${u}.1" "${T}/${u}" || die
 				fi
 			fi
 		done
 	fi
+
 	if use python ; then
-		cp -rp "${ED}/usr/lib64/openusd/lib/${EPYTHON}/site-packages/pxr/" \
-			"${E}$(python_get_sitedir)/" || die
-		rm -r "${ED}/usr/lib64/openusd/lib/${EPYTHON}/site-packages/pxr"
+		mkdir -p "${D}$(python_get_sitedir)" || die
+		cp -rp \
+			"${ED}${USD_PATH}/lib/python/pxr" \
+			"${D}$(python_get_sitedir)/" || die
+		rm -r \
+			"${ED}${USD_PATH}/lib/python/pxr" || die
+
 		# Remove stray python files generated by the build system
-		find "${ED}" -name '*.pyc' -exec rm -f {} \; || die
-		find "${ED}" -name '*.pyo' -exec rm -f {} \; || die
+		find "${ED}" \( -name '*.pyc' -o -name '*.pyo' \) -exec rm -vf {} \; || die
+
 		python_optimize
 	fi
-	use usdview && domenu "${FILESDIR}/org.openusd.usdview.desktop"
-	use usdview && newicon -s scalable "${FILESDIR}/openusd.svg" "openusd.svg"
+
+	if use usdview; then
+		domenu "${FILESDIR}/org.openusd.usdview.desktop"
+		newicon -s scalable "${FILESDIR}/openusd.svg" "openusd.svg"
+	fi
+
 	dodoc LICENSE.txt NOTICE.txt
-}
-
-pkg_postinst() {
-	xdg_icon_cache_update
-}
-
-pkg_postrm() {
-	xdg_icon_cache_update
 }

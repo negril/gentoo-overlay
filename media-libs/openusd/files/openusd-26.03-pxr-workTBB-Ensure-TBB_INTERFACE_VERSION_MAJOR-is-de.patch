@@ -1,0 +1,162 @@
+From 8fc0ba9121ccb115cd9a320573e220da1e4cf345 Mon Sep 17 00:00:00 2001
+From: npbarber <npbarber@users.noreply.github.com>
+Date: Fri, 12 Jun 2026 13:25:15 -0700
+Subject: pxr: workTBB - Ensure TBB_INTERFACE_VERSION_MAJOR is defined
+
+(Internal change: 2413914)
+
+diff --git a/pxr/base/work/CMakeLists.txt b/pxr/base/work/CMakeLists.txt
+index 515a37ece..3f4cd9b57 100644
+--- a/pxr/base/work/CMakeLists.txt
++++ b/pxr/base/work/CMakeLists.txt
+@@ -23,6 +23,7 @@ if (use_tbb)
+         workTBB/loops_impl.h
+         workTBB/reduce_impl.h
+         workTBB/sort_impl.h
++        workTBB/tbb_version.h
+         workTBB/withScopedParallelism_impl.h
+     )   
+ 
+diff --git a/pxr/base/work/workTBB/detachedTask_impl.h b/pxr/base/work/workTBB/detachedTask_impl.h
+index c0f0949f2..bb05e3b68 100644
+--- a/pxr/base/work/workTBB/detachedTask_impl.h
++++ b/pxr/base/work/workTBB/detachedTask_impl.h
+@@ -7,7 +7,7 @@
+ #ifndef PXR_BASE_WORK_TBB_DETACHED_TASK_IMPL_H
+ #define PXR_BASE_WORK_TBB_DETACHED_TASK_IMPL_H
+ 
+-#include <tbb/blocked_range.h>
++#include "pxr/base/work/workTBB/tbb_version.h"
+ #include "pxr/base/work/workTBB/dispatcher_impl.h"
+ #include "pxr/base/work/api.h"
+ 
+diff --git a/pxr/base/work/workTBB/dispatcher_impl.h b/pxr/base/work/workTBB/dispatcher_impl.h
+index 9cecf4a4d..0f0007620 100644
+--- a/pxr/base/work/workTBB/dispatcher_impl.h
++++ b/pxr/base/work/workTBB/dispatcher_impl.h
+@@ -9,10 +9,8 @@
+ 
+ #include "pxr/pxr.h"
+ #include "pxr/base/work/api.h"
++#include "pxr/base/work/workTBB/tbb_version.h"
+ 
+-// Blocked range is not used in this file, but this header happens to pull in
+-// the TBB version header in a way that works in all TBB versions.
+-#include <tbb/blocked_range.h>
+ #include <tbb/concurrent_vector.h>
+ #if TBB_INTERFACE_VERSION_MAJOR >= 12
+ #include <tbb/task_group.h>
+diff --git a/pxr/base/work/workTBB/taskGraph_impl.h b/pxr/base/work/workTBB/taskGraph_impl.h
+index 8cd2a47ba..e60e59d7e 100644
+--- a/pxr/base/work/workTBB/taskGraph_impl.h
++++ b/pxr/base/work/workTBB/taskGraph_impl.h
+@@ -9,18 +9,7 @@
+ 
+ #include "pxr/pxr.h"
+ #include "pxr/base/work/api.h"
+-
+-// The TBB version macro is located in different headers in legacy TBB
+-// (tbb/tbb_stddef.h) and oneTBB (tbb/version.h)
+-#if __has_include(<tbb/tbb_stddef.h>)
+-#include <tbb/tbb_stddef.h>
+-#elif __has_include(<tbb/version.h>)
+-#include <tbb/version.h>
+-#endif
+-
+-#ifndef TBB_INTERFACE_VERSION_MAJOR
+-#error "TBB version macro TBB_INTERFACE_VERSION_MAJOR not found"
+-#endif
++#include "pxr/base/work/workTBB/tbb_version.h"
+ 
+ #if TBB_INTERFACE_VERSION_MAJOR < 12
+ 
+diff --git a/pxr/base/work/workTBB/tbb_version.h b/pxr/base/work/workTBB/tbb_version.h
+new file mode 100644
+index 000000000..5c3ed5833
+--- /dev/null
++++ b/pxr/base/work/workTBB/tbb_version.h
+@@ -0,0 +1,22 @@
++//
++// Copyright 2026 Pixar
++//
++// Licensed under the terms set forth in the LICENSE.txt file available at
++// https://openusd.org/license.
++//
++#ifndef PXR_BASE_WORK_TBB_VERSION_H
++#define PXR_BASE_WORK_TBB_VERSION_H
++
++// The TBB version macro is located in different headers in legacy TBB
++// (tbb/tbb_stddef.h) and oneTBB (tbb/version.h)
++#if __has_include(<tbb/tbb_stddef.h>)
++#include <tbb/tbb_stddef.h>
++#elif __has_include(<tbb/version.h>)
++#include <tbb/version.h>
++#endif
++
++#ifndef TBB_INTERFACE_VERSION_MAJOR
++#error "TBB version macro TBB_INTERFACE_VERSION_MAJOR not found"
++#endif
++
++#endif //PXR_BASE_WORK_TBB_VERSION_H
+diff --git a/pxr/base/work/workTBB/testenv/testWorkThreadLimitsTBB.cpp b/pxr/base/work/workTBB/testenv/testWorkThreadLimitsTBB.cpp
+index 49ef1d111..f61e29294 100644
+--- a/pxr/base/work/workTBB/testenv/testWorkThreadLimitsTBB.cpp
++++ b/pxr/base/work/workTBB/testenv/testWorkThreadLimitsTBB.cpp
+@@ -8,6 +8,7 @@
+ #include "pxr/pxr.h"
+ #include "pxr/base/work/loops.h"
+ #include "pxr/base/work/threadLimits.h"
++#include "pxr/base/work/workTBB/tbb_version.h"
+ #include "pxr/base/tf/diagnostic.h"
+ #include "pxr/base/tf/getenv.h"
+ #include "pxr/base/tf/staticData.h"
+diff --git a/pxr/base/work/workTBB/threadLimits_impl.cpp b/pxr/base/work/workTBB/threadLimits_impl.cpp
+index eb28a1a39..3815accbc 100644
+--- a/pxr/base/work/workTBB/threadLimits_impl.cpp
++++ b/pxr/base/work/workTBB/threadLimits_impl.cpp
+@@ -6,11 +6,9 @@
+ //
+ #include "pxr/pxr.h"
+ 
++#include "pxr/base/work/workTBB/tbb_version.h"
+ #include "pxr/base/work/workTBB/threadLimits_impl.h"
+ 
+-// Blocked range is not used in this file, but this header happens to pull in
+-// the TBB version header in a way that works in all TBB versions.
+-#include <tbb/blocked_range.h>
+ #include <tbb/task_arena.h>
+ 
+ #if TBB_INTERFACE_VERSION_MAJOR >= 12
+diff --git a/pxr/imaging/plugin/hdEmbree/renderer.cpp b/pxr/imaging/plugin/hdEmbree/renderer.cpp
+index f2c13dbfc..f28fc1b6f 100644
+--- a/pxr/imaging/plugin/hdEmbree/renderer.cpp
++++ b/pxr/imaging/plugin/hdEmbree/renderer.cpp
+@@ -18,6 +18,8 @@
+ #include "pxr/base/work/loops.h"
+ #include "pxr/base/work/threadLimits.h"
+ 
++#include "pxr/base/work/workTBB/tbb_version.h"
++
+ #include "pxr/base/tf/hash.h"
+ 
+ #include <embree4/rtcore_common.h>
+@@ -38,16 +40,6 @@
+ //
+ // Note: The TBB version macro is located in different headers in legacy TBB.
+ // -------------------------------------------------------------------------
+-#if __has_include(<tbb/tbb_stddef.h>)
+-#include <tbb/tbb_stddef.h>
+-#elif __has_include(<tbb/version.h>)
+-#include <tbb/version.h>
+-#endif
+-
+-#ifndef TBB_INTERFACE_VERSION_MAJOR
+-#error "TBB version macro TBB_INTERFACE_VERSION_MAJOR not found"
+-#endif
+-
+ #if TBB_INTERFACE_VERSION_MAJOR < 12
+ 
+ #include <optional>
+-- 
+2.55.0
+
