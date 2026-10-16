@@ -56,7 +56,7 @@ RESTRICT="!test? ( test ) mirror"
 DOCS=( AUTHORS CONTRIBUTING.md README.md )
 
 PATCHES=(
-	"${FILESDIR}/draco-fix-include-cstdint.patch"
+	"${FILESDIR}/${PN}-1.5.7-fix-include-cstdint.patch"
 	"${FILESDIR}/${PN}-9999-cstdint.patch"
 	"${FILESDIR}/${PN}-9999-fix-reader-file-collision.patch"
 )

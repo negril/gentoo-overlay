@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
-	<maintainer type="person">
-		<email>waebbl@gmail.com</email>
-		<name>Bernd Waibel</name>
+	<maintainer type="person" proxied="yes">
+		<email>negril.nx+gentoo@gmail.com</email>
+		<name>Paul Zander</name>
+	</maintainer>
+	<maintainer type="project" proxied="proxy">
+		<email>proxy-maint@gentoo.org</email>
+		<name>Proxy Maintainers</name>
 	</maintainer>
 	<longdescription>
 		Library for compressing and decompressing 3D geometric meshes and point clouds.
@@ -16,6 +20,9 @@
 		<flag name="gltf">
 			Compile with support for glTF (GL Transmission Format) from
 			The Khronos Group Inc.
+		</flag>
+		<flag name="transcoder">
+			Enable the Draco transcoder
 		</flag>
 	</use>
 	<upstream>
