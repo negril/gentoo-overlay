@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 # Notes:
@@ -21,31 +21,50 @@ if [[ ${PV} =~ 9999 ]] ; then
 		'-third_party/eigen'
 		'-third_party/filesystem'
 	)
+	SLOT="0/9999"
 else
 	GTEST_PV="1.17.0"
-	SRC_URI="
-		https://github.com/google/draco/archive/${PV}.tar.gz -> ${P}.tar.gz
+	if [[ ${PV} == *_p* ]] ; then
+		COMMIT="47238930f698250f474163e1a29d77858aa5c158"
+		SRC_URI="
+			https://github.com/google/draco/archive/${COMMIT}.tar.gz -> ${P}.tar.gz
+		"
+		S="${WORKDIR}/${PN}-${COMMIT}"
+	else
+		SRC_URI="
+			https://github.com/google/draco/archive/${PV}.tar.gz -> ${P}.tar.gz
+		"
+	fi
+	SRC_URI+="
 		https://github.com/google/googletest/archive/refs/tags/v${GTEST_PV}.tar.gz
 			-> gtest-${GTEST_PV}.tar.gz
 	"
-	KEYWORDS="~amd64 ~x86 ~arm64"
+	# from cmake/draco_build_definitions.cmake LT_CURRENT - LT_AGE
+	SLOT="0/9"
+	KEYWORDS="~amd64"
 fi
 
 LICENSE="Apache-2.0"
 
-SLOT="0/9"
-
-IUSE="+compat debug gltf usd javascript transcoder test"
+IUSE="+compat debug gltf test"
+IUSE+="
+	transcoder
+"
+# 	usd
+# 	javascript
+# "
 
 RDEPEND="
 	dev-cpp/eigen:=
-	javascript? (
-		dev-util/emscripten[llvm_targets_WebAssembly(+)]
-	)
-	usd? (
-		media-libs/openusd
-	)
 "
+# RDEPEND+="
+# 	usd? (
+# 		media-libs/openusd
+# 	)
+# 	javascript? (
+# 		dev-util/emscripten[llvm_targets_WebAssembly(+)]
+# 	)
+# "
 
 DEPEND="${RDEPEND}
 	virtual/pkgconfig
@@ -56,9 +75,7 @@ RESTRICT="!test? ( test ) mirror"
 DOCS=( AUTHORS CONTRIBUTING.md README.md )
 
 PATCHES=(
-	"${FILESDIR}/draco-fix-include-cstdint.patch"
-	"${FILESDIR}/${PN}-9999-cstdint.patch"
-	"${FILESDIR}/${PN}-9999-gtest-cstdint.patch"
+	"${FILESDIR}/${PN}-1.5.7-fix-include-cstdint.patch"
 	"${FILESDIR}/${PN}-9999-fix-reader-file-collision.patch"
 )
 
@@ -79,11 +96,11 @@ src_configure() {
 	EMSCRIPTEN=
 	local mycmakeargs=(
 		-DCMAKE_CXX_STANDARD=17
-		-DDRACO_EIGEN_PATH="${EPREFIX}/usr/include/eigen3"
+		-DDRACO_EIGEN_PATH="${ESYSROOT}/usr/include/eigen3"
 		# -DDRACO_TINYGLTF_PATH=
 		# currently only used for javascript/emscripten build
-		-DDRACO_ANIMATION_ENCODING="$(usex javascript)"
-		-DDRACO_WASM="$(usex javascript)"
+		-DDRACO_ANIMATION_ENCODING="no" # $(usex javascript)"
+		-DDRACO_WASM="no" # $(usex javascript)"
 		-DDRACO_GLTF_BITSTREAM="$(usex gltf)"
 		# -DDRACO_MAYA_PLUGIN="no" # default
 		-DBUILD_SHARED_LIBS="yes"
