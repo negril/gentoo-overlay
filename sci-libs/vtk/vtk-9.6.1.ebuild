@@ -432,11 +432,11 @@ src_prepare() {
 
 	cmake_src_prepare
 
-	# 14 GiB is the highest single process ram usage seen
-	# 932464
-	sed \
-		-e "/EXPR viskores_pool_size/s/3072/$(( 10 * 1024 ))/g" \
-		-i ThirdParty/viskores/vtkviskores/viskores/CMake/ViskoresWrappers.cmake || die
+	# # 14 GiB is the highest single process ram usage seen
+	# # 932464
+	# sed \
+	# 	-e "/EXPR viskores_pool_size/s/3072/$(( 3 * 1024 ))/g" \
+	# 	-i ThirdParty/viskores/vtkviskores/viskores/CMake/ViskoresWrappers.cmake || die
 
 	if use test; then
 		ebegin "Copying data files to ${BUILD_DIR}"
@@ -454,6 +454,10 @@ src_prepare() {
 #	VTK_DISPATCH_{AOS,SOA,TYPED}_ARRAYS
 src_configure() {
 	filter-lto
+
+	# append-cxxflags '-DSCN_TRIVIAL_ABI="&& defined(__clang__)"'
+	# append-cxxflags -DSCN_TRIVIAL_ABI=""
+	append-cxxflags -DSCN_USE_TRIVIAL_ABI=0
 
 	local mycmakeargs=(
 		-DCMAKE_DISABLE_FIND_PACKAGE_Git="yes"
@@ -872,7 +876,11 @@ src_configure() {
 			-DVTK_MODULE_USE_EXTERNAL_VTK_scn=OFF
 		)
 	else
-		mycmakeargs+=( -DVTK_BUILD_TESTING=OFF )
+		mycmakeargs+=(
+			-DVTK_BUILD_TESTING=OFF
+			# not packaged in Gentoo
+			-DVTK_MODULE_USE_EXTERNAL_VTK_scn=OFF
+		)
 	fi
 
 	# FIXME: upstream provides 4 threading models, as of 9.1.0. These are
