@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..14} )
+PYTHON_COMPAT=( python3_{12..14} )
 
 inherit cuda cmake flag-o-matic python-single-r1 toolchain-funcs
 
@@ -20,7 +20,7 @@ if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/OpenImageIO.git"
 else
-	TEST_OIIO_IMAGE_COMMIT="75099275c73a6937d40c69f9e14a006aa49fa201"
+	TEST_OIIO_IMAGE_COMMIT="5786ca12864359c2c0fdf9e5eaa79d24bb037453"
 	TEST_OEXR_IMAGE_COMMIT="e38ffb0790f62f05a6f083a6fa4cac150b3b7452"
 	SRC_URI="
 		https://github.com/AcademySoftwareFoundation/OpenImageIO/archive/v${PV/_/-}.tar.gz
@@ -70,13 +70,29 @@ X86_CPU_FEATURES=(
 )
 CPU_FEATURES=( "${X86_CPU_FEATURES[@]/#/cpu_flags_x86_}" )
 
-IUSE="cuda debug dicom doc ffmpeg fits gif gui jpeg2k jpegxl jph libcxx opencv openvdb ptex python raw test +tools +truetype +uhdr ${CPU_FEATURES[*]%:*}"
-REQUIRED_USE="python? ( ${PYTHON_REQUIRED_USE} ) gui? ( tools ) test? ( tools truetype )"
+IUSE="cuda debug dicom doc ffmpeg fits gif gui jpeg2k jpegxl jph libcxx opencv openvdb ptex python raw tbb test +tools +truetype uhdr ${CPU_FEATURES[*]%:*}"
+REQUIRED_USE="
+	gui? (
+		tools
+	)
+	python? (
+		${PYTHON_REQUIRED_USE}
+	)
+	openvdb? (
+		tbb
+	)
+	test? (
+		tools
+		truetype
+	)
+"
 
 RESTRICT="!test? ( test )"
 
 BDEPEND="
-	jpeg2k? ( app-arch/unzip )
+	jpeg2k? (
+		app-arch/unzip
+	)
 	doc? (
 		app-text/doxygen
 		dev-texlive/texlive-bibtexextra
@@ -87,30 +103,49 @@ BDEPEND="
 	)
 "
 
-# >=media-libs/libuhdr-1.3
+# TODO
+# 	fits? ( sci-libs/cfitsio:= )
+# 	media-libs/libheif:=[aom,de265,jpeg,jpeg2k?,webp,x265]
 RDEPEND="
-	app-arch/bzip2:=
 	dev-cpp/robin-map
+	dev-libs/libfmt:=
 	dev-libs/pugixml
 	media-libs/libheif:=
+	|| (
+		media-libs/libheif[x265]
+		media-libs/libheif[kvazaar]
+	)
+	|| (
+		media-libs/libheif[ffmpeg]
+		media-libs/libheif[de265]
+	)
+	|| (
+		media-libs/libheif[aom]
+		media-libs/libheif[dav1d]
+	)
 	media-libs/libjpeg-turbo:=
 	media-libs/libpng:=
 	>=media-libs/libwebp-1.6.0:=
 	>=media-libs/opencolorio-2.3:=
-	media-libs/openexr:=
-	media-libs/tiff:=
+	media-libs/openexr:=[tbb(+)?]
+	media-libs/tiff:=[jpeg,libdeflate(+)]
 	virtual/zlib:=
+	cuda? (
+		dev-util/nvidia-cuda-toolkit:=
+	)
 	dicom? ( sci-libs/dcmtk )
 	ffmpeg? ( media-video/ffmpeg:= )
-	fits? ( sci-libs/cfitsio:= )
 	gif? ( media-libs/giflib:= )
+	gui? (
+		media-libs/libglvnd
+		dev-qt/qtbase:6[gui,widgets,opengl]
+	)
 	jpeg2k? ( media-libs/openjpeg:= )
-	jpegxl? ( media-libs/libjxl:= )
+	jpegxl? ( media-libs/libjxl:=[jpeg,openexr,png] )
 	jph? ( media-libs/openjph:= )
 	opencv? ( media-libs/opencv:= )
 	openvdb? (
-		dev-cpp/tbb:=
-		media-gfx/openvdb:=
+		media-gfx/openvdb:=[jpeg,openexr,png]
 	)
 	ptex? ( media-libs/ptex:= )
 	python? (
@@ -120,19 +155,22 @@ RDEPEND="
 			dev-python/pybind11[${PYTHON_USEDEP}]
 		')
 	)
-	gui? (
-		media-libs/libglvnd
-		dev-qt/qtbase:6[gui,widgets,opengl]
+	raw? (
+		>=media-libs/libraw-0.21.3:=
 	)
-	raw? ( media-libs/libraw:= )
+	tbb? (
+		dev-cpp/tbb:=
+	)
 	truetype? ( media-libs/freetype )
 	uhdr? ( media-libs/libultrahdr:= )
 "
 DEPEND="
 	dev-libs/imath:=
-	dev-libs/libfmt:=
 	${RDEPEND}
-	test? ( media-fonts/droid )
+	test? (
+		media-libs/libheif[x265]
+		media-fonts/droid
+	)
 "
 
 DOCS=(
@@ -142,11 +180,10 @@ DOCS=(
 )
 
 PATCHES=(
-	# "${FILESDIR}/${PN}-2.5.8.0-fix-tests.patch"
 	"${FILESDIR}/${PN}-2.5.12.0-heif-find-fix.patch"
 	"${FILESDIR}/${PN}-3.1.6.2-tests-optional.patch"
 	# in src_prepare
-	# "${FILESDIR}/${PN}-2.5.12.0_heif_test.patch"
+	# "${FILESDIR}/${PN}-3.1.15.0-jxl-fix-build-with-libjxl-0.12.0.patch"
 )
 
 pkg_setup() {
@@ -154,7 +191,7 @@ pkg_setup() {
 }
 
 src_prepare() {
-	# IO plugin directories are globbed and included, so we just remove the ones we don't want
+	# IO plugin directories are globbed and included, so we just remove the ones we don't build
 	if ! use dicom; then
 		rm -r "src/dicom.imageio" || die
 	fi
@@ -175,8 +212,9 @@ src_prepare() {
 		rm -r "src/raw.imageio" || die
 	fi
 
-	cmake_src_prepare
 	cmake_comment_add_subdirectory src/fonts
+
+	cmake_src_prepare
 
 	if use test ; then
 		if [[ ${PV} != *9999* ]] ; then
@@ -201,7 +239,11 @@ src_prepare() {
 		fi
 
 		cp testsuite/heif/ref/out-libheif1.1{2,5}-orient.txt || die
-		# eapply "${FILESDIR}/${PN}-2.5.12.0_heif_test.patch"
+
+		if use jpegxl && has_version ">=media-libs/libjxl-0.12"; then
+			# needs patch for changed ICCProfile
+			eapply "${FILESDIR}/${PN}-3.1.15.0-jxl-fix-build-with-libjxl-0.12.0.patch"
+		fi
 	fi
 
 	mkdir "${T}/cmake" || die
@@ -310,13 +352,28 @@ src_configure() {
 	# Even if there are no SIMD features selected, it seems like the code will turn on NEON support if it is available.
 	use arm64 && append-flags -flax-vector-conversions
 
-	append-cflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
-	append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
+	if ! use debug; then
+		# TODO move to cmake.eclass
+		append-cflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
+		append-cxxflags "$(usex debug '-DDEBUG' '-DNDEBUG')"
+	fi
+
+	append-cflags -fno-fast-math -ffp-contract=off
+	append-cxxflags -fno-fast-math -ffp-contract=off
 
 	local mycmakeargs=(
-		-DVERBOSE="no"
+		# this will break tests due to extra output which will make output diffs fail
+		# so we pass OPENIMAGEIO_DEBUG=0
+		-DVERBOSE="$(usex debug)"
 		-DLINKSTATIC="no"
+		-DTIME_COMMANDS="$(usex debug)"
+		-DEXTRA_WARNINGS="$(usex debug)"
 
+		-DENABLE_FAST_MATH="no"
+
+		# TODO BUG what's the size for cuda?
+		# src/doc/texturesys.rst
+		# vaild: 4 8 16 32 64
 		-DTEX_BATCH_SIZE="16" # AVX512 -> 16
 		-DSTOP_ON_WARNING="no"
 
@@ -325,7 +382,7 @@ src_configure() {
 
 		-DCMAKE_UNITY_BUILD=OFF
 		# -DCMAKE_UNITY_BUILD_MODE="BATCH"
-		# -DCMAKE_UNITY_BUILD_BATCH_SIZE="$(nproc)"
+		# -DCMAKE_UNITY_BUILD_BATCH_SIZE="8"
 
 		-DBUILD_DOCS="$(usex doc)"
 		# -DBUILD_OIIOUTIL_ONLY="no"
@@ -346,7 +403,7 @@ src_configure() {
 		-DENABLE_openjph="$(usex jph)"
 		-DENABLE_OpenVDB="$(usex openvdb)"
 		-DENABLE_Ptex="$(usex ptex)"
-		-DENABLE_TBB="$(usex openvdb)"
+		-DENABLE_TBB="$(usex tbb)"
 
 		-DENABLE_libuhdr="$(usex uhdr)"
 		-DENABLE_WebP="yes"
@@ -354,6 +411,7 @@ src_configure() {
 		-DOIIO_BUILD_TESTS="$(usex test)"
 		-DOIIO_BUILD_TOOLS="$(usex tools)"
 		-DOIIO_DOWNLOAD_MISSING_TESTDATA="no"
+		# TODO Defaults to ON
 		-DOIIO_INTERNALIZE_FMT="no"
 		-DOIIO_USE_CUDA="$(usex cuda)"
 		# -DOIIO_USE_EXR_C_API="yes"
@@ -372,7 +430,38 @@ src_configure() {
 		-DUSE_SIMD="$(local IFS=','; echo "${mysimd[*]}")"
 
 		-DWebP_DIR="${T}/cmake"
+		# TODO
+		-DVISIBILITY_INLINES_HIDDEN="no"
+		-DCMAKE_CXX_VISIBILITY_PRESET="default"
 	)
+
+	if use cuda; then
+		if [[ ! -v CUDAARCHS ]]; then
+			export CUDAARCHS="all-major"
+		fi
+
+		# wants arch preceded with sm_, but doesn't use it!?
+		local _CUDAARCHS
+		if [[ ${CUDAARCHS} != "native" && ${CUDAARCHS} != "all" && ${CUDAARCHS} != "all-major" ]]; then
+			_CUDAARCHS="$(echo "${CUDAARCHS}" | sed -e 's/^/sm_/g' -e 's/;/;sm_/g')"
+		else
+			_CUDAARCHS="${CUDAARCHS}"
+		fi
+
+		mycmakeargs+=(
+			# uses FindCUDAToolkit ...
+			-DCUDAToolkit_ROOT="${CUDA_PATH:-${ESYSROOT}/opt/cuda}"
+			-DCUDA_TARGET_ARCH="${_CUDAARCHS}"
+			-DCUDA_VERBOSE_BUILD="$(usex debug)" # $(usex debug "$(usex !test)")"
+		)
+	fi
+
+	if use debug; then
+		mycmakeargs+=(
+			# prevent broken linkage
+			-DCMAKE_DEBUG_POSTFIX=""
+		)
+	fi
 
 	if use gui; then
 		mycmakeargs+=(
@@ -411,12 +500,6 @@ src_configure() {
 	cmake_src_configure
 }
 
-src_compile() {
-	declare -p
-	# die
-	cmake_src_compile
-}
-
 src_test() {
 	# A lot of tests needs to have access to the installed data files.
 	# So install them into the image directory now.
@@ -428,45 +511,51 @@ src_test() {
 		addpredict "/dev/char/"
 	fi
 
-	CMAKE_SKIP_TESTS=(
+	local CMAKE_SKIP_TESTS=(
 		"-broken$"
 
 		"^cmake-consumer$"
 		"^docs-examples-(cpp|python)$"
 
-		"texture-interp-bilinear.batch$"
-		"texture-interp-closest.batch$"
-		"texture-levels-stochaniso.batch$"
-		"texture-levels-stochmip.batch$"
+		# TODO
+		# "^python-imagebufalgo$" # fails
 
-		"texture-mip-onelevel.batch$"
-		"texture-mip-stochastictrilinear.batch$"
-		"texture-mip-stochasticaniso.batch$"
+		# # needs >=openexr-3.4
+		# "^htj2k$"
 
-		"^python-imagebufalgo$"
-
-		"^bmp$"
-		"^dds$"
-		"^ico$"
-		"^htj2k$"
-		"^jpeg2000$"
-		"^jpeg2000-j2kp4files$"
-		"^psd$"
-		"^ptex$"
+		# fails with heif[kvazaar]
+		# "^unit_imageinout$"
 	)
+
+	if ! has_version 'media-libs/libheif[aom]'; then
+		CMAKE_SKIP_TESTS+=(
+			'^heif$'
+		)
+	fi
+
+	if tc-is-gcc && ver_test "$(gcc-major-version)" -ge 17; then
+		CMAKE_SKIP_TESTS+=(
+			"^unit_fmath$"
+		)
+	fi
 
 	sed -e "s#../../../testsuite#../../../OpenImageIO-${PV}/testsuite#g" \
 		-i "${CMAKE_USE_DIR}/testsuite/python-imagebufalgo/ref/out.txt" || die
 
 	# NOTE testsuite/runtest.py
 	local -x CI=true
+	local -x OpenImageIO_CI=1
+
 	# local -x OPENIMAGEIO_CUDA=0 # prevent trying to access gpu devices
 	# local -x OIIO_USE_CUDA=0
+
 	local -x CMAKE_MODULE_PATH="${T}/usr"
 	local -x LD_LIBRARY_PATH
 	LD_LIBRARY_PATH="${T%/}/usr/$(get_libdir)"
-	# local -x OPENIMAGEIO_DEBUG_FILE
+
+	# prevent debug output breaking tests
 	local -x OPENIMAGEIO_DEBUG=0
+	# local -x OPENIMAGEIO_DEBUG_FILE
 
 	# find ${CMAKE_USE_DIR}/src/fonts -mindepth 1 -type d
 	local -x OPENIMAGEIO_FONTS="${CMAKE_USE_DIR}/src/fonts/Droid_Serif"
@@ -486,6 +575,9 @@ src_install() {
 
 	# remove Windows loader file
 	if use python; then
-		rm "${D}$(python_get_sitedir)/__init__.py" || die
+		rm \
+			"${D}$(python_get_sitedir)/__init__.py" \
+			"${D}$(python_get_sitedir)/py.typed" \
+			|| die
 	fi
 }
