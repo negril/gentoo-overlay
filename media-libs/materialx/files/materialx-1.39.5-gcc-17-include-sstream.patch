@@ -1,0 +1,22 @@
+From 6b473a93d99c674f48fc60232f780039b857df0c Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Fri, 19 Jun 2026 19:24:47 +0200
+Subject: gcc-17 include sstream
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/source/MaterialXGenShader/Library.h b/source/MaterialXGenShader/Library.h
+index c39f10ba..48738890 100644
+--- a/source/MaterialXGenShader/Library.h
++++ b/source/MaterialXGenShader/Library.h
+@@ -11,6 +11,7 @@
+ /// any public header in the MaterialXGenShader library.
+ 
+ #include <MaterialXCore/Exception.h>
++#include <sstream>
+ 
+ MATERIALX_NAMESPACE_BEGIN
+ 
+-- 
+2.54.0
+

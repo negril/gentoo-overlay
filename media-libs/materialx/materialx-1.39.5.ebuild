@@ -6,10 +6,10 @@ EAPI=8
 MY_PN="MaterialX"
 MY_P="${MY_PN}-${PV}"
 
-PYTHON_COMPAT=( python3_{11..14} ) # CI does not list 3.10 for this package.
+PYTHON_COMPAT=( python3_{12..14} ) # CI does not list 3.10 for this package.
 inherit cmake python-single-r1 desktop flag-o-matic toolchain-funcs virtualx
 
-DESCRIPTION="MaterialX is an open standard for the exchange of rich material content."
+DESCRIPTION="MaterialX is an open standard for the exchange of rich material content"
 HOMEPAGE="
 	https://materialx.org/
 	https://github.com/AcademySoftwareFoundation/MaterialX
@@ -84,10 +84,6 @@ REQUIRED_USE="
 	)
 "
 RDEPEND="
-	python? ( ${PYTHON_DEPS} )
-"
-DEPEND="
-	${RDEPEND}
 	media-libs/libglvnd[X?]
 	opencolorio? (
 		media-libs/opencolorio:=
@@ -97,6 +93,9 @@ DEPEND="
 	)
 	osl? (
 		>=media-libs/osl-1.11:=[test?]
+	)
+	python? (
+		${PYTHON_DEPS}
 	)
 	X? (
 		x11-libs/libX11
@@ -109,6 +108,7 @@ DEPEND="
 		')
 	)
 "
+DEPEND="${RDEPEND}"
 BDEPEND="
 	javascript? (
 		dev-util/emscripten
@@ -125,8 +125,8 @@ RESTRICT="
 QA_PRESTRIPPED="usr/lib/python.*/site-packages/${MY_PN}/.*.so"
 
 PATCHES=(
-	# "${FILESDIR}/materialx-1.38.9-setup.py-fix-sandbox-violation.patch"
-	"${FILESDIR}/materialx-1.39.0-include-cstdint-gcc15-fix.patch"
+	"${FILESDIR}/${PN}-1.39.0-include-cstdint-gcc15-fix.patch"
+	"${FILESDIR}/${PN}-1.39.5-gcc-17-include-sstream.patch"
 )
 
 pkg_setup() {
@@ -201,12 +201,16 @@ src_unpack() {
 
 src_prepare() {
 	if false; then
-	# sed -e "s/\(${CMAKE_BINARY_DIR}\)\/lib/\1\/$(get_libdir)/" -i CMakeLists.txt || die "Sed failed."
-	sed -i 's|resources|/usr/share/materialx/resources|g' source/MaterialXView/{Main.cpp,Viewer.cpp} || die
-	sed -i 's|"libraries"|"/usr/share/materialx/libraries"|g' source/MaterialXView/Main.cpp || die
-	sed -i 's|resources|/usr/share/materialx/resources|g' source/MaterialXGraphEditor/{Main.cpp,Graph.cpp} || die
-	sed -i 's|"libraries"|"/usr/share/materialx/libraries"|g' source/MaterialXGraphEditor/{Main.cpp,Graph.cpp} || die
-	sed -i 's|"libraries"|"/usr/share/materialx/libraries"|g' source/MaterialXGenShader/GenOptions.h || die
+	sed -e "s/\(${CMAKE_BINARY_DIR}\)\/lib/\1\/$(get_libdir)/" -i CMakeLists.txt || die "Sed failed."
+	sed -i 's|resources|share/materialx/resources|g' \
+		source/MaterialXView/{Main.cpp,Viewer.cpp} \
+		source/MaterialXGraphEditor/{Main.cpp,Graph.cpp} \
+		|| die
+	sed -i 's|"libraries"|"materialx/libraries"|g' \
+		source/MaterialXView/Main.cpp \
+		source/MaterialXGraphEditor/{Main.cpp,Graph.cpp} \
+		source/MaterialXGenShader/GenOptions.h \
+		|| die
 
 	# Fix path in CMake module
 	sed \
@@ -214,9 +218,13 @@ src_prepare() {
 		-e "s/\(@PACKAGE_CMAKE_INSTALL_PREFIX@\)\/resources/\1\/share\/${PN}\/resources/" \
 		-i cmake/modules/MaterialXConfig.cmake.in || die
 
+	sed \
+		-e "/DESTINATION/s/\(resources\)/share\/${PN}\/\1/" \
+		-i resources/CMakeLists.txt || die
+
 	if use python; then
 	sed \
-		-e "s|\(@PACKAGE_CMAKE_INSTALL_PREFIX@\)\/python|\1\/$(python_get_sitedir)\/${PN}|" \
+		-e "s|\(@PACKAGE_CMAKE_INSTALL_PREFIX@\)\/python|\1\$(python_get_sitedir)\/${PN}|" \
 		-i cmake/modules/MaterialXConfig.cmake.in || die
 	fi
 
@@ -225,6 +233,12 @@ src_prepare() {
 		-e "/install(FILES LICENSE CHANGELOG.md README.md THIRD-PARTY.md/d" \
 		-e  "/DESTINATION .)/d" \
 		-i CMakeLists.txt || die "Sed failed."
+	sed -i \
+		-e 's/MESSAGE_NEVER//g' \
+		documents/CMakeLists.txt \
+		resources/CMakeLists.txt \
+		python/CMakeLists.txt \
+		|| die
 	fi
 	cmake_src_prepare
 }
@@ -241,8 +255,8 @@ src_configure() {
 		-DBUILD_SHARED_LIBS="yes"
 		-DCMAKE_POLICY_DEFAULT_CMP0148="OLD"
 		-DMATERIALX_BUILD_USE_CCACHE="no"
-		# -DMATERIALX_INSTALL_LIB_PATH="$(get_libdir)"
-		# -DMATERIALX_INSTALL_STDLIB_PATH="share/${PN}/libraries"
+		-DMATERIALX_INSTALL_LIB_PATH="$(get_libdir)"
+		-DMATERIALX_INSTALL_STDLIB_PATH="share/${PN}/libraries"
 		-DMATERIALX_BUILD_JS="$(usex javascript)"
 		-DMATERIALX_BUILD_DOCS="$(usex doc)"
 		-DMATERIALX_BUILD_OCIO="$(usex opencolorio)"
@@ -255,30 +269,38 @@ src_configure() {
 		-DMATERIALX_INSTALL_RESOURCES="$(usex resources)"
 		-DMATERIALX_BUILD_GRAPH_EDITOR="$(usex graph-editor)"
 		-DMATERIALX_BUILD_VIEWER="$(usex viewer)"
+		# -DMATERIALX_NANOGUI_EXTERNAL
+
+		-DMATERIALX_BUILD_USE_CCACHE="no"
 	)
 
 	if use renderer ; then
 		mycmakeargs+=(
 			-DMATERIALX_BUILD_GEN_GLSL="$(usex X)"
 			-DMATERIALX_BUILD_GEN_OSL="$(usex osl)"
+			-DMATERIALX_BUILD_OSOS="$(usex osl)"
 			-DMATERIALX_BUILD_GEN_MDL="$(usex X)"
-			-DMATERIALX_BUILD_GEN_MSL="no"
+			-DMATERIALX_BUILD_GEN_MSL="yes"
+			-DMATERIALX_BUILD_GEN_SLANG="no"
+			-DMATERIALX_BUILD_RENDER_PLATFORMS="no"
 		)
 	fi
 
 	if use python ; then
 		mycmakeargs+=(
-			-DMATERIALX_PYTHON_FOLDER_NAME="$(python_get_sitedir)/${MY_PN}"
+			-DPYTHON_EXECUTABLE="${PYTHON}"
 			-Dpybind11_ROOT="$(python_get_sitedir)/pybind11"
+			-DMATERIALX_PYTHON_LTO="$(tc-is-lto)"
+			-DMATERIALX_PYTHON_FOLDER_NAME="$(python_get_sitedir)/${MY_PN}"
 			-DMATERIALX_PYTHON_EXECUTABLE="${PYTHON}"
 			-DMATERIALX_PYTHON_VERSION="${EPYTHON/python/}"
-			-DPYTHON_EXECUTABLE="${PYTHON}"
 		)
-		if tc-is-lto ; then
-			mycmakeargs+=(
-				-DMATERIALX_PYTHON_LTO="yes"
-			)
-		fi
+	fi
+
+	if use viewer ; then
+		mycmakeargs+=(
+			-DNANOGUI_NATIVE_FLAGS=""
+		)
 	fi
 
 	cmake_src_configure
@@ -286,37 +308,40 @@ src_configure() {
 
 src_test() {
 	local CMAKE_SKIP_TESTS=(
-		# requires /usr/share/materialx/libraries/stdlib/genmsl/lib/mx_math.metal
-		"^MaterialXTest_GenShader_Deterministic_Generation$"
-		"^MaterialXTest_GenShader_Track_Dependencies$"
-		"^MaterialXTest_GenShader_Track_Application_Variables$"
-		"^MaterialXTest_GenShader_GLSL_Unique_Names$"
-		"^MaterialXTest_GenShader_GLSL_Shader_Generation$"
-		"^MaterialXTest_GenShader_GLSL_Shader_Generation_with_Layout$"
-		"^MaterialXTest_GenShader_Vulkan_GLSL_Shader_Generation$"
-		"^MaterialXTest_GenShader_Wgsl_GLSL_Shader_Generation$"
-		"^MaterialXTest_GenShader_Slang_Unique_Names$"
-		"^MaterialXTest_GenShader_Slang_Shader_Generation$"
-		"^MaterialXTest_GenShader_MSL_Unique_Names$"
-		"^MaterialXTest_GenShader_MSL_Shader_with_Layout_Generation$"
-		"^MaterialXTest_Render_GLSL_TestSuite$"
+		# # requires /usr/share/materialx/libraries/stdlib/genmsl/lib/mx_math.metal
+		# "^MaterialXTest_GenShader_Deterministic_Generation$"
+		# "^MaterialXTest_GenShader_Track_Dependencies$"
+		# "^MaterialXTest_GenShader_Track_Application_Variables$"
+		# "^MaterialXTest_GenShader_GLSL_Unique_Names$"
+		# "^MaterialXTest_GenShader_GLSL_Shader_Generation$"
+		# "^MaterialXTest_GenShader_GLSL_Shader_Generation_with_Layout$"
+		# "^MaterialXTest_GenShader_Vulkan_GLSL_Shader_Generation$"
+		# "^MaterialXTest_GenShader_Wgsl_GLSL_Shader_Generation$"
+		# "^MaterialXTest_GenShader_Slang_Unique_Names$"
+		# "^MaterialXTest_GenShader_Slang_Shader_Generation$"
+		# "^MaterialXTest_GenShader_MSL_Unique_Names$"
+		# "^MaterialXTest_GenShader_MSL_Shader_with_Layout_Generation$"
+		# "^MaterialXTest_Render_GLSL_TestSuite$"
 		"^MaterialXTest_Render_OSL_TestSuite$"
+		"^MaterialXTest_Render_OSL_Network_TestSuite$"
 	)
+	# local -x OPENIMAGEIO_DEBUG=1
+	# local myctestargs=(
+	# 	--extra-verbose
+	# 	--output-on-failure
+	# )
 	virtx cmake_src_test
 }
 
 src_install() {
 	cmake_src_install
 
-	# Remove garbage
-	# rm -r "${ED}/var" || die
-
-	# Add LDPATH to gentoo env # TODO
-	cat > "${T}/99-${PN}" <<-_EOF_ || die
-		LDPATH=${EPREFIX}/usr/$(get_libdir)/${PN}/libraries
-	_EOF_
-
-	doenvd "${T}/99-${PN}"
+	# # Add LDPATH to gentoo env # TODO
+	# cat > "${T}/99-${PN}" <<-_EOF_ || die
+	# 	LDPATH=${EPREFIX}/usr/$(get_libdir)/${PN}/libraries
+	# _EOF_
+	#
+	# doenvd "${T}/99-${PN}"
 
 	# Desktop shortcuts
 	use viewer && domenu "${FILESDIR}/materialx-view.desktop"
@@ -334,26 +359,18 @@ src_install() {
 	# 		"README.md"
 	# 		"THIRD-PARTY.md"
 	# 	)
-
+ #
 	# 	einstalldocs
 	# fi
 
-	if use python ; then
-		if use examples ; then
-			python_domodule "${ED}/usr/python/${MY_PN}"
-			insinto "/usr/share/${PN}/python"
-			doins -R "${ED}/usr/python/"
-		fi
-		# rm -vr "${ED}/usr/python/" || die
-		# TODO: Check double install of shared shaders
-		# rm -vr "${E}/$(python_get_sitedir)/${MY_PN}/share" || die
-	fi
-
-	# Install resources
-	# if use resources ; then
-	# 	mv "${ED}/usr/resources" "${ED}/usr/share/${PN}/" || die
-	# else
-	# 	:
-	# 	# rm -vr "${ED}/usr/resources" || die
+	# if use python ; then
+	# 	if use examples ; then
+	# 		python_domodule "${ED}/usr/python/${MY_PN}"
+	# 		insinto "/usr/share/${PN}/python"
+	# 		doins -R "${ED}/usr/python/"
+	# 	fi
+	# 	rm -vr "${ED}/usr/python/" || die
+	# 	# TODO: Check double install of shared shaders
+	# 	rm -vr "${D}/$(python_get_sitedir)/${MY_PN}/share" || die
 	# fi
 }
