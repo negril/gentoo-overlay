@@ -6,7 +6,7 @@ EAPI=8
 MY_PN="MaterialX"
 MY_P="${MY_PN}-${PV}"
 
-PYTHON_COMPAT=( python3_{11..13} ) # CI does not list 3.10 for this package.
+PYTHON_COMPAT=( python3_{11..14} ) # CI does not list 3.10 for this package.
 inherit cmake python-single-r1 desktop flag-o-matic
 
 DESCRIPTION="MaterialX is an open standard for the exchange of rich material content."
@@ -63,7 +63,7 @@ LICENSE="
 	graph-editor? ( ZLIB MIT Boost-1.0 BSD )
 "
 
-SLOT="0/$(ver_cut 1-2)"
+SLOT="0/$(ver_cut 1)"
 
 IUSE="X doc debug examples graph-editor javascript lto openimageio +osl python +renderer resources test viewer"
 
@@ -209,8 +209,13 @@ src_prepare() {
 	sed \
 		-e "s/\(@PACKAGE_CMAKE_INSTALL_PREFIX@\)\/libraries/\1\/share\/${PN}\/libraries/" \
 		-e "s/\(@PACKAGE_CMAKE_INSTALL_PREFIX@\)\/resources/\1\/share\/${PN}\/resources/" \
+		-i cmake/modules/MaterialXConfig.cmake.in || die
+
+	if use python; then
+	sed \
 		-e "s|\(@PACKAGE_CMAKE_INSTALL_PREFIX@\)\/python|\1\/$(python_get_sitedir)\/${PN}|" \
-		-i cmake/modules/MaterialXConfig.cmake.in ||
+		-i cmake/modules/MaterialXConfig.cmake.in || die
+	fi
 
 	# Do not install docs by default
 	sed \
@@ -232,7 +237,6 @@ src_configure() {
 		-DCMAKE_POLICY_DEFAULT_CMP0148="OLD"
 		-DMATERIALX_INSTALL_LIB_PATH="$(get_libdir)"
 		-DMATERIALX_INSTALL_STDLIB_PATH="share/${PN}/libraries"
-		-DMATERIALX_PYTHON_FOLDER_NAME="$(python_get_sitedir)/${MY_PN}"
 		-DMATERIALX_BUILD_JS="$(usex javascript)"
 		-DMATERIALX_BUILD_DOCS="$(usex doc)"
 		-DMATERIALX_BUILD_OIIO="$(usex openimageio)"
@@ -257,6 +261,7 @@ src_configure() {
 
 	if use python ; then
 		mycmakeargs+=(
+			-DMATERIALX_PYTHON_FOLDER_NAME="$(python_get_sitedir)/${MY_PN}"
 			-Dpybind11_ROOT="$(python_get_sitedir)/pybind11"
 			-DMATERIALX_PYTHON_EXECUTABLE="${PYTHON}"
 			-DMATERIALX_PYTHON_VERSION="${EPYTHON/python/}"
@@ -272,7 +277,7 @@ src_install() {
 	cmake_src_install
 
 	# Remove garbage
-	rm -r "${ED}/var" || die
+	# rm -r "${ED}/var" || die
 
 	# Add LDPATH to gentoo env # TODO
 	cat > "${T}/99-${PN}" <<-_EOF_ || die
@@ -290,7 +295,7 @@ src_install() {
 		cp documents/Images/MaterialXLogo_200x155.png "${ED}/usr/share/icons/hicolor/256x256/apps/materialx.png" || die
 	fi
 
-	if use docs ; then
+	if use doc ; then
 		local DOCS=(
 			"LICENSE"
 			"CHANGELOG.md"
@@ -316,6 +321,6 @@ src_install() {
 	if use resources ; then
 		mv "${ED}/usr/resources" "${ED}/usr/share/${PN}/" || die
 	else
-		rm -vr "${ED}/usr/resources" || die
+		: # rm -vr "${ED}/usr/resources" || die
 	fi
 }
