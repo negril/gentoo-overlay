@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="project">
+		<email>sci-geosciences@gentoo.org</email>
+		<name>Gentoo Geosciences Project</name>
+	</maintainer>
+	<upstream>
+		<remote-id type="github">OSGeo/PROJ</remote-id>
+	</upstream>
+	<use>
+		<flag name="curl">Install projsync for synchronizing PROJ datum and transformation support data using <pkg>net-misc/curl</pkg></flag>
+		<flag name="proj-data">Preinstall all freely available resource files</flag>
+	</use>
+</pkgmetadata>
