@@ -1,4 +1,4 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
@@ -28,14 +28,13 @@ BDEPEND="
 	test? (
 		dev-cpp/gtest
 		dev-libs/openssl
-		dev-debug/valgrind
 	)
 "
 
 PATCHES=(
-	"${FILESDIR}"/${PN}-2.3.2-remove-std-and-opt-flags.patch
-	"${FILESDIR}"/${PN}-2.2.0-include-cstdint.patch
-	"${FILESDIR}"/${PN}-2.3.2-include-cstdint.patch
+	"${FILESDIR}/${PN}-2.4.1-cmake_minimum_version-3.10.patch"
+	"${FILESDIR}/${PN}-2.4.1-remove-std-and-opt-flags.patch"
+	"${FILESDIR}/${PN}-2.4.1-include-algorithm.patch"
 )
 
 src_prepare() {
@@ -56,6 +55,8 @@ src_configure() {
 		-DUSE_INCLUDED_LIBZIP=OFF
 		-DUSE_INCLUDED_ZLIB=OFF
 		-DSTRIP_BINARIES=OFF
+		# we don't want valgrind tests
+		-DVALGRIND=NOTFOUND
 	)
 
 	if use test; then
@@ -72,6 +73,6 @@ src_install() {
 	cmake_src_install
 
 	for suf in abi types implicit; do
-		dosym -r /usr/include/${PN}/Bindings/Cpp/${PN}_${suf}.hpp /usr/include/${PN}/${PN}_${suf}.hpp
+		dosym -r "/usr/include/${PN}/Bindings/Cpp/${PN}_${suf}.hpp" "/usr/include/${PN}/${PN}_${suf}.hpp"
 	done
 }
