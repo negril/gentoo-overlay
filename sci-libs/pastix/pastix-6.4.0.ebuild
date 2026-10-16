@@ -1,14 +1,14 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 
 # add gdb symbols in debug and relwithdebinfo
 CMAKE_BUILD_TYPE="Release"
 
-inherit bash-completion-r1 cmake cuda fortran-2 python-single-r1 toolchain-funcs
+inherit cmake cuda flag-o-matic fortran-2 python-single-r1 toolchain-funcs
 
 DESCRIPTION="Parallel solver for very large sparse linear systems"
 HOMEPAGE="https://solverstack.gitlabpages.inria.fr/pastix/ https://gitlab.inria.fr/solverstack/pastix"
@@ -20,7 +20,7 @@ if [[ ${PV} = *9999* ]] ; then
 else
 	SRC_URI="https://files.inria.fr/pastix/releases/v$(ver_cut 1)/${P}.tar.gz"
 	SLOT="0"
-	KEYWORDS="~amd64 ~arm ~arm64 ~loong ~ppc ~ppc64 ~riscv ~sparc ~x86"
+	KEYWORDS="~amd64 ~arm ~arm64 ~riscv ~x86"
 fi
 
 IUSE="cuda examples +fortran int64 metis mpi +python +scotch starpu test"
@@ -278,6 +278,10 @@ src_prepare () {
 }
 
 src_configure() {
+	# lto1: fatal error: bytecode stream in file ‘kernels/gpus/CMakeFiles/pastix_kernels_cuda.dir/pastix_kernels_cuda_generated_pastix_sgemm_vbatched.cu.o’ generated with LTO version 14.0 instead of the expected 16.0
+	if use cuda; then
+		filter-lto
+	fi
 
 	local mycmakeargs=(
 		-DCMAKE_POLICY_DEFAULT_CMP0146="OLD" # BUG FindCUDA
@@ -287,7 +291,6 @@ src_configure() {
 
 		-DBUILD_SHARED_LIBS="yes"
 		-DBUILD_TESTING="$(usex test)"
-
 
 		# -DINSTALL_EXAMPLES="$(usex examples)"
 		-DPASTIX_INT64="$(usex int64)"
@@ -322,11 +325,19 @@ src_configure() {
 
 		local -x CUDAHOSTCXX CUDAHOSTLD
 		CUDAHOSTCXX="$(cuda_get_host_compiler)"
+		CUDAHOSTLD="$(tc-getCXX)"
+
+		local CUDA_NVCC_FLAGS
+		# TODO this will break if CUDAARCHS contains more than one arch
+		if [[ ${CUDAARCHS} != "native" && ${CUDAARCHS} != "all" && ${CUDAARCHS} != "all-major" ]]; then
+			CUDA_NVCC_FLAGS+="-arch sm_${CUDAARCHS} -DCUDA_SM_VERSION=${CUDAARCHS}"
+		else
+			CUDA_NVCC_FLAGS+="-arch ${CUDAARCHS}"
+		fi
 
 		mycmakeargs+=(
-			-DCUDA_NVCC_FLAGS="-ccbin ${CUDAHOSTCXX} -arch sm_${CUDAARCHS} -DCUDA_SM_VERSION=${CUDAARCHS}"
+			-DCUDA_NVCC_FLAGS="-ccbin ${CUDAHOSTCXX} ${CUDA_NVCC_FLAGS}"
 		)
-
 	fi
 
 	if ! use test; then
