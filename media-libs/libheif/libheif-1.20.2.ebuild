@@ -5,6 +5,9 @@ EAPI=8
 
 inherit cmake-multilib gnome2-utils xdg
 
+# From https://github.com/strukturag/libheif/commit/6c3fb973c5d9f954899839f6f4aaa6a173cab098
+PATCHES="${FILESDIR}/libheif-undefined.diff"
+
 DESCRIPTION="ISO/IEC 23008-12:2017 HEIF file format decoder and encoder"
 HOMEPAGE="https://github.com/strukturag/libheif"
 
