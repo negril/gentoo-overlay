@@ -1,0 +1,69 @@
+From febff8aa19ff85ea5fd636f9dd268d6341513028 Mon Sep 17 00:00:00 2001
+From: Paul Zander <negril.nx@gmail.com>
+Date: Mon, 5 Oct 2026 12:13:18 +0200
+Subject: Install CXX to default location
+
+Signed-off-by: Paul Zander <negril.nx@gmail.com>
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9022fd0..f46f789 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -162,6 +162,7 @@ math(EXPR OTIO_SOVERSION "${OTIO_VERSION_MAJOR} * 100 + ${OTIO_VERSION_MINOR}")
+ set(OTIO_RESOLVED_CXX_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}")
+ 
+ if(OTIO_CXX_INSTALL)
++    include(GNUInstallDirs)
+     message(STATUS "Installing C++ bindings to: ${OTIO_RESOLVED_CXX_INSTALL_DIR}")
+     message(STATUS "Installing C++ dynamic libraries to: ${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}")
+ 
+diff --git a/src/opentime/CMakeLists.txt b/src/opentime/CMakeLists.txt
+index 73cdcfb..62fa95c 100644
+--- a/src/opentime/CMakeLists.txt
++++ b/src/opentime/CMakeLists.txt
+@@ -59,9 +59,9 @@ if(OTIO_CXX_INSTALL)
+     install(TARGETS opentime
+             EXPORT OpenTimeTargets
+             INCLUDES DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/include"
+-            ARCHIVE DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}"
+-            LIBRARY DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}"
+-            RUNTIME DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}")
++            ARCHIVE DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}"
++            LIBRARY DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}"
++            RUNTIME DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}")
+ 
+     install(EXPORT OpenTimeTargets
+             DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/lib/cmake/opentime"
+diff --git a/src/opentimelineio/CMakeLists.txt b/src/opentimelineio/CMakeLists.txt
+index be05a7c..04a4d78 100644
+--- a/src/opentimelineio/CMakeLists.txt
++++ b/src/opentimelineio/CMakeLists.txt
+@@ -139,9 +139,9 @@ if(OTIO_CXX_INSTALL)
+     if(NOT OTIO_FIND_MINIZIP_NG)
+         install(TARGETS ${OTIO_MINIZIP_LIB}
+             EXPORT OpenTimelineIOTargets
+-            ARCHIVE DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}"
+-            LIBRARY DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}"
+-            RUNTIME DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}")
++            ARCHIVE DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}"
++            LIBRARY DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}"
++            RUNTIME DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}")
+     endif()
+ 
+     set(OTIO_CONFIG_DEPENDENCIES "")
+@@ -153,9 +153,9 @@ if(OTIO_CXX_INSTALL)
+     install(TARGETS opentimelineio
+            EXPORT OpenTimelineIOTargets
+            INCLUDES DESTINATION "${OPENTIMELINEIO_INCLUDES}"
+-           ARCHIVE DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}"
+-           LIBRARY DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}"
+-           RUNTIME DESTINATION "${OTIO_RESOLVED_CXX_DYLIB_INSTALL_DIR}")
++           ARCHIVE DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}"
++           LIBRARY DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}"
++           RUNTIME DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}")
+ 
+     install(EXPORT OpenTimelineIOTargets
+            DESTINATION "${OTIO_RESOLVED_CXX_INSTALL_DIR}/lib/cmake/opentimelineio"
+-- 
+2.56.0
+
