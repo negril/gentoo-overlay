@@ -4,7 +4,7 @@
 EAPI=8
 
 # keep in sync with blender
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{11..14} )
 
 # Check this on updates
 LLVM_COMPAT=( {18..19} )
@@ -173,7 +173,7 @@ pkg_setup() {
 
 src_prepare() {
 	# we can use clang as default
-	if use clang && ! tc-is-clang ; then
+	if use clang-cuda && ! tc-is-clang ; then
 		export CC="${CHOST}-clang"
 		export CXX="${CHOST}-clang++"
 	else
@@ -336,7 +336,7 @@ src_configure() {
 
 	# Environment OPENIMAGEIO_CUDA=0 trumps everything else, turns off
 	# Cuda functionality. We don't even initialize in this case.
-# 	export OPENIMAGEIO_CUDA=0
+	# export OPENIMAGEIO_CUDA=0
 	cmake_src_configure
 }
 
@@ -403,7 +403,7 @@ src_test() {
 		'--force-new-ctest-process'
 	)
 
-# 	OPENIMAGEIO_CUDA=0 \
+	# OPENIMAGEIO_CUDA=0 \
 	cmake_src_test
 
 	# NOTE this should go to cuda eclass

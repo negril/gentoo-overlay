@@ -1,14 +1,14 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 
 # Check this on updates
 LLVM_COMPAT=( {17..18} )
 
-inherit cmake cuda flag-o-matic llvm-r1 toolchain-funcs python-single-r1
+inherit cmake cuda flag-o-matic llvm-r2 toolchain-funcs python-single-r1
 
 DESCRIPTION="Advanced shading language for production GI renderers"
 HOMEPAGE="https://www.imageworks.com/technology/opensource https://github.com/AcademySoftwareFoundation/OpenShadingLanguage"
@@ -82,7 +82,7 @@ PATCHES=(
 )
 
 pkg_setup() {
-	llvm-r1_pkg_setup
+	llvm-r2_pkg_setup
 
 	use python && python-single-r1_pkg_setup
 }
@@ -285,7 +285,7 @@ src_test() {
 
 	myctestargs=(
 		# src/build-scripts/ci-test.bash
-		# '--force-new-ctest-process'
+		'--force-new-ctest-process'
 	)
 
 	local -x DEBUG CXXFLAGS LD_LIBRARY_PATH DIR OSL_DIR OSL_SOURCE_DIR PYTHONPATH
@@ -319,7 +319,7 @@ src_test() {
 
 	myctestargs=(
 		# src/build-scripts/ci-test.bash
-		# '--force-new-ctest-process'
+		'--force-new-ctest-process'
 		--repeat until-pass:10
 		-R "^render"
 	)

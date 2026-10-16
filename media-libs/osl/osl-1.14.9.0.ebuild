@@ -4,24 +4,28 @@
 EAPI=8
 
 # keep in sync with blender
-PYTHON_COMPAT=( python3_{11..13} )
+PYTHON_COMPAT=( python3_{12..14} )
 
 # Check this on updates
 LLVM_COMPAT=( {18..22} )
 
-inherit cmake cuda flag-o-matic llvm-r1 toolchain-funcs python-single-r1
+inherit cmake cuda flag-o-matic llvm-r2 toolchain-funcs python-single-r1
 
 DESCRIPTION="Advanced shading language for production GI renderers"
 HOMEPAGE="https://www.imageworks.com/technology/opensource https://github.com/AcademySoftwareFoundation/OpenShadingLanguage"
 
-if [[ ${PV} = *9999* ]] ; then
+if [[ ${PV} == *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/AcademySoftwareFoundation/OpenShadingLanguage.git"
+	if [[ ${PV} != 9999* ]] ; then
+		EGIT_BRANCH="dev-$(ver_cut 1-2)"
+	fi
 else
 	# If a development release, please don't keyword!
 	SRC_URI="https://github.com/AcademySoftwareFoundation/OpenShadingLanguage/archive/v${PV}.tar.gz -> ${P}.tar.gz"
-	KEYWORDS="~amd64 ~arm ~arm64 ~ppc64"
 	S="${WORKDIR}/OpenShadingLanguage-${PV}"
+
+	KEYWORDS="~amd64 ~arm ~arm64 ~ppc64"
 fi
 
 LICENSE="BSD"
@@ -41,6 +45,7 @@ X86_CPU_FEATURES=(
 CPU_FEATURES=( "${X86_CPU_FEATURES[@]/#/cpu_flags_x86_}" )
 
 IUSE="+clang-cuda debug doc gui libcxx nofma optix partio test ${CPU_FEATURES[*]%:*} python"
+# IUSE+=" clang"
 
 RESTRICT="!test? ( test )"
 
@@ -164,7 +169,7 @@ cuda_get_host_native_arch() {
 }
 
 pkg_setup() {
-	llvm-r1_pkg_setup
+	llvm-r2_pkg_setup
 
 	use python && python-single-r1_pkg_setup
 }
@@ -277,7 +282,7 @@ src_configure() {
 		-DUSE_BATCHED="$(IFS=","; echo "${mybatched[*]}")"
 		-DUSE_LIBCPLUSPLUS="$(usex libcxx)"
 		-DUSE_QT="$(usex gui)"
-# 		-DUSE_FAST_MATH="no"
+		# -DUSE_FAST_MATH="no"
 	)
 
 	if use debug; then
@@ -335,7 +340,7 @@ src_configure() {
 
 	# Environment OPENIMAGEIO_CUDA=0 trumps everything else, turns off
 	# Cuda functionality. We don't even initialize in this case.
-# 	export OPENIMAGEIO_CUDA=0
+	# export OPENIMAGEIO_CUDA=0
 	cmake_src_configure
 }
 
@@ -382,12 +387,13 @@ src_test() {
 		# batchregression
 		"^spline-reg.regress.batched.opt$"
 		"^transform-reg.regress.batched.opt$"
-# 		"^texture3d-opts-reg.regress.batched.opt$"
+		# "^texture3d-opts-reg.regress.batched.opt$"
 
 		# doesn't handle parameters
 		"^osl-imageio"
 
-		# TODO Unknown exception: Unable to convert function return value to a Python type! The signature was (self: oslquery.Parameter) -> OpenImageIO_v3_0::TypeDesc
+		# TODO Unknown exception: Unable to convert function return value to a Python type!
+		# The signature was (self: oslquery.Parameter) -> OpenImageIO_v3_0::TypeDesc
 		"^python-oslquery"
 	)
 
@@ -398,8 +404,8 @@ src_test() {
 		'--force-new-ctest-process'
 	)
 
-# 	OPENIMAGEIO_CUDA=0 \
-# 	cmake_src_test
+	# OPENIMAGEIO_CUDA=0 \
+	cmake_src_test
 
 	# NOTE this should go to cuda eclass
 	cuda_add_sandbox -w
@@ -428,7 +434,6 @@ src_test() {
 		# src/build-scripts/ci-test.bash
 		'--force-new-ctest-process'
 		--repeat until-pass:10
-		--output-on-failure
 	)
 
 	cmake_src_test
