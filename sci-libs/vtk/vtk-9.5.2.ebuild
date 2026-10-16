@@ -30,20 +30,20 @@ if [[ ${PV} = *9999* ]] ; then
 	"
 else
 	SRC_URI="
-		https://www.vtk.org/files/release/${MY_PV}/VTK-${PV}.tar.gz
-		doc? (
-			https://www.vtk.org/files/release/${MY_PV}/vtkDocHtml-${PV}.tar.gz
-		)
-		examples? (
-			https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
-			https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
-		)
-		test? (
-			https://www.vtk.org/files/release/${MY_PV}/VTKData-${PV}.tar.gz
-			https://www.vtk.org/files/release/${MY_PV}/VTKDataFiles-${PV}.tar.gz
-			https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
-			https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
-		)
+	https://www.vtk.org/files/release/${MY_PV}/VTK-${PV}.tar.gz
+	doc? (
+		https://www.vtk.org/files/release/${MY_PV}/vtkDocHtml-${PV}.tar.gz
+	)
+	examples? (
+		https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
+		https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
+	)
+	test? (
+		https://www.vtk.org/files/release/${MY_PV}/VTKData-${PV}.tar.gz
+		https://www.vtk.org/files/release/${MY_PV}/VTKDataFiles-${PV}.tar.gz
+		https://www.vtk.org/files/release/${MY_PV}/VTKLargeData-${PV}.tar.gz
+		https://www.vtk.org/files/release/${MY_PV}/VTKLargeDataFiles-${PV}.tar.gz
+	)
 	"
 	S="${WORKDIR}/VTK-${PV}"
 	KEYWORDS="~amd64 ~arm ~arm64 ~x86"
@@ -211,6 +211,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-9.4.2-ThirdParty-libfmt-12.patch"
 	"${FILESDIR}/${PN}-9.5.0-cuda-13-1.patch"
 	"${FILESDIR}/${PN}-9.5.0-cuda-13-2.patch"
+	"${FILESDIR}/${PN}-9.5.2-gcc17-include-string.patch"
 )
 
 DOCS=( CONTRIBUTING.md README.md )
@@ -1254,7 +1255,7 @@ src_test() {
 				"^VTK::RenderingCoreCxx-TestCompositePolyDataMapperPartialFieldData$"
 				"^VTK::RenderingCoreCxx-TestMixedGeometryCellScalars$"
 				"^VTK::RenderingCoreCxx-TestTilingCxx$"
-			)
+		)
 		fi
 
 		if use vtkm && use cuda; then
