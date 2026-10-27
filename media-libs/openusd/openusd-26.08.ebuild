@@ -159,7 +159,10 @@ BDEPEND="
 	dev-cpp/argparse
 	dev-util/patchelf
 	man? ( sys-apps/help2man )
-	doc? ( >=app-text/doxygen-1.9.6[dot] )
+	doc? (
+		>=app-text/doxygen-1.9.6
+		media-gfx/graphviz
+	)
 "
 
 RESTRICT="

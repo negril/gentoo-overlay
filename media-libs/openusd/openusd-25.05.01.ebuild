@@ -153,7 +153,10 @@ BDEPEND="
 	dev-util/patchelf
 	virtual/pkgconfig
 	man? ( sys-apps/help2man )
-	doc? ( >=app-text/doxygen-1.9.6[dot] )
+	doc? (
+		>=app-text/doxygen-1.9.6
+		media-gfx/graphviz
+	)
 	|| (
 		(
 			<sys-devel/gcc-16
