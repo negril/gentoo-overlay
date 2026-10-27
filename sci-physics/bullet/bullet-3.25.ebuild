@@ -27,7 +27,12 @@ RDEPEND="
 	tbb? ( <dev-cpp/tbb-2021.4.0:= )
 "
 DEPEND="${RDEPEND}"
-BDEPEND="doc? ( app-text/doxygen[dot] )"
+BDEPEND="
+	doc? (
+		app-text/doxygen
+		media-gfx/graphviz
+	)
+"
 
 PATCHES=( "${FILESDIR}"/${PN}-2.85-soversion.patch )
 
