@@ -346,7 +346,8 @@ BDEPEND="
 	virtual/pkgconfig
 	cuda? ( dev-util/nvidia-cuda-toolkit:= )
 	doc? (
-		app-text/doxygen[dot]
+		app-text/doxygen
+		media-gfx/graphviz
 		python? (
 			dev-python/beautifulsoup4[${PYTHON_USEDEP}]
 		)
