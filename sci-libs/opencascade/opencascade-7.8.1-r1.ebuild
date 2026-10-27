@@ -99,7 +99,10 @@ DEPEND="
 	json? ( dev-libs/rapidjson )
 "
 BDEPEND="
-	doc? ( app-text/doxygen[dot] )
+	doc? (
+		app-text/doxygen
+		media-gfx/graphviz
+	)
 	test? ( dev-tcltk/thread )
 "
 if [[ "${OCCT_QT5}" ]]; then

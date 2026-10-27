@@ -135,7 +135,8 @@ DEPEND="
 "
 BDEPEND="
 	doc? (
-		app-text/doxygen[dot]
+		app-text/doxygen
+		media-gfx/graphviz
 	)
 	test? (
 		dev-tcltk/thread
