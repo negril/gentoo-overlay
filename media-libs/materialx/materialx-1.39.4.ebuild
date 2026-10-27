@@ -112,7 +112,8 @@ BDEPEND="
 		dev-util/emscripten
 	)
 	doc? (
-		app-text/doxygen[dot]
+		app-text/doxygen
+		media-gfx/graphviz
 	)
 "
 RESTRICT="

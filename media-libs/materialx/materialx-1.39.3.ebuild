@@ -98,7 +98,10 @@ DEPEND="
 BDEPEND="
 	>=dev-build/cmake-3.16
 	javascript? ( dev-util/emscripten )
-	doc? ( app-text/doxygen[dot] )
+	doc? (
+		app-text/doxygen
+		media-gfx/graphviz
+	)
 "
 RESTRICT="
 	mirror
