@@ -35,7 +35,8 @@ DEPEND="${RDEPEND}"
 BDEPEND="
 	virtual/pkgconfig
 	doc? (
-		app-text/doxygen[dot]
+		app-text/doxygen
+		media-gfx/graphviz
 		qch? ( dev-qt/qttools:6[assistant] )
 	)
 "
