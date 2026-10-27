@@ -243,13 +243,14 @@ fi
 BDEPEND="
 	virtual/pkgconfig
 	doc? (
-		app-text/doxygen[dot]
+		app-text/doxygen
 		dev-python/sphinx[latex]
 		dev-texlive/texlive-bibtexextra
 		dev-texlive/texlive-fontsextra
 		dev-texlive/texlive-fontutils
 		dev-texlive/texlive-latex
 		dev-texlive/texlive-latexextra
+		media-gfx/graphviz
 	)
 	vulkan? (
 		dev-util/spirv-headers
