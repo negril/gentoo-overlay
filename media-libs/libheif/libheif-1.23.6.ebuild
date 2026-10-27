@@ -26,7 +26,10 @@ REQUIRED_USE="
 RESTRICT="!test? ( test )"
 
 BDEPEND="
-	doc? ( app-text/doxygen[dot] )
+	doc? (
+		app-text/doxygen
+		media-gfx/graphviz
+	)
 "
 RDEPEND="
 	aom? ( >=media-libs/libaom-2.0.0:=[${MULTILIB_USEDEP}] )
