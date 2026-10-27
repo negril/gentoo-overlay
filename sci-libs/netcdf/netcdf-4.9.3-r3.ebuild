@@ -40,7 +40,10 @@ RDEPEND="
 DEPEND="${RDEPEND}"
 BDEPEND="
 	virtual/pkgconfig
-	doc? ( app-text/doxygen[dot] )
+	doc? (
+		app-text/doxygen
+		media-gfx/graphviz
+	)
 "
 
 REQUIRED_USE="
