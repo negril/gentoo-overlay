@@ -138,12 +138,13 @@ FORTRAN_DEPEND="virtual/fortran"
 
 BDEPEND="
 	doc? (
-		app-text/doxygen[dot]
+		app-text/doxygen
 		dev-texlive/texlive-bibtexextra
 		dev-texlive/texlive-fontsextra
 		dev-texlive/texlive-fontutils
 		dev-texlive/texlive-latex
 		dev-texlive/texlive-latexextra
+		media-gfx/graphviz
 		mathjax? ( dev-libs/mathjax )
 	)
 	test? (
