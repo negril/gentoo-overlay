@@ -13,7 +13,7 @@ LICENSE="BSD"
 # SONAME -> ASSIMP_SOVERSION
 SLOT="0/$(ver_cut 1)"
 KEYWORDS="~amd64 ~arm ~arm64 ~loong ~ppc64 ~riscv ~x86"
-IUSE="collada doc samples test"
+IUSE="collada doc draco samples test"
 
 RESTRICT="!test? ( test )"
 
@@ -21,6 +21,9 @@ RDEPEND="
 	virtual/minizip:=
 	collada? ( media-libs/opencollada )
 	doc? ( app-text/doxygen )
+	draco? (
+		media-libs/draco:=
+	)
 	samples? (
 		media-libs/freeglut
 		media-libs/libglvnd
@@ -77,7 +80,7 @@ src_configure() {
 		# -DASSIMP_ASAN=yes # Enable AddressSanitizer.
 		-DASSIMP_BUILD_ASSIMP_TOOLS=yes # If the supplementary tools for Assimp are built in addition to the library.
 		-DASSIMP_BUILD_DOCS=$(usex doc) # Build documentation using Doxygen.
-		# -DASSIMP_BUILD_DRACO=no # If the Draco libraries are to be built. Primarily for glTF
+		-DASSIMP_BUILD_DRACO=$(usex draco) # If the Draco libraries are to be built. Primarily for glTF
 		# -DASSIMP_BUILD_NONFREE_C4D_IMPORTER=no # Build the C4D importer, which relies on the non-free Cineware SDK.
 		-DASSIMP_BUILD_SAMPLES=$(usex samples) # If the official samples are built as well (needs Glut).
 		-DASSIMP_BUILD_TESTS=$(usex test) # If the test suite for Assimp is built in addition to the library.
