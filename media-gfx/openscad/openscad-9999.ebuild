@@ -1,28 +1,34 @@
-# Copyright 1999-2025 Gentoo Authors
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
+
+# verify QT_XCB_GL_INTEGRATION= breakage via alaric/SeanFenian
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{11..13} )
-inherit cmake flag-o-matic optfeature python-any-r1 virtualx xdg
+PYTHON_COMPAT=( python3_{12..14} )
+inherit cmake flag-o-matic optfeature python-single-r1 virtualx xdg
 
 DESCRIPTION="The Programmers Solid 3D CAD Modeller"
 HOMEPAGE="https://openscad.org/"
+
+# TODO
+# NOTE the build system sets up a venv for tests, we could use imagemagick with -DUSE_IMAGE_COMPARE_PY="no"
 
 if [[ ${PV} = *9999* ]] ; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/openscad/openscad.git"
 	EGIT_SUBMODULES=(
 		'*'
+		'-Clipper2'
 		'-mimalloc'
 		'-submodules/manifold'
 		'-OpenCSG'
 	)
 else
 	if [[ ${PV} = *pre* ]] ; then
-		COMMIT="f3cac59bf973502ad4b278fd3f20298f9bc2fc84"
-		SANITIZERS_CMAKE_COMMIT="0573e2ea8651b9bb3083f193c41eb086497cc80a"
-		MCAD_COMMIT="bd0a7ba3f042bfbced5ca1894b236cea08904e26"
+		COMMIT="019c069c3c07ed9c280e643f2c156104736cebd0"
+		SANITIZERS_CMAKE_COMMIT="bcb1fc68616e9645ca5acea2992412606373ab04"
+		MCAD_COMMIT="1ea402208c3127ffb443931e9bb1681c191dacca"
 
 		SRC_URI="
 			https://github.com/openscad/openscad/archive/${COMMIT}.tar.gz
@@ -46,18 +52,22 @@ fi
 LICENSE="GPL-3+ LGPL-2.1"
 SLOT="0"
 
-IUSE="+cgal dbus +egl experimental glx +gui hidapi +manifold mimalloc pdf spacenav test"
+IUSE="+cgal dbus +egl experimental glx +gui hidapi +manifold mimalloc pdf +python spacenav test"
 RESTRICT="!test? ( test )"
+	# ?? ( glad glew )
+	# || ( cgal manifold )
 REQUIRED_USE="
-	|| ( cgal manifold )
+	|| ( egl glx )
 	dbus? ( gui )
 	hidapi? ( gui )
-	spacenav? ( gui )
-	|| ( egl glx )
 	manifold? ( cgal )
+	python? ( ${PYTHON_REQUIRED_USE} )
+	spacenav? ( gui )
+	test? ( pdf )
 "
 
 RDEPEND="
+	dev-cpp/eigen:=
 	dev-libs/boost:=
 	dev-libs/double-conversion:=
 	dev-libs/glib:2
@@ -86,15 +96,21 @@ RDEPEND="
 	hidapi? ( dev-libs/hidapi )
 	manifold? (
 		dev-cpp/tbb:=
-		>=sci-mathematics/manifold-3.0.2_pre20250330:=
+		>=sci-mathematics/manifold-3.0.2_pre20250330:=[tbb]
 	)
 	mimalloc? ( dev-libs/mimalloc:= )
 	pdf? ( x11-libs/cairo )
+	python? (
+		${PYTHON_DEPS}
+		dev-libs/nettle:=
+	)
 	spacenav? ( dev-libs/libspnav )
 "
 DEPEND="
 	${RDEPEND}
-	dev-cpp/eigen:3=
+	test? (
+		>=dev-cpp/catch-3
+	)
 "
 BDEPEND="
 	app-alternatives/yacc
@@ -103,12 +119,19 @@ BDEPEND="
 	sys-devel/gettext
 	virtual/pkgconfig
 	test? (
-		$(python_gen_any_dep '
+		$(python_gen_cond_dep '
 			dev-python/numpy[${PYTHON_USEDEP}]
 			dev-python/pillow[${PYTHON_USEDEP}]
 			dev-python/pip[${PYTHON_USEDEP}]
 		')
 		gui-wm/tinywl
+		python? (
+			${PYTHON_DEPS}
+			dev-python/pillow[zlib]
+		)
+		!python? (
+			media-gfx/imagemagick
+		)
 	)
 "
 
@@ -130,7 +153,9 @@ python_check_deps() {
 }
 
 pkg_setup() {
-	use test && python-any-r1_pkg_setup
+	if use python || use test ; then
+		python-single-r1_pkg_setup
+	fi
 }
 
 src_prepare() {
@@ -153,23 +178,35 @@ src_configure() {
 	filter-lto
 
 	local mycmakeargs=(
+		-DINFO="yes"
+		-DUSE_MANIFOLD_TRIANGULATOR="$(usex manifold)"
+		-DUSE_MANIFOLD_MINKOWSKI="$(usex manifold "no")" # experimental
+		-DBUILD_SHARED_LIBS="yes"
+
 		-DCLANG_TIDY="no"
 		-DENABLE_CAIRO="$(usex pdf)"
 		-DENABLE_CGAL="$(usex cgal)"
 		-DENABLE_EGL="$(usex egl)"
+		-DENABLE_GAMEPAD="no"
 		-DENABLE_GLX="$(usex glx)"
 		-DENABLE_MANIFOLD="$(usex manifold)"
-		-DENABLE_PYTHON="no"
+		-DENABLE_PYTHON="$(usex python)"
 		-DENABLE_TESTS="$(usex test)"
 
 		-DEXPERIMENTAL="$(usex experimental)"
 
-		-DHEADLESS="$(usex !gui)"
 		-DUSE_BUILTIN_CLIPPER2="no"
 		-DUSE_BUILTIN_MANIFOLD="no"
+		-DUSE_BUILTIN_OPENCSG="no"
+
 		-DUSE_CCACHE="no"
-		-DUSE_GLAD="yes"
+
+		# For now, we'll default to whatever OpenCSG uses (>=1.6 -> GLAD, <1.6 -> GLEW)
+		-DUSE_GLAD="$(usex gui)"
 		-DUSE_GLEW="no"
+		-DHEADLESS="$(usex !gui)"
+		-DNULLGL="$(usex !gui)"
+
 		-DUSE_MIMALLOC="$(usex mimalloc)"
 		-DUSE_QT6="$(usex gui)"
 		-DOFFLINE_DOCS="no" # TODO
@@ -179,8 +216,15 @@ src_configure() {
 	if use gui; then
 		mycmakeargs+=(
 			-DENABLE_HIDAPI="$(usex hidapi)"
+			-DENABLE_GUI_TESTS="$(usex gui)"
 			-DENABLE_QTDBUS="$(usex dbus)"
 			-DENABLE_SPNAV="$(usex spacenav)"
+		)
+	fi
+
+	if use test; then
+		mycmakeargs+=(
+			-DUSE_IMAGE_COMPARE_PY="$(usex python)"
 		)
 	fi
 
@@ -317,22 +361,21 @@ virtwl() {
 	read -r WAYLAND_DISPLAY <&"${VIRTWL[0]}"
 
 	debug-print "${FUNCNAME[0]}: $*"
-	nonfatal "$@"
-	local r=$?
+	nonfatal "${@}"
+	local r="${?}"
 
 	[[ -n $VIRTWL_PID ]] || die "tinywl exited unexpectedly"
 	exec {VIRTWL[0]}<&- {VIRTWL[1]}>&-
-	return "$r"
+
+	if [[ "${r}" -ne 0 ]]; then
+		die -n "${*} failed"
+	fi
+
+	return "${r}"
 }
 
 src_test() {
-	# xdg_environment_reset
-
 	hardware_add_gpu_sandbox
-
-	sed \
-		-e "s/OPENSCAD_BINARY/OPENSCADPATH/g" \
-		-i tests/test_cmdline_tool.py || die
 
 	cd "${BUILD_DIR}" || die
 
@@ -341,7 +384,17 @@ src_test() {
 	ln -s "${CMAKE_USE_DIR}/locale" . || die
 	ln -s "${CMAKE_USE_DIR}/shaders" . || die
 
+	if [[ ! -d tests/data/image ]]; then
+		ln -sr "${CMAKE_USE_DIR}/tests/data/image" tests/data/image || die
+	fi
+
 	local CMAKE_SKIP_TESTS=(
+		# just skip all issue tests all together
+		# "_issue[0-9]*$"
+
+		# fails
+		"_spec-paths-arcs01$"
+		"_issue6607$"
 	)
 
 	if ! has_version app-text/ghostscript-gpl ; then
@@ -352,7 +405,20 @@ src_test() {
 		)
 	fi
 
-	virtwl cmake_src_test -j1
+	# local myctestargs=(
+		# -j1
+	# )
+
+	if [[ ${PV} = *9999* ]] ; then
+		local -x GIT_DIR="${CMAKE_USE_DIR}/.git"
+	fi
+
+	if use egl; then
+		xdg_environment_reset
+		virtwl cmake_src_test
+	else
+		virtx cmake_src_test
+	fi
 }
 
 src_install() {
